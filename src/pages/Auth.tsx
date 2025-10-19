@@ -17,11 +17,12 @@ const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
-    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
@@ -33,7 +34,6 @@ const Auth = () => {
       }
     );
 
-    // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -56,6 +56,10 @@ const Auth = () => {
           email,
           password,
           options: {
+            data: {
+              full_name: fullName,
+              phone: phone,
+            },
             emailRedirectTo: `${window.location.origin}/dashboard`
           }
         });
@@ -72,6 +76,7 @@ const Auth = () => {
         if (error) throw error;
         
         toast.success("Login realizado com sucesso!");
+        navigate("/dashboard");
       }
     } catch (error: any) {
       toast.error(error.message || "Erro ao processar autenticação");
@@ -105,14 +110,42 @@ const Auth = () => {
         <Card className="shadow-xl border-2">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl font-bold text-center">
-              Entrar no Pedido 123
+              {isSignUp ? "Crie sua conta" : "Acesse sua conta"}
             </CardTitle>
             <CardDescription className="text-center">
-              Utilize uma das opções abaixo para criar sua conta ou fazer login
+              {isSignUp ? "Preencha os campos para começar" : "Utilize uma das opções para fazer login"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <form onSubmit={handleEmailAuth} className="space-y-4">
+              {isSignUp && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">Nome Completo</Label>
+                    <Input
+                      id="fullName"
+                      type="text"
+                      placeholder="Seu nome completo"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                      className="h-12"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Telefone</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="(99) 99999-9999"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required
+                      className="h-12"
+                    />
+                  </div>
+                </>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -143,16 +176,25 @@ const Auth = () => {
                 size="lg"
                 disabled={isLoading}
               >
-                {isLoading ? "Processando..." : isSignUp ? "Criar conta" : "Criar conta ou fazer login"}
+                {isLoading ? "Processando..." : isSignUp ? "Criar conta" : "Entrar"}
               </Button>
             </form>
+
+            <div className="text-center text-sm">
+              <span
+                className="cursor-pointer text-primary hover:underline"
+                onClick={() => setIsSignUp(!isSignUp)}
+              >
+                {isSignUp ? "Já tem uma conta? Faça login" : "Não tem uma conta? Crie uma agora"}
+              </span>
+            </div>
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <Separator />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">acesso rápido</span>
+                <span className="bg-card px-2 text-muted-foreground">ou</span>
               </div>
             </div>
 
