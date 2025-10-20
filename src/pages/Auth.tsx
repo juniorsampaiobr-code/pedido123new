@@ -52,7 +52,7 @@ const Auth = () => {
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -64,9 +64,16 @@ const Auth = () => {
         });
         
         if (error) throw error;
-        
-        toast.success("Conta criada com sucesso!");
-        // O redirecionamento será feito pelo onAuthStateChange
+
+        // Se a confirmação de email estiver desativada, o usuário já estará logado.
+        // O onAuthStateChange cuidará do redirecionamento.
+        if (data.session) {
+          toast.success("Conta criada e login efetuado com sucesso!");
+        } else {
+          // Fallback caso a confirmação ainda esteja ativa por algum motivo
+          toast.success("Conta criada! Verifique seu email para confirmar.");
+        }
+
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -76,10 +83,14 @@ const Auth = () => {
         if (error) throw error;
         
         toast.success("Login realizado com sucesso!");
-        navigate("/dashboard");
+        // O onAuthStateChange cuidará do redirecionamento.
       }
     } catch (error: any) {
-      toast.error(error.message || "Erro ao processar autenticação");
+      if (error.message.includes("Email not confirmed")) {
+        toast.error("Por favor, verifique seu e-mail para confirmar sua conta antes de fazer login.");
+      } else {
+        toast.error(error.message || "Erro ao processar autenticação");
+      }
     } finally {
       setIsLoading(false);
     }
