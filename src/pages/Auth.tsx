@@ -209,7 +209,7 @@ const Auth = () => {
               >
                 <Apple className="w-5 h-5" />
                 Entrar com Apple
-              </h-button>
+              </Button>
               <Button
                 variant="google"
                 className="w-full justify-start"
