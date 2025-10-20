@@ -60,13 +60,13 @@ const Auth = () => {
               full_name: fullName,
               phone: phone,
             },
-            emailRedirectTo: `${window.location.origin}/dashboard`
           }
         });
         
         if (error) throw error;
         
-        toast.success("Conta criada! Verifique seu email para confirmar.");
+        toast.success("Conta criada com sucesso!");
+        // O redirecionamento será feito pelo onAuthStateChange
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -209,7 +209,7 @@ const Auth = () => {
               >
                 <Apple className="w-5 h-5" />
                 Entrar com Apple
-              </Button>
+              </h-button>
               <Button
                 variant="google"
                 className="w-full justify-start"
