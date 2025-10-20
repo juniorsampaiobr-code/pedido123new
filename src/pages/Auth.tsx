@@ -180,13 +180,15 @@ const Auth = () => {
               </Button>
             </form>
 
-            <div className="text-center text-sm">
-              <span
-                className="cursor-pointer text-primary hover:underline"
+            <div className="text-center">
+              <Button
+                variant="link"
+                type="button"
+                className="p-0 h-auto"
                 onClick={() => setIsSignUp(!isSignUp)}
               >
                 {isSignUp ? "Já tem uma conta? Faça login" : "Não tem uma conta? Crie uma agora"}
-              </span>
+              </Button>
             </div>
 
             <div className="relative">
