@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import Hours from "./pages/Hours";
 import Cashier from "./pages/Cashier";
 import Payments from "./pages/Payments";
+import Delivery from "./pages/Delivery"; // Adicionando import de volta
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/hours" element={<Hours />} />
           <Route path="/cashier" element={<Cashier />} />
           <Route path="/payments" element={<Payments />} />
+          <Route path="/delivery" element={<Delivery />} /> {/* Adicionando rota de volta */}
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
