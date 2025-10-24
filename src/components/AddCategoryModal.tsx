@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
@@ -99,9 +100,12 @@ export const AddCategoryModal = ({ isOpen, onClose }: AddCategoryModalProps) => 
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Nova Categoria</DialogTitle>
+          <DialogDescription>
+            Gerencie as categorias dos seus produtos
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
             <FormField
               control={form.control}
               name="name"
@@ -109,7 +113,7 @@ export const AddCategoryModal = ({ isOpen, onClose }: AddCategoryModalProps) => 
                 <FormItem>
                   <FormLabel>Nome *</FormLabel>
                   <FormControl>
-                    <Input placeholder="Nome da categoria" {...field} />
+                    <Input placeholder="" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -122,7 +126,7 @@ export const AddCategoryModal = ({ isOpen, onClose }: AddCategoryModalProps) => 
                 <FormItem>
                   <FormLabel>Descrição</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Descrição da categoria" {...field} />
+                    <Textarea placeholder="" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -145,20 +149,26 @@ export const AddCategoryModal = ({ isOpen, onClose }: AddCategoryModalProps) => 
               control={form.control}
               name="is_active"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                  <FormLabel>Categoria Ativa</FormLabel>
+                <FormItem className="flex flex-row items-center space-x-3 space-y-0 pt-2">
                   <FormControl>
-                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      id="is_active"
+                    />
                   </FormControl>
+                  <FormLabel htmlFor="is_active" className="font-normal cursor-pointer">
+                    Ativa
+                  </FormLabel>
                 </FormItem>
               )}
             />
-            <DialogFooter>
+            <DialogFooter className="pt-4">
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancelar</Button>
               </DialogClose>
               <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? 'Criando...' : 'Criar Categoria'}
+                {mutation.isPending ? 'Criando...' : 'Criar'}
               </Button>
             </DialogFooter>
           </form>
