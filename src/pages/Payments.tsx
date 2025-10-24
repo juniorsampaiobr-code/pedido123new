@@ -9,12 +9,11 @@ import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from "sonner";
-import { CreditCard, Key, ExternalLink, DollarSign, Smartphone, Package, Store, Terminal } from 'lucide-react';
+import { CreditCard, Key, ExternalLink, DollarSign, Smartphone, Package, Store } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
-import { Tables, TablesUpdate, TablesInsert } from '@/integrations/supabase/types';
+import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import {
   Form,
   FormControl,
@@ -24,7 +23,6 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 
 type PaymentMethod = Tables<'payment_methods'>;
 type PaymentSettings = Tables<'payment_settings'>;
@@ -84,6 +82,17 @@ const DEFAULT_METHODS = [
   { name: 'Pagamento Online', description: 'Pagamento online via cartão de crédito ou PIX', icon: CreditCard },
   { name: 'Pagamento com cartão na entrega', description: 'Aceita pagamento com cartão de débito ou crédito na entrega', icon: Package },
 ];
+
+// Helper function to map icon name string back to Lucide component
+const getIconComponent = (iconName: string) => {
+  switch (iconName) {
+    case 'DollarSign': return DollarSign;
+    case 'Smartphone': return Smartphone;
+    case 'CreditCard': return CreditCard;
+    case 'Package': return Package;
+    default: return Store;
+  }
+};
 
 // --- Components ---
 
@@ -149,7 +158,7 @@ const Payments = () => {
   }, [navigate]);
 
   // 2. Busca do ID do Restaurante
-  const { data: fetchedRestaurantId } = useQuery({
+  useQuery({
     queryKey: ['restaurantId'],
     queryFn: fetchRestaurantId,
     enabled: !!user && !restaurantId,
@@ -172,12 +181,23 @@ const Payments = () => {
   // 4. Formulário de Credenciais (Mercado Pago)
   const credentialsForm = useForm<CredentialsFormValues>({
     resolver: zodResolver(credentialsSchema),
-    values: {
-      mercado_pago_public_key: settings?.mercado_pago_public_key || '',
-      mercado_pago_access_token: '', // Nunca preenchemos o token por segurança
+    defaultValues: {
+      mercado_pago_public_key: '',
+      mercado_pago_access_token: '',
     },
     mode: 'onBlur',
   });
+
+  // Sincroniza dados de settings com o formulário de credenciais
+  useEffect(() => {
+    if (settings) {
+      credentialsForm.reset({
+        mercado_pago_public_key: settings.mercado_pago_public_key || '',
+        mercado_pago_access_token: '', // Sempre limpa o token por segurança
+      });
+    }
+  }, [settings, credentialsForm]);
+
 
   const credentialsMutation = useMutation({
     mutationFn: async (data: CredentialsFormValues) => {
@@ -254,11 +274,19 @@ const Payments = () => {
 
   const methodsForm = useForm<MethodsFormValues>({
     resolver: zodResolver(methodsSchema),
-    values: {
-      methods: methods?.map(m => ({ id: m.id, is_active: m.is_active ?? true })) || [],
-    },
+    defaultValues: { methods: [] },
     mode: 'onBlur',
   });
+
+  // Sincroniza dados de methods com o formulário de métodos
+  useEffect(() => {
+    if (methods && methods.length > 0) {
+      methodsForm.reset({
+        methods: methods.map(m => ({ id: m.id, is_active: m.is_active ?? true })),
+      });
+    }
+  }, [methods, methodsForm]);
+
 
   const updateMethodsMutation = useMutation({
     mutationFn: async (data: MethodsFormValues) => {
@@ -338,7 +366,7 @@ const Payments = () => {
                 </p>
               </CardHeader>
               <CardContent>
-                {isDataLoading ? (
+                {isLoadingSettings ? (
                   <div className="space-y-4">
                     <Skeleton className="h-4 w-1/4" />
                     <Skeleton className="h-10 w-full" />
@@ -413,7 +441,7 @@ const Payments = () => {
                 </p>
               </CardHeader>
               <CardContent>
-                {isDataLoading ? (
+                {isLoadingMethods || ensureDefaultMethods.isPending ? (
                   <div className="space-y-4">
                     {[...Array(4)].map((_, i) => (
                       <div key={i} className="flex items-center justify-between py-4 border-b last:border-b-0">
@@ -433,13 +461,13 @@ const Payments = () => {
                   <Form {...methodsForm}>
                     <form onSubmit={methodsForm.handleSubmit(handleMethodsSubmit)} className="space-y-4">
                       {methodsForm.watch('methods').map((method, index) => {
-                        const defaultMethod = DEFAULT_METHODS.find(d => d.name === methods?.find(m => m.id === method.id)?.name);
-                        const Icon = defaultMethod?.icon || Store; // Fallback icon
+                        const dbMethod = methods?.find(m => m.id === method.id);
+                        const Icon = dbMethod?.icon ? getIconComponent(dbMethod.icon) : Store;
                         
                         return (
                           <PaymentMethodItem
                             key={method.id}
-                            method={methods!.find(m => m.id === method.id)!}
+                            method={dbMethod!}
                             index={index}
                             control={methodsForm.control}
                             icon={Icon}
