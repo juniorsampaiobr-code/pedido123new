@@ -11,9 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { toast } from "sonner";
-import { Settings as SettingsIcon, Store } from 'lucide-react';
+import { Store } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { TablesUpdate, Tables } from '@/integrations/supabase/types';
 import {
@@ -24,6 +23,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type Restaurant = Tables<'restaurants'>;
 type RestaurantUpdate = TablesUpdate<'restaurants'>;
@@ -71,7 +71,7 @@ const updateRestaurantData = async (data: RestaurantUpdate & { id: string }) => 
   if (error) throw new Error(error.message);
 };
 
-const Settings = () => {
+const MyStore = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
@@ -156,8 +156,8 @@ const Settings = () => {
         <header className="border-b bg-background sticky top-0 z-40">
           <div className="container max-w-none mx-auto px-8 h-16 flex justify-between items-center">
             <div className="flex items-center gap-4">
-              <SettingsIcon className="h-6 w-6" />
-              <h1 className="text-xl font-semibold">Configurações</h1>
+              <Store className="h-6 w-6" />
+              <h1 className="text-xl font-semibold">Minha Loja</h1>
             </div>
             <Button variant="outline" onClick={handleSignOut}>
               Sair
@@ -169,7 +169,6 @@ const Settings = () => {
           <Card className="max-w-3xl mx-auto">
             <CardHeader>
               <CardTitle className="text-2xl font-bold flex items-center gap-2">
-                <Store className="h-6 w-6 text-primary" />
                 Configurações do Restaurante
               </CardTitle>
             </CardHeader>
@@ -383,4 +382,4 @@ const Settings = () => {
   );
 };
 
-export default Settings;
+export default MyStore;
