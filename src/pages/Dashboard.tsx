@@ -1,36 +1,60 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { User, Session } from "@supabase/supabase-js";
+import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
-import { Logo } from "@/components/Logo";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { Sidebar } from "@/components/Sidebar";
+import {
+  ShoppingCart,
+  Package,
+  LineChart,
+  Users,
+  Copy,
+  ExternalLink,
+} from "lucide-react";
+
+const DashboardStatCard = ({ icon: Icon, title, value, description }: { icon: React.ElementType, title: string, value: string, description: string }) => (
+  <Card>
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      <Icon className="h-4 w-4 text-muted-foreground" />
+    </CardHeader>
+    <CardContent>
+      <div className="text-2xl font-bold">{value}</div>
+      <p className="text-xs text-muted-foreground">{description}</p>
+    </CardContent>
+  </Card>
+);
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        navigate("/auth");
+      } else {
+        setUser(session.user);
+      }
+    };
+
+    checkSession();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (!session?.user) {
+        if (event === 'SIGNED_OUT') {
+          navigate("/");
+        } else if (session?.user) {
+          setUser(session.user);
+        } else {
           navigate("/auth");
         }
       }
     );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (!session?.user) {
-        navigate("/auth");
-      }
-    });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
@@ -41,39 +65,122 @@ const Dashboard = () => {
       toast.error("Erro ao fazer logout");
     } else {
       toast.success("Logout realizado com sucesso!");
-      navigate("/");
     }
   };
 
+  const menuLink = `${window.location.origin}${window.location.pathname}#/menu`;
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(menuLink);
+    toast.success("Link copiado para a área de transferência!");
+  };
+
   if (!user) {
-    return null;
+    return <div className="flex h-screen items-center justify-center">Carregando...</div>;
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <Logo />
-          <Button variant="outline" onClick={handleSignOut}>
-            Sair
-          </Button>
-        </div>
-      </header>
-      
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-4">Dashboard</h1>
-          <div className="bg-card rounded-lg p-6 shadow-md border-2">
-            <h2 className="text-xl font-semibold mb-4">Bem-vindo ao Pedido 123!</h2>
-            <p className="text-muted-foreground mb-4">
-              Email: {user.email}
-            </p>
-            <p className="text-muted-foreground">
-              Seu painel de controle está em desenvolvimento. Em breve você poderá gerenciar seus pedidos, cardápios e muito mais!
-            </p>
+    <div className="flex min-h-screen bg-muted/40">
+      <Sidebar />
+      <div className="flex-1 flex flex-col">
+        <header className="border-b bg-background sticky top-0 z-40">
+          <div className="container max-w-none mx-auto px-8 h-16 flex justify-between items-center">
+            <div>
+              {/* Header content can go here if needed, or it can be removed for a cleaner look */}
+            </div>
+            <Button variant="outline" onClick={handleSignOut}>
+              Sair
+            </Button>
           </div>
-        </div>
-      </main>
+        </header>
+        
+        <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
+          <div className="mb-4">
+            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <p className="text-muted-foreground">Bem-vindo ao painel de controle do Pedido 123</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <DashboardStatCard
+              title="Pedidos Hoje"
+              value="0"
+              description="Nenhum pedido hoje"
+              icon={ShoppingCart}
+            />
+            <DashboardStatCard
+              title="Produtos"
+              value="2"
+              description="Total de produtos"
+              icon={Package}
+            />
+            <DashboardStatCard
+              title="Vendas do Mês"
+              value="R$ 291,00"
+              description="Receita mensal"
+              icon={LineChart}
+            />
+            <DashboardStatCard
+              title="Clientes"
+              value="1"
+              description="Total de clientes"
+              icon={Users}
+            />
+          </div>
+
+          <div className="grid gap-8 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Primeiros Passos</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold flex-shrink-0">1</div>
+                  <div>
+                    <h3 className="font-semibold">Configure sua loja</h3>
+                    <p className="text-sm text-muted-foreground">Adicione informações sobre seu restaurante ou estabelecimento</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold flex-shrink-0">2</div>
+                  <div>
+                    <h3 className="font-semibold">Cadastre seus produtos</h3>
+                    <p className="text-sm text-muted-foreground">Crie categorias e adicione os produtos do seu cardápio</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold flex-shrink-0">3</div>
+                  <div>
+                    <h3 className="font-semibold">Compartilhe seu link</h3>
+                    <p className="text-sm text-muted-foreground">Envie o link da sua loja para seus clientes começarem a fazer pedidos</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Compartilhe seu Link</CardTitle>
+                <p className="text-sm text-muted-foreground pt-1">Envie este link para seus clientes fazerem pedidos</p>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center space-x-2">
+                  <div className="flex-1 bg-muted rounded-md px-3 py-2 text-sm text-muted-foreground overflow-x-auto whitespace-nowrap">
+                    {menuLink}
+                  </div>
+                  <Button variant="outline" size="icon" onClick={copyLink}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <a href={menuLink} target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="icon">
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </a>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </div>
     </div>
   );
 };
