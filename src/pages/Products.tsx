@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { AddProductModal } from '@/components/AddProductModal';
+import { CategoryManager } from '@/components/CategoryManager';
 
 type Product = {
   id: string;
@@ -211,11 +212,7 @@ const Products = () => {
                 )}
               </TabsContent>
               <TabsContent value="categories">
-                <Card>
-                  <CardContent className="p-6">
-                    <p>Gerenciamento de categorias em breve.</p>
-                  </CardContent>
-                </Card>
+                <CategoryManager />
               </TabsContent>
             </Tabs>
           </main>
