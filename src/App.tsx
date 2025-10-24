@@ -9,7 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import Menu from "./pages/Menu";
 import Products from "./pages/Products";
 import Orders from "./pages/Orders";
-import MyStore from "./pages/MyStore";
+import Settings from "./pages/Settings";
 import Hours from "./pages/Hours";
 import Cashier from "./pages/Cashier";
 import Payments from "./pages/Payments";
@@ -31,7 +31,7 @@ const App = () => (
           <Route path="/menu" element={<Menu />} />
           <Route path="/products" element={<Products />} />
           <Route path="/orders" element={<Orders />} />
-          <Route path="/my-store" element={<MyStore />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="/hours" element={<Hours />} />
           <Route path="/cashier" element={<Cashier />} />
           <Route path="/payments" element={<Payments />} />
