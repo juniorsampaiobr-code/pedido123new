@@ -11,6 +11,7 @@ import Products from "./pages/Products";
 import Orders from "./pages/Orders";
 import MyStore from "./pages/MyStore";
 import Hours from "./pages/Hours";
+import Cashier from "./pages/Cashier";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
           <Route path="/orders" element={<Orders />} />
           <Route path="/my-store" element={<MyStore />} />
           <Route path="/hours" element={<Hours />} />
+          <Route path="/cashier" element={<Cashier />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
