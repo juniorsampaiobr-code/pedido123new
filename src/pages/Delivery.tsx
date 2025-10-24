@@ -17,6 +17,14 @@ import { User } from '@supabase/supabase-js';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from '@/components/ui/separator';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 
 type Restaurant = Tables<'restaurants'>;
 type DeliveryZone = Tables<'delivery_zones'>;
