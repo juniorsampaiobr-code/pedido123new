@@ -244,6 +244,7 @@ export type Database = {
           price: number
           restaurant_id: string
           updated_at: string | null
+          is_price_by_weight: boolean | null
         }
         Insert: {
           category_id?: string | null
@@ -257,6 +258,7 @@ export type Database = {
           price: number
           restaurant_id: string
           updated_at?: string | null
+          is_price_by_weight?: boolean | null
         }
         Update: {
           category_id?: string | null
@@ -270,6 +272,7 @@ export type Database = {
           price?: number
           restaurant_id?: string
           updated_at?: string | null
+          is_price_by_weight?: boolean | null
         }
         Relationships: [
           {
@@ -328,6 +331,11 @@ export type Database = {
           opening_hours: Json | null
           phone: string | null
           updated_at: string | null
+          street: string | null
+          number: string | null
+          neighborhood: string | null
+          city: string | null
+          zip_code: string | null
         }
         Insert: {
           address?: string | null
@@ -341,6 +349,11 @@ export type Database = {
           opening_hours?: Json | null
           phone?: string | null
           updated_at?: string | null
+          street?: string | null
+          number?: string | null
+          neighborhood?: string | null
+          city?: string | null
+          zip_code?: string | null
         }
         Update: {
           address?: string | null
@@ -354,6 +367,11 @@ export type Database = {
           opening_hours?: Json | null
           phone?: string | null
           updated_at?: string | null
+          street?: string | null
+          number?: string | null
+          neighborhood?: string | null
+          city?: string | null
+          zip_code?: string | null
         }
         Relationships: []
       }
@@ -377,6 +395,138 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      cash_register: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          closing_balance: number | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          opened_at: string
+          opened_by: string | null
+          opening_balance: number
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_balance?: number | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          opening_balance?: number
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_balance?: number | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string | null
+          opening_balance?: number
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_register_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_methods: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_hours: {
+        Row: {
+          close_time: string | null
+          created_at: string | null
+          day_of_week: number
+          id: string
+          is_open: boolean | null
+          open_time: string | null
+          restaurant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          close_time?: string | null
+          created_at?: string | null
+          day_of_week: number
+          id?: string
+          is_open?: boolean | null
+          open_time?: string | null
+          restaurant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          close_time?: string | null
+          created_at?: string | null
+          day_of_week?: number
+          id?: string
+          is_open?: boolean | null
+          open_time?: string | null
+          restaurant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_hours_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
