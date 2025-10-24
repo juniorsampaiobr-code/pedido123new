@@ -7,7 +7,6 @@ import {
   ShoppingCart,
   Wallet,
   Clock,
-  Truck,
   CreditCard,
   Settings,
 } from "lucide-react";
@@ -18,7 +17,6 @@ const navItems = [
   { href: "/orders", label: "Pedidos", icon: ShoppingCart },
   { href: "/cashier", label: "Caixa", icon: Wallet },
   { href: "/hours", label: "Horários", icon: Clock },
-  { href: "/delivery", label: "Taxa de Entrega", icon: Truck },
   { href: "/payments", label: "Pagamentos", icon: CreditCard },
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
