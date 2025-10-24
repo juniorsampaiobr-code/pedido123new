@@ -18,7 +18,7 @@ import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/type
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from '@/components/ui/separator';
 
-type Restaurant = Tables<'restaurants'> & { latitude: number | null, longitude: number | null };
+type Restaurant = Tables<'restaurants'>;
 type DeliveryZone = Tables<'delivery_zones'>;
 
 // --- Schemas ---
@@ -26,11 +26,11 @@ type DeliveryZone = Tables<'delivery_zones'>;
 const coordinateSchema = z.object({
   latitude: z.preprocess(
     (val) => String(val).replace(',', '.'),
-    z.coerce.number({ invalid_type_error: 'Latitude deve ser um número.' }).optional(),
+    z.coerce.number({ invalid_type_error: 'Latitude deve ser um número.' }).optional().nullable(),
   ),
   longitude: z.preprocess(
     (val) => String(val).replace(',', '.'),
-    z.coerce.number({ invalid_type_error: 'Longitude deve ser um número.' }).optional(),
+    z.coerce.number({ invalid_type_error: 'Longitude deve ser um número.' }).optional().nullable(),
   ),
 });
 
@@ -38,15 +38,12 @@ type CoordinateFormValues = z.infer<typeof coordinateSchema>;
 
 const zoneSchema = z.object({
   id: z.string().optional(),
-  name: z.string().optional(), // Name is optional for distance zones, but required for neighborhood zones (not implemented yet)
+  name: z.string().optional(),
   delivery_fee: z.preprocess(
     (val) => String(val).replace(',', '.'),
     z.coerce.number({ invalid_type_error: 'Taxa deve ser um número.' }).min(0, 'A taxa não pode ser negativa.')
   ),
-  minimum_order: z.preprocess(
-    (val) => String(val).replace(',', '.'),
-    z.coerce.number({ invalid_type_error: 'Pedido mínimo deve ser um número.' }).min(0, 'O pedido mínimo não pode ser negativo.')
-  ).optional().default(0),
+  // Usamos minimum_order para armazenar a distância máxima em km, conforme a implementação anterior
   max_distance_km: z.preprocess(
     (val) => String(val).replace(',', '.'),
     z.coerce.number({ invalid_type_error: 'Distância deve ser um número.' }).positive('A distância máxima deve ser maior que zero.')
@@ -78,7 +75,7 @@ const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]>
     .from('delivery_zones')
     .select('*')
     .eq('restaurant_id', restaurantId)
-    .order('delivery_fee', { ascending: true }); // Order by fee for display
+    .order('delivery_fee', { ascending: true });
 
   if (error) throw new Error(`Erro ao buscar zonas de entrega: ${error.message}`);
   return data;
@@ -112,7 +109,7 @@ const Delivery = () => {
   }, [navigate]);
 
   // 2. Busca de Dados do Restaurante (Coordenadas)
-  const { data: restaurantData, isLoading: isLoadingRestaurant, isError: isErrorRestaurant, error: errorRestaurant } = useQuery<Restaurant>({
+  const { data: restaurantData, isLoading: isLoadingRestaurant } = useQuery<Restaurant>({
     queryKey: ['restaurantCoordinates'],
     queryFn: fetchRestaurantData,
     enabled: !!user,
@@ -131,12 +128,23 @@ const Delivery = () => {
   // Coordenadas
   const coordForm = useForm<CoordinateFormValues>({
     resolver: zodResolver(coordinateSchema),
-    values: {
-      latitude: restaurantData?.latitude || undefined,
-      longitude: restaurantData?.longitude || undefined,
+    defaultValues: {
+      latitude: undefined,
+      longitude: undefined,
     },
     mode: 'onBlur',
   });
+
+  // Sincroniza dados do restaurante com o formulário de coordenadas
+  useEffect(() => {
+    if (restaurantData) {
+      coordForm.reset({
+        latitude: restaurantData.latitude ?? undefined,
+        longitude: restaurantData.longitude ?? undefined,
+      });
+    }
+  }, [restaurantData, coordForm]);
+
 
   const coordMutation = useMutation({
     mutationFn: async (data: CoordinateFormValues) => {
@@ -179,27 +187,19 @@ const Delivery = () => {
     name: "zones",
   });
 
-  // Sincroniza dados buscados com o formulário
+  // Sincroniza dados buscados com o formulário de zonas
   useEffect(() => {
     if (deliveryZones) {
       const formattedZones = deliveryZones.map(zone => ({
         id: zone.id,
         name: zone.name || '',
         delivery_fee: zone.delivery_fee,
-        minimum_order: zone.minimum_order || 0,
-        max_distance_km: zone.minimum_order || 1, // Assuming minimum_order is used as max_distance_km for now based on the image context, but we should use a proper column.
-        // NOTE: The current DB schema for delivery_zones only has 'name', 'delivery_fee', 'minimum_order'. 
-        // I will assume 'minimum_order' is being repurposed as 'max_distance_km' for this UI, 
-        // but ideally the DB should be updated. For now, I'll use a placeholder value for max_distance_km in the form.
-        // Since the image shows 'Distância Máxima (km)', I will use a temporary field in the form and update the DB schema later if needed.
-        // For now, let's assume we are managing distance-based zones and use the 'name' field for distance description if necessary, but focus on the fee/min_order.
-        // Given the image, I will add a temporary field 'max_distance_km' to the form and rely on the user to input it correctly.
-        // Since the DB schema doesn't have max_distance_km, I will use the 'minimum_order' column to store the distance for now, as it's a numeric field.
+        // Usamos minimum_order para armazenar a distância máxima em km
         max_distance_km: zone.minimum_order || 1, 
       }));
       zonesForm.reset({ zones: formattedZones });
     }
-  }, [deliveryZones, zonesForm.reset]);
+  }, [deliveryZones, zonesForm]);
 
   const zonesMutation = useMutation({
     mutationFn: async (data: ZonesFormValues) => {
@@ -282,7 +282,7 @@ const Delivery = () => {
                 </p>
               </CardHeader>
               <CardContent>
-                {isDataLoading ? (
+                {isLoadingRestaurant ? (
                   <div className="grid grid-cols-2 gap-4">
                     <Skeleton className="h-10 w-full" />
                     <Skeleton className="h-10 w-full" />
@@ -353,12 +353,18 @@ const Delivery = () => {
                 </p>
               </CardHeader>
               <CardContent>
-                {isDataLoading ? (
+                {isLoadingZones ? (
                   <div className="space-y-4">
                     <Skeleton className="h-10 w-full" />
                     <Skeleton className="h-10 w-full" />
                     <Skeleton className="h-12 w-full mt-4" />
                   </div>
+                ) : isErrorZones ? (
+                  <Alert variant="destructive">
+                    <Terminal className="h-4 w-4" />
+                    <AlertTitle>Erro ao carregar zonas de entrega</AlertTitle>
+                    <AlertDescription>{errorZones instanceof Error ? errorZones.message : "Ocorreu um erro desconhecido."}</AlertDescription>
+                  </Alert>
                 ) : (
                   <Form {...zonesForm}>
                     <form onSubmit={zonesForm.handleSubmit(handleZonesSubmit)} className="space-y-6">
