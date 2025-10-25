@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +14,7 @@ import { Tables, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { OrderDetailsModal } from "@/components/OrderDetailsModal";
 import { toast } from "sonner";
+import { useSound } from "@/layouts/DashboardLayout";
 
 type Order = Tables<'orders'> & { customer: Tables<'customers'> | null };
 
@@ -67,11 +68,27 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline }: { order: Order
 
 const OrdersList = ({ status, onViewDetails, restaurantId }: { status: Enums<'order_status'> | 'all', onViewDetails: (order: Order) => void, restaurantId: string }) => {
   const queryClient = useQueryClient();
+  const { playSound, soundStatus } = useSound();
+  const prevOrderCount = useRef<number>();
+
   const { data: orders, isLoading, isError, error, refetch } = useQuery<Order[]>({
     queryKey: ['orders', status, restaurantId],
     queryFn: () => fetchOrders(restaurantId, status),
     enabled: !!restaurantId,
   });
+
+  useEffect(() => {
+    if (status !== 'pending' || !orders) return;
+    const currentCount = orders.length;
+    if (prevOrderCount.current === undefined) {
+      prevOrderCount.current = currentCount;
+      return;
+    }
+    if (currentCount > prevOrderCount.current && soundStatus === 'enabled') {
+      playSound();
+    }
+    prevOrderCount.current = currentCount;
+  }, [orders, status, playSound, soundStatus]);
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: Enums<'order_status'> }) => {
