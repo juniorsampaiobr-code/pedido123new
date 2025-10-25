@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShoppingCart, Terminal, RefreshCw, Clock, CheckCircle, XCircle, Truck, Package, Utensils, Check, X } from 'lucide-react';
+import { ShoppingCart, Terminal, RefreshCw, Clock, CheckCircle, XCircle, Truck, Package, Utensils, Check, X, Volume2, VolumeX, AlertCircle } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
@@ -105,8 +105,7 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
-  const toastIdRef = useRef<string | number | undefined>(undefined);
+  const [soundStatus, setSoundStatus] = useState<'disabled' | 'enabled' | 'error'>('disabled');
 
   const { data: restaurant } = useQuery<Restaurant>({
     queryKey: ['restaurantForOrders'],
@@ -131,35 +130,8 @@ const Orders = () => {
   }, [navigate]);
 
   useEffect(() => {
-    if (restaurant?.notification_sound_url) {
-      audioRef.current = new Audio(restaurant.notification_sound_url);
-      audioRef.current.load();
-    }
-
-    const unlockAudio = () => {
-      if (audioRef.current && !isAudioUnlocked) {
-        audioRef.current.play().then(() => {
-          audioRef.current?.pause();
-          if(audioRef.current) audioRef.current.currentTime = 0;
-          setIsAudioUnlocked(true);
-          if (toastIdRef.current) toast.dismiss(toastIdRef.current);
-          window.removeEventListener('click', unlockAudio);
-        }).catch(() => {});
-      }
-    };
-
-    const timer = setTimeout(() => {
-      if (!isAudioUnlocked && restaurant?.notification_sound_url) {
-        toastIdRef.current = toast("Ativar som?", {
-          description: "Clique no botão para habilitar as notificações sonoras.",
-          action: { label: "Ativar Som", onClick: () => { unlockAudio(); toast.success("Notificações sonoras ativadas!"); } },
-          duration: Infinity,
-        });
-      }
-    }, 3000);
-
     const channel = supabase.channel('new-orders').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-      if (isAudioUnlocked && audioRef.current) {
+      if (soundStatus === 'enabled' && audioRef.current) {
         audioRef.current.play().catch(error => console.error("Erro ao tocar áudio:", error));
       }
       toast.info("🔔 Novo pedido recebido!", { description: "Um novo pedido está aguardando sua confirmação.", duration: 10000 });
@@ -168,11 +140,43 @@ const Orders = () => {
 
     return () => {
       supabase.removeChannel(channel);
-      window.removeEventListener('click', unlockAudio);
-      clearTimeout(timer);
-      if (toastIdRef.current) toast.dismiss(toastIdRef.current);
     };
-  }, [queryClient, isAudioUnlocked, restaurant]);
+  }, [queryClient, soundStatus]);
+
+  const handleToggleSound = async () => {
+    if (!restaurant?.notification_sound_url) {
+      toast.error("Nenhum som de notificação configurado.", { description: "Por favor, envie um arquivo MP3 na página de Configurações." });
+      setSoundStatus('error');
+      return;
+    }
+
+    if (!audioRef.current) {
+      audioRef.current = new Audio(restaurant.notification_sound_url);
+    }
+
+    try {
+      await audioRef.current.play();
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setSoundStatus(prev => prev === 'enabled' ? 'disabled' : 'enabled');
+      toast.success(`Notificações sonoras ${soundStatus === 'enabled' ? 'desativadas' : 'ativadas'}.`);
+    } catch (err) {
+      console.error("Erro ao tentar tocar o áudio:", err);
+      toast.error("Erro ao ativar o som.", { description: "Seu navegador pode estar bloqueando a reprodução automática. Tente interagir com a página e clicar novamente." });
+      setSoundStatus('error');
+    }
+  };
+
+  const handleTestSound = () => {
+    if (soundStatus === 'enabled' && audioRef.current) {
+      audioRef.current.play().catch(err => {
+        toast.error("Não foi possível tocar o som de teste.");
+        console.error(err);
+      });
+    } else {
+      toast.info("O som está desativado.", { description: "Clique no ícone de som para ativar as notificações." });
+    }
+  };
 
   const handleViewDetails = (order: Order) => { setSelectedOrder(order); setIsModalOpen(true); };
   const handleCloseModal = () => { setIsModalOpen(false); setSelectedOrder(null); };
@@ -195,7 +199,15 @@ const Orders = () => {
           <header className="border-b bg-background sticky top-0 z-40">
             <div className="container max-w-none mx-auto px-8 h-16 flex justify-between items-center">
               <div className="flex items-center gap-4"><ShoppingCart className="h-6 w-6" /><h1 className="text-xl font-semibold">Pedidos</h1></div>
-              <Button variant="outline" onClick={handleSignOut}>Sair</Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleTestSound} disabled={soundStatus !== 'enabled'}>Testar Som</Button>
+                <Button variant="outline" size="icon" onClick={handleToggleSound}>
+                  {soundStatus === 'enabled' && <Volume2 className="h-4 w-4 text-green-500" />}
+                  {soundStatus === 'disabled' && <VolumeX className="h-4 w-4" />}
+                  {soundStatus === 'error' && <AlertCircle className="h-4 w-4 text-destructive" />}
+                </Button>
+                <Button variant="outline" onClick={handleSignOut}>Sair</Button>
+              </div>
             </div>
           </header>
           <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
