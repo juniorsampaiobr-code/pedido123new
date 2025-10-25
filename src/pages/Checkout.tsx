@@ -75,19 +75,20 @@ const checkoutSchema = z.object({
 }).superRefine((data, ctx) => {
   // Delivery address validation
   if (data.delivery_option === 'delivery') {
-    if (!data.street || !data.number || !data.neighborhood || !data.city || !data.zip_code) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Todos os campos de endereço são obrigatórios para entrega.',
-        path: ['street'],
-      });
+    if (!data.street || data.street.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Rua é obrigatória.', path: ['street'] });
     }
-    if (data.zip_code && data.zip_code.length !== 8) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'CEP deve ter 8 dígitos.',
-        path: ['zip_code'],
-      });
+    if (!data.number || data.number.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Número é obrigatório.', path: ['number'] });
+    }
+    if (!data.neighborhood || data.neighborhood.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Bairro é obrigatório.', path: ['neighborhood'] });
+    }
+    if (!data.city || data.city.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Cidade é obrigatória.', path: ['city'] });
+    }
+    if (!data.zip_code || data.zip_code.length !== 8) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CEP é obrigatório e deve ter 8 dígitos.', path: ['zip_code'] });
     }
   }
 });
