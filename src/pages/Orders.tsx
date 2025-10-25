@@ -117,6 +117,7 @@ const Orders = () => {
     enabled: !!user,
   });
 
+  // Effect to setup user session
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -129,6 +130,25 @@ const Orders = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  // Effect to setup the Audio object
+  useEffect(() => {
+    if (restaurant?.notification_sound_url) {
+      const audio = new Audio(restaurant.notification_sound_url);
+      audio.onerror = () => {
+        toast.error("Erro ao carregar o som de notificação.", { description: "Verifique o arquivo em Configurações." });
+        setSoundStatus('error');
+      };
+      audioRef.current = audio;
+    }
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [restaurant?.notification_sound_url]);
+
+  // Effect to setup Supabase real-time channel
   useEffect(() => {
     const channel = supabase.channel('new-orders').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -148,25 +168,27 @@ const Orders = () => {
   }, [queryClient, soundStatus]);
 
   const handleToggleSound = async () => {
-    if (!restaurant?.notification_sound_url) {
-      toast.error("Nenhum som de notificação configurado.", { description: "Por favor, envie um arquivo MP3 na página de Configurações." });
-      setSoundStatus('error');
+    if (soundStatus === 'enabled') {
+      setSoundStatus('disabled');
+      toast.info('Notificações sonoras desativadas.');
       return;
     }
 
     if (!audioRef.current) {
-      audioRef.current = new Audio(restaurant.notification_sound_url);
+      toast.error("Som de notificação não está pronto ou configurado.");
+      setSoundStatus('error');
+      return;
     }
 
     try {
       await audioRef.current.play();
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
-      setSoundStatus(prev => prev === 'enabled' ? 'disabled' : 'enabled');
-      toast.success(`Notificações sonoras ${soundStatus === 'enabled' ? 'desativadas' : 'ativadas'}.`);
+      setSoundStatus('enabled');
+      toast.success('Notificações sonoras ativadas!');
     } catch (err) {
-      console.error("Erro ao tentar tocar o áudio:", err);
-      toast.error("Erro ao ativar o som.", { description: "Seu navegador pode estar bloqueando a reprodução automática. Tente interagir com a página e clicar novamente." });
+      console.error("Audio activation failed:", err);
+      toast.error("Falha ao ativar o som.", { description: "Seu navegador pode ter bloqueado. Clique na página e tente novamente." });
       setSoundStatus('error');
     }
   };
