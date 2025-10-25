@@ -27,7 +27,8 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { PhoneInput } from '@/components/PhoneInput'; // Importando o novo componente
+import { PhoneInput } from '@/components/PhoneInput';
+import { ZipCodeInput } from '@/components/ZipCodeInput'; // Importando o novo componente
 
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
@@ -35,6 +36,8 @@ type DeliveryZone = Tables<'delivery_zones'>;
 
 // Helper function to clean phone number
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
+// Helper function to clean zip code
+const cleanZipCode = (zipCode: string) => zipCode.replace(/\D/g, '');
 
 // --- Schemas ---
 
@@ -56,7 +59,9 @@ const checkoutSchema = z.object({
   number: z.string().optional(),
   neighborhood: z.string().optional(),
   city: z.string().optional(),
-  zip_code: z.string().optional(),
+  zip_code: z.string().optional().transform(cleanZipCode).refine(val => val.length === 8 || val.length === 0, {
+    message: 'CEP inválido. Deve conter 8 dígitos.',
+  }),
   
   // Payment
   payment_method_id: z.string().min(1, 'Selecione uma forma de pagamento.'),
@@ -75,6 +80,13 @@ const checkoutSchema = z.object({
         code: z.ZodIssueCode.custom,
         message: 'Todos os campos de endereço são obrigatórios para entrega.',
         path: ['street'],
+      });
+    }
+    if (data.zip_code && data.zip_code.length !== 8) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'CEP deve ter 8 dígitos.',
+        path: ['zip_code'],
       });
     }
   }
@@ -555,7 +567,7 @@ const Checkout = () => {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>CEP</FormLabel>
-                              <Input {...field} />
+                              <ZipCodeInput {...field} />
                               <FormMessage />
                             </FormItem>
                           )}
