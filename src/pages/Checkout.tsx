@@ -32,12 +32,17 @@ type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
 type DeliveryZone = Tables<'delivery_zones'>;
 
+// Helper function to clean phone number
+const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
+
 // --- Schemas ---
 
 const checkoutSchema = z.object({
   // Customer Details
   name: z.string().min(1, 'Nome é obrigatório.'),
-  phone: z.string().min(10, 'Telefone é obrigatório.'),
+  phone: z.string().min(1, 'Telefone é obrigatório.').transform(cleanPhoneNumber).refine(val => val.length >= 10, {
+    message: 'O telefone deve ter pelo menos 10 dígitos (incluindo DDD).',
+  }),
   email: z.string().email('Email inválido.').optional().or(z.literal('')),
   
   // Delivery/Pickup
@@ -114,6 +119,17 @@ const fetchInitialData = async () => {
     paymentMethods: methodsResult.data as PaymentMethod[],
     deliveryZones: zonesResult.data as DeliveryZone[],
   };
+};
+
+// Helper function to map icon name string back to Lucide component
+const getIconComponent = (iconName: string) => {
+  switch (iconName) {
+    case 'DollarSign': return DollarSign;
+    case 'Smartphone': return Smartphone;
+    case 'CreditCard': return CreditCard;
+    case 'Package': return Package;
+    default: return Store;
+  }
 };
 
 // --- Components ---
@@ -246,10 +262,12 @@ const Checkout = () => {
 
       // 1. Find or Create Customer
       let customerId: string;
+      const cleanedPhone = cleanPhoneNumber(formData.phone);
+      
       const { data: existingCustomer } = await supabase
         .from('customers')
         .select('id')
-        .eq('phone', formData.phone)
+        .eq('phone', cleanedPhone)
         .limit(1)
         .single();
 
@@ -258,7 +276,7 @@ const Checkout = () => {
       } else {
         const customerInsert: TablesInsert<'customers'> = {
           name: formData.name,
-          phone: formData.phone,
+          phone: cleanedPhone, // Save cleaned phone number
           email: formData.email || null,
           address: formData.delivery_option === 'delivery' 
             ? `${formData.street}, ${formData.number}, ${formData.neighborhood}, ${formData.city} - ${formData.zip_code}`
@@ -573,12 +591,7 @@ const Checkout = () => {
                               className="flex flex-col space-y-2"
                             >
                               {paymentMethods.map(method => {
-                                const Icon = method.icon ? (
-                                  method.icon === 'DollarSign' ? DollarSign : 
-                                  method.icon === 'Smartphone' ? Smartphone : 
-                                  method.icon === 'CreditCard' ? CreditCard : 
-                                  method.icon === 'Package' ? Package : Store
-                                ) : Store;
+                                const Icon = getIconComponent(method.icon || 'Store');
 
                                 return (
                                   <FormItem 
