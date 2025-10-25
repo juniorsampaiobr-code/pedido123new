@@ -185,13 +185,10 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isAudioUnlocked, setIsAudioUnlocked] = useState(false);
+  const toastIdRef = useRef<string | number | undefined>(undefined);
 
-  // Preload the audio on component mount
-  useEffect(() => {
-    audioRef.current = new Audio('/notification.mp3');
-    audioRef.current.load();
-  }, []);
-
+  // Effect for user session
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -210,43 +207,66 @@ const Orders = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Real-time subscription for new orders
+  // Effect for audio setup and real-time subscription
   useEffect(() => {
+    audioRef.current = new Audio('/notification.mp3');
+    audioRef.current.load();
+
+    const unlockAudio = () => {
+      if (audioRef.current && !isAudioUnlocked) {
+        audioRef.current.play().then(() => {
+          audioRef.current?.pause();
+          if(audioRef.current) audioRef.current.currentTime = 0;
+          setIsAudioUnlocked(true);
+          if (toastIdRef.current) toast.dismiss(toastIdRef.current);
+          window.removeEventListener('click', unlockAudio);
+        }).catch(() => {});
+      }
+    };
+
+    window.addEventListener('click', unlockAudio, { once: true });
+
+    const timer = setTimeout(() => {
+      if (!isAudioUnlocked) {
+        toastIdRef.current = toast("Ativar som?", {
+          description: "Clique no botão para habilitar as notificações sonoras.",
+          action: {
+            label: "Ativar Som",
+            onClick: () => {
+              unlockAudio();
+              toast.success("Notificações sonoras ativadas!");
+            },
+          },
+          duration: Infinity,
+        });
+      }
+    }, 3000);
+
     const channel = supabase.channel('new-orders')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'orders' },
         (payload) => {
-          console.log('Novo pedido recebido!', payload);
-          
-          // Play notification sound
-          if (audioRef.current) {
-            audioRef.current.play().catch(error => {
-              console.error("Erro ao tocar áudio:", error);
-              toast.warning("Clique na página para ativar as notificações sonoras.", {
-                description: "Os navegadores bloqueiam o som automático até que você interaja com o site.",
-              });
-            });
+          if (isAudioUnlocked && audioRef.current) {
+            audioRef.current.play().catch(error => console.error("Erro ao tocar áudio:", error));
           }
-
-          // Show toast notification
           toast.info("🔔 Novo pedido recebido!", {
             description: "Um novo pedido está aguardando sua confirmação.",
             duration: 10000,
           });
-
-          // Refetch orders to update the UI
           queryClient.invalidateQueries({ queryKey: ['orders', 'pending'] });
           queryClient.invalidateQueries({ queryKey: ['orders', 'all'] });
         }
       )
       .subscribe();
 
-    // Cleanup subscription on component unmount
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('click', unlockAudio);
+      clearTimeout(timer);
+      if (toastIdRef.current) toast.dismiss(toastIdRef.current);
     };
-  }, [queryClient]);
+  }, [queryClient, isAudioUnlocked]);
 
   const handleViewDetails = (order: Order) => {
     setSelectedOrder(order);
@@ -299,7 +319,7 @@ const Orders = () => {
             <Tabs defaultValue="pending" onValueChange={(value) => {}}>
               <TabsList className="w-full overflow-x-auto justify-start">
                 {statusTabs.map(tab => (
-                  <TabsTrigger key={tab.value} value={tab.value} className="whitespace-nowrap">
+                  <TabsTrigger key={tab.value} value={tab.value} className="whitespace-rap">
                     {tab.label}
                   </TabsTrigger>
                 ))}
