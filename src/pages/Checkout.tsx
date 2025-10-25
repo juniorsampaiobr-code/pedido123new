@@ -222,28 +222,19 @@ const Checkout = () => {
   const cart = useCart();
   const { items, subtotal, deliveryFee, total, setDeliveryFee, clearCart } = cart;
 
-  // Verifica se o carrinho está vazio e redireciona imediatamente
-  if (items.length === 0) {
-    // Usamos setTimeout para garantir que o toast seja exibido antes do redirecionamento
-    setTimeout(() => {
-      toast.info('Seu carrinho está vazio. Adicione itens para continuar.');
-      navigate('/menu');
-    }, 0);
-    return <div className="flex h-screen items-center justify-center">Redirecionando para o cardápio...</div>;
-  }
-
-  // Fetch initial data (Restaurant, Methods, Zones)
+  // Fetch initial data (Restaurant, Methods, Zones) - HOOK 1
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['checkoutInitialData'],
     queryFn: fetchInitialData,
-    enabled: items.length > 0,
+    // Only enable if items are present, but call the hook unconditionally
+    enabled: items.length > 0, 
   });
 
   const restaurantId = data?.restaurant?.id;
   const paymentMethods = data?.paymentMethods || [];
   const deliveryZones = data?.deliveryZones || [];
 
-  // --- Form Setup ---
+  // --- Form Setup - HOOK 2
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
@@ -258,8 +249,8 @@ const Checkout = () => {
       zip_code: '',
       payment_method_id: '',
       notes: '',
-      card_number: '', // Novo campo
-      cpf_cnpj: '',    // Novo campo
+      card_number: '', 
+      cpf_cnpj: '',    
       change_for: null,
     },
     mode: 'onBlur',
@@ -270,21 +261,18 @@ const Checkout = () => {
   const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
   
   const isCashPayment = selectedPaymentMethod?.name === 'Dinheiro';
-  const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online'; // Verifica se é Pagamento Online
+  const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online'; 
 
-  // Pre-select first payment method if available
+  // Pre-select first payment method if available - HOOK 3 (useEffect)
   useEffect(() => {
     if (paymentMethods.length > 0 && !selectedPaymentMethodId) {
       form.setValue('payment_method_id', paymentMethods[0].id);
     }
   }, [paymentMethods, selectedPaymentMethodId, form]);
 
-  // --- Delivery Fee Calculation (Mock based on fixed fee for now) ---
+  // Delivery Fee Calculation - HOOK 4 (useEffect)
   useEffect(() => {
-    // NOTE: For a real app, this would involve geolocation/distance calculation.
-    // Since we don't have that, we'll use a fixed fee or the lowest zone fee if delivery is selected.
     if (deliveryOption === 'delivery') {
-      // Use the lowest delivery fee from the zones as a placeholder
       const lowestFee = deliveryZones.length > 0 ? deliveryZones[0].delivery_fee : 5.00;
       setDeliveryFee(lowestFee);
     } else {
@@ -292,7 +280,7 @@ const Checkout = () => {
     }
   }, [deliveryOption, deliveryZones, setDeliveryFee]);
 
-  // --- Order Submission Mutation ---
+  // Order Submission Mutation - HOOK 5
   const orderMutation = useMutation({
     mutationFn: async (formData: CheckoutFormValues) => {
       if (!restaurantId) throw new Error('Dados do restaurante indisponíveis.');
@@ -313,7 +301,7 @@ const Checkout = () => {
       } else {
         const customerInsert: TablesInsert<'customers'> = {
           name: formData.name,
-          phone: cleanedPhone, // Save cleaned phone number
+          phone: cleanedPhone, 
           email: formData.email || null,
           address: formData.delivery_option === 'delivery' 
             ? `${formData.street}, ${formData.number}, ${formData.neighborhood}, ${formData.city} - ${formData.zip_code}`
@@ -367,18 +355,12 @@ const Checkout = () => {
 
       if (itemsError) throw new Error(`Erro ao adicionar itens do pedido: ${itemsError.message}`);
       
-      // NOTE: Card details (card_number, cpf_cnpj) are not saved to the DB for security reasons.
-      // In a real app, this is where the payment gateway API call would happen.
-      
       return orderId;
     },
     onSuccess: (orderId) => {
-      // 1. Limpa o carrinho
-      clearCart();
       toast.success(`Pedido #${orderId.slice(-4)} realizado com sucesso!`);
+      clearCart();
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      
-      // 2. Redireciona para a tela de sucesso
       navigate(`/order-success/${orderId}`); 
     },
     onError: (err) => {
@@ -391,13 +373,26 @@ const Checkout = () => {
   };
   
   const onValidationFail = (errors: any) => {
-    // Melhorando o log de erros para debug
     if (Object.keys(errors).length > 0) {
       toast.error('Por favor, preencha todos os campos obrigatórios e corrija os erros.');
       console.error("Validation Errors:", JSON.stringify(errors, null, 2));
     }
   };
 
+  // --- Conditional Rendering (After all hooks are called) ---
+
+  // Check 1: Cart is empty (This is the safe place for the early return)
+  if (items.length === 0) {
+    // We navigate here, but return null/loading to prevent the component from rendering the form
+    // while the navigation takes effect.
+    setTimeout(() => {
+      toast.info('Seu carrinho está vazio. Adicione itens para continuar.');
+      navigate('/menu');
+    }, 0);
+    return <div className="flex h-screen items-center justify-center">Redirecionando para o cardápio...</div>;
+  }
+
+  // Check 2: Initial data loading
   if (isLoading) {
     return (
       <div className="container mx-auto p-4 max-w-6xl">
@@ -413,6 +408,7 @@ const Checkout = () => {
     );
   }
 
+  // Check 3: Data error
   if (isError) {
     return (
       <div className="container mx-auto p-4 max-w-6xl">
