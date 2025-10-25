@@ -104,19 +104,6 @@ const checkoutSchema = z.object({
     }
   }
   
-  // Conditional validation for Online Payment fields
-  // NOTE: We cannot reliably check the payment method name here without fetching data inside superRefine, 
-  // which is complex. We rely on the client-side component logic to determine if it's online payment.
-  // For now, we assume if the user selected a method, the fields are visible and should be validated.
-  // Since we don't have the payment method data available directly in the schema refinement, 
-  // we will rely on the component logic to handle visibility and assume the fields are optional 
-  // unless the component logic makes them required.
-  
-  // **Temporary fix: Assuming 'Pagamento Online' is the method that requires these fields.**
-  // Since we don't have the method name here, we skip mandatory validation for card_number and cpf_cnpj 
-  // in the Zod schema itself, relying on the component to handle required state if needed.
-  // The previous issue was likely due to `undefined` values, which we fixed by adding `.default('')`.
-  
   // Let's ensure the CPF/CNPJ validation is strict if a value is provided, even if optional.
   if (data.cpf_cnpj.length > 0 && data.cpf_cnpj.length !== 11 && data.cpf_cnpj.length !== 14) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CPF deve ter 11 dígitos ou CNPJ 14 dígitos.', path: ['cpf_cnpj'] });
@@ -235,13 +222,15 @@ const Checkout = () => {
   const cart = useCart();
   const { items, subtotal, deliveryFee, total, setDeliveryFee, clearCart } = cart;
 
-  // Redirect if cart is empty
-  useEffect(() => {
-    if (items.length === 0) {
-      navigate('/menu');
+  // Verifica se o carrinho está vazio e redireciona imediatamente
+  if (items.length === 0) {
+    // Usamos setTimeout para garantir que o toast seja exibido antes do redirecionamento
+    setTimeout(() => {
       toast.info('Seu carrinho está vazio. Adicione itens para continuar.');
-    }
-  }, [items, navigate]);
+      navigate('/menu');
+    }, 0);
+    return <div className="flex h-screen items-center justify-center">Redirecionando para o cardápio...</div>;
+  }
 
   // Fetch initial data (Restaurant, Methods, Zones)
   const { data, isLoading, isError, error } = useQuery({
@@ -384,10 +373,13 @@ const Checkout = () => {
       return orderId;
     },
     onSuccess: (orderId) => {
-      toast.success(`Pedido #${orderId.slice(-4)} realizado com sucesso!`);
+      // 1. Limpa o carrinho
       clearCart();
+      toast.success(`Pedido #${orderId.slice(-4)} realizado com sucesso!`);
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      navigate(`/order-success/${orderId}`); // Navegar para uma tela de sucesso
+      
+      // 2. Redireciona para a tela de sucesso
+      navigate(`/order-success/${orderId}`); 
     },
     onError: (err) => {
       toast.error(`Erro ao finalizar pedido: ${err.message}`);
@@ -405,10 +397,6 @@ const Checkout = () => {
       console.error("Validation Errors:", JSON.stringify(errors, null, 2));
     }
   };
-
-  if (items.length === 0) {
-    return null; // Wait for redirect
-  }
 
   if (isLoading) {
     return (
