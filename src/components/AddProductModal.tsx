@@ -11,7 +11,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription, // Importado
+  DialogDescription,
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
@@ -150,6 +150,7 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
       form.reset();
     },
     onError: (error) => {
+      // Mensagem de erro mais genérica para capturar erros de upload ou inserção
       toast.error(`Erro ao criar produto: ${error.message}`);
     },
   });
