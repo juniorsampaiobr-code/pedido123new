@@ -222,19 +222,17 @@ const Checkout = () => {
   const cart = useCart();
   const { items, subtotal, deliveryFee, total, setDeliveryFee, clearCart } = cart;
 
-  // Fetch initial data (Restaurant, Methods, Zones) - HOOK 1
+  // HOOK 1: Fetch initial data (Restaurant, Methods, Zones) - Called unconditionally
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['checkoutInitialData'],
     queryFn: fetchInitialData,
-    // Only enable if items are present, but call the hook unconditionally
-    enabled: items.length > 0, 
   });
 
   const restaurantId = data?.restaurant?.id;
   const paymentMethods = data?.paymentMethods || [];
   const deliveryZones = data?.deliveryZones || [];
 
-  // --- Form Setup - HOOK 2
+  // HOOK 2: Form Setup - Called unconditionally
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
@@ -263,14 +261,27 @@ const Checkout = () => {
   const isCashPayment = selectedPaymentMethod?.name === 'Dinheiro';
   const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online'; 
 
-  // Pre-select first payment method if available - HOOK 3 (useEffect)
+  // HOOK 3: Redirection if cart is empty - Called unconditionally
+  useEffect(() => {
+    if (items.length === 0) {
+      // Use setTimeout to ensure the toast is displayed before navigation
+      const timer = setTimeout(() => {
+        toast.info('Seu carrinho está vazio. Adicione itens para continuar.');
+        navigate('/menu');
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [items.length, navigate]);
+
+
+  // HOOK 4: Pre-select first payment method if available
   useEffect(() => {
     if (paymentMethods.length > 0 && !selectedPaymentMethodId) {
       form.setValue('payment_method_id', paymentMethods[0].id);
     }
   }, [paymentMethods, selectedPaymentMethodId, form]);
 
-  // Delivery Fee Calculation - HOOK 4 (useEffect)
+  // HOOK 5: Delivery Fee Calculation
   useEffect(() => {
     if (deliveryOption === 'delivery') {
       const lowestFee = deliveryZones.length > 0 ? deliveryZones[0].delivery_fee : 5.00;
@@ -280,7 +291,7 @@ const Checkout = () => {
     }
   }, [deliveryOption, deliveryZones, setDeliveryFee]);
 
-  // Order Submission Mutation - HOOK 5
+  // HOOK 6: Order Submission Mutation
   const orderMutation = useMutation({
     mutationFn: async (formData: CheckoutFormValues) => {
       if (!restaurantId) throw new Error('Dados do restaurante indisponíveis.');
@@ -381,18 +392,12 @@ const Checkout = () => {
 
   // --- Conditional Rendering (After all hooks are called) ---
 
-  // Check 1: Cart is empty (This is the safe place for the early return)
+  // Se o carrinho estiver vazio, mostre um estado de carregamento enquanto o useEffect redireciona.
   if (items.length === 0) {
-    // We navigate here, but return null/loading to prevent the component from rendering the form
-    // while the navigation takes effect.
-    setTimeout(() => {
-      toast.info('Seu carrinho está vazio. Adicione itens para continuar.');
-      navigate('/menu');
-    }, 0);
     return <div className="flex h-screen items-center justify-center">Redirecionando para o cardápio...</div>;
   }
 
-  // Check 2: Initial data loading
+  // Se estiver carregando dados iniciais
   if (isLoading) {
     return (
       <div className="container mx-auto p-4 max-w-6xl">
@@ -408,7 +413,7 @@ const Checkout = () => {
     );
   }
 
-  // Check 3: Data error
+  // Se houver erro nos dados iniciais
   if (isError) {
     return (
       <div className="container mx-auto p-4 max-w-6xl">
