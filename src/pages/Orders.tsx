@@ -13,6 +13,7 @@ import { ShoppingCart, Terminal, RefreshCw, Clock, CheckCircle, XCircle, Truck, 
 import { User } from '@supabase/supabase-js';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
+import { OrderDetailsModal } from "@/components/OrderDetailsModal";
 
 type Order = Tables<'orders'> & {
   customer: Tables<'customers'> | null;
@@ -54,7 +55,7 @@ const fetchOrders = async (status: Enums<'order_status'> | 'all'): Promise<Order
   return data as Order[];
 };
 
-const OrderCard = ({ order }: { order: Order }) => {
+const OrderCard = ({ order, onViewDetails }: { order: Order, onViewDetails: (order: Order) => void }) => {
   const statusInfo = ORDER_STATUS_MAP[order.status || 'pending'];
   const customerName = order.customer?.name || 'Cliente Desconhecido';
   const orderNumber = order.created_at ? new Date(order.created_at).getTime().toString().slice(-4) : 'N/A';
@@ -76,14 +77,14 @@ const OrderCard = ({ order }: { order: Order }) => {
           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total_amount)}
         </p>
         <div className="flex justify-end pt-2 border-t">
-          <Button variant="outline" size="sm">Ver Detalhes</Button>
+          <Button variant="outline" size="sm" onClick={() => onViewDetails(order)}>Ver Detalhes</Button>
         </div>
       </CardContent>
     </Card>
   );
 };
 
-const OrdersList = ({ status }: { status: Enums<'order_status'> | 'all' }) => {
+const OrdersList = ({ status, onViewDetails }: { status: Enums<'order_status'> | 'all', onViewDetails: (order: Order) => void }) => {
   const { data: orders, isLoading, isError, error, refetch } = useQuery<Order[]>({
     queryKey: ['orders', status],
     queryFn: () => fetchOrders(status),
@@ -125,7 +126,7 @@ const OrdersList = ({ status }: { status: Enums<'order_status'> | 'all' }) => {
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {orders.map((order) => (
-        <OrderCard key={order.id} order={order} />
+        <OrderCard key={order.id} order={order} onViewDetails={onViewDetails} />
       ))}
     </div>
   );
@@ -135,6 +136,8 @@ const Orders = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<Enums<'order_status'> | 'all'>('pending');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -153,6 +156,16 @@ const Orders = () => {
     });
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  const handleViewDetails = (order: Order) => {
+    setSelectedOrder(order);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedOrder(null);
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -174,40 +187,43 @@ const Orders = () => {
   ];
 
   return (
-    <div className="flex min-h-screen bg-muted/40">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <header className="border-b bg-background sticky top-0 z-40">
-          <div className="container max-w-none mx-auto px-8 h-16 flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <ShoppingCart className="h-6 w-6" />
-              <h1 className="text-xl font-semibold">Pedidos</h1>
+    <>
+      <OrderDetailsModal order={selectedOrder} isOpen={isModalOpen} onClose={handleCloseModal} />
+      <div className="flex min-h-screen bg-muted/40">
+        <Sidebar />
+        <div className="flex-1 flex flex-col">
+          <header className="border-b bg-background sticky top-0 z-40">
+            <div className="container max-w-none mx-auto px-8 h-16 flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <ShoppingCart className="h-6 w-6" />
+                <h1 className="text-xl font-semibold">Pedidos</h1>
+              </div>
+              <Button variant="outline" onClick={handleSignOut}>
+                Sair
+              </Button>
             </div>
-            <Button variant="outline" onClick={handleSignOut}>
-              Sair
-            </Button>
-          </div>
-        </header>
+          </header>
 
-        <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
-          <Tabs defaultValue="pending" onValueChange={(value) => setActiveTab(value as Enums<'order_status'> | 'all')}>
-            <TabsList className="w-full overflow-x-auto justify-start">
+          <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
+            <Tabs defaultValue="pending" onValueChange={(value) => setActiveTab(value as Enums<'order_status'> | 'all')}>
+              <TabsList className="w-full overflow-x-auto justify-start">
+                {statusTabs.map(tab => (
+                  <TabsTrigger key={tab.value} value={tab.value} className="whitespace-nowrap">
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              
               {statusTabs.map(tab => (
-                <TabsTrigger key={tab.value} value={tab.value} className="whitespace-nowrap">
-                  {tab.label}
-                </TabsTrigger>
+                <TabsContent key={tab.value} value={tab.value} className="mt-6">
+                  <OrdersList status={tab.value} onViewDetails={handleViewDetails} />
+                </TabsContent>
               ))}
-            </TabsList>
-            
-            {statusTabs.map(tab => (
-              <TabsContent key={tab.value} value={tab.value} className="mt-6">
-                <OrdersList status={tab.value} />
-              </TabsContent>
-            ))}
-          </Tabs>
-        </main>
+            </Tabs>
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
