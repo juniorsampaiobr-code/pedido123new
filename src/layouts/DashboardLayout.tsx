@@ -17,7 +17,9 @@ type AudioReadyState = 'loading' | 'ready' | 'error';
 
 interface SoundContextType {
   playSound: () => void;
+  stopSoundLoop: () => void;
   soundStatus: SoundStatus;
+  loopingOrderId: string | null;
 }
 
 export const SoundContext = createContext<SoundContextType | null>(null);
@@ -54,6 +56,7 @@ const DashboardLayout = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [audioReadyState, setAudioReadyState] = useState<AudioReadyState>('loading');
   const [isEnableSoundModalOpen, setIsEnableSoundModalOpen] = useState(false);
+  const [loopingOrderId, setLoopingOrderId] = useState<string | null>(null);
 
   const [soundStatus, setSoundStatus] = useState<SoundStatus>(() => {
     const savedStatus = localStorage.getItem('soundNotificationStatus');
@@ -93,30 +96,54 @@ const DashboardLayout = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  useEffect(() => {
-    const channel = supabase.channel('new-orders-toast').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast.info("🔔 Novo pedido recebido!", { 
-        description: `Um novo pedido está aguardando confirmação.`,
-        duration: 10000,
-      });
-    }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [queryClient]);
+  const stopSoundLoop = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.loop = false;
+      setLoopingOrderId(null);
+    }
+  }, []);
 
-  const playSound = useCallback(() => {
+  const startSoundLoop = useCallback((orderId: string) => {
     if (soundStatus === 'enabled' && audioRef.current && audioReadyState === 'ready') {
-      audioRef.current.currentTime = 0;
+      if (loopingOrderId) return; 
+      setLoopingOrderId(orderId);
+      audioRef.current.loop = true;
       audioRef.current.play().catch(error => {
         console.error("Erro na reprodução automática de áudio:", error);
+        setLoopingOrderId(null);
         toast.warning("Não foi possível tocar o som automaticamente.", {
-          description: "Clique para tocar o som do novo pedido.",
-          action: { label: "Tocar Som", onClick: () => audioRef.current?.play() },
-          duration: Infinity,
+          description: "Interaja com a página para permitir a reprodução de som.",
         });
       });
     }
-  }, [soundStatus, audioReadyState]);
+  }, [soundStatus, audioReadyState, loopingOrderId]);
+
+  useEffect(() => {
+    const channel = supabase.channel('new-orders-toast').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      const newOrder = payload.new as Tables<'orders'>;
+      toast.info("🔔 Novo pedido recebido!", { 
+        description: `Pedido #${newOrder.id.slice(-4)} está aguardando confirmação.`,
+        duration: 15000,
+      });
+      if (newOrder.id) {
+        startSoundLoop(newOrder.id);
+      }
+    }).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [queryClient, startSoundLoop]);
+
+  const playSound = useCallback(() => {
+    if (soundStatus === 'enabled' && audioRef.current && audioReadyState === 'ready') {
+      stopSoundLoop();
+      audioRef.current.loop = false;
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(error => {
+        console.error("Erro na reprodução de áudio de teste:", error);
+      });
+    }
+  }, [soundStatus, audioReadyState, stopSoundLoop]);
 
   const handleEnableSoundFromModal = async () => {
     if (audioReadyState !== 'ready' || !audioRef.current) {
@@ -140,6 +167,7 @@ const DashboardLayout = () => {
 
   const handleToggleSound = async () => {
     if (soundStatus === 'enabled') {
+      stopSoundLoop();
       setSoundStatus('disabled');
       toast.info('Notificações sonoras desativadas.');
       return;
@@ -160,14 +188,6 @@ const DashboardLayout = () => {
     }
   };
 
-  const handleTestSound = () => {
-    if (soundStatus === 'enabled') {
-      playSound();
-    } else {
-      toast.info("O som está desativado ou não está pronto.", { description: "Clique no ícone de som para ativar as notificações." });
-    }
-  };
-
   const handleSignOut = async () => { await supabase.auth.signOut(); };
 
   if (!user) {
@@ -177,7 +197,7 @@ const DashboardLayout = () => {
   const isSoundControlDisabled = audioReadyState !== 'ready';
 
   return (
-    <SoundContext.Provider value={{ playSound, soundStatus }}>
+    <SoundContext.Provider value={{ playSound, stopSoundLoop, soundStatus, loopingOrderId }}>
       <EnableSoundModal 
         isOpen={isEnableSoundModalOpen} 
         onEnable={handleEnableSoundFromModal} 
@@ -194,7 +214,7 @@ const DashboardLayout = () => {
               <div className="flex items-center gap-2">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" onClick={handleTestSound} disabled={isSoundControlDisabled || soundStatus !== 'enabled'}>Testar Som</Button>
+                    <Button variant="outline" size="sm" onClick={playSound} disabled={isSoundControlDisabled}>Testar Som</Button>
                   </TooltipTrigger>
                   {isSoundControlDisabled && <TooltipContent><p>Carregando som...</p></TooltipContent>}
                 </Tooltip>

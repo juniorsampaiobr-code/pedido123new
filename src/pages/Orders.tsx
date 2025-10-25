@@ -68,27 +68,13 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline }: { order: Order
 
 const OrdersList = ({ status, onViewDetails, restaurantId }: { status: Enums<'order_status'> | 'all', onViewDetails: (order: Order) => void, restaurantId: string }) => {
   const queryClient = useQueryClient();
-  const { playSound, soundStatus } = useSound();
-  const prevOrderCount = useRef<number>();
+  const { stopSoundLoop } = useSound();
 
   const { data: orders, isLoading, isError, error, refetch } = useQuery<Order[]>({
     queryKey: ['orders', status, restaurantId],
     queryFn: () => fetchOrders(restaurantId, status),
     enabled: !!restaurantId,
   });
-
-  useEffect(() => {
-    if (status !== 'pending' || !orders) return;
-    const currentCount = orders.length;
-    if (prevOrderCount.current === undefined) {
-      prevOrderCount.current = currentCount;
-      return;
-    }
-    if (currentCount > prevOrderCount.current && soundStatus === 'enabled') {
-      playSound();
-    }
-    prevOrderCount.current = currentCount;
-  }, [orders, status, playSound, soundStatus]);
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: Enums<'order_status'> }) => {
@@ -103,14 +89,24 @@ const OrdersList = ({ status, onViewDetails, restaurantId }: { status: Enums<'or
     onError: (err) => toast.error(`Erro ao atualizar pedido: ${err.message}`),
   });
 
-  const handleAccept = (orderId: string) => updateStatusMutation.mutate({ orderId, newStatus: 'confirmed' });
-  const handleDecline = (orderId: string) => updateStatusMutation.mutate({ orderId, newStatus: 'cancelled' });
+  const handleAccept = (orderId: string) => {
+    stopSoundLoop();
+    updateStatusMutation.mutate({ orderId, newStatus: 'confirmed' });
+  };
+  const handleDecline = (orderId: string) => {
+    stopSoundLoop();
+    updateStatusMutation.mutate({ orderId, newStatus: 'cancelled' });
+  };
+  const handleViewDetails = (order: Order) => {
+    stopSoundLoop();
+    onViewDetails(order);
+  };
 
   if (isLoading) return <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{[...Array(4)].map((_, i) => <Card key={i}><CardContent className="p-4 space-y-3"><Skeleton className="h-32 w-full" /></CardContent></Card>)}</div>;
   if (isError) return <Alert variant="destructive"><Terminal className="h-4 w-4" /><AlertTitle>Erro ao carregar pedidos</AlertTitle><AlertDescription>{error instanceof Error ? error.message : "Ocorreu um erro desconhecido."}</AlertDescription><Button onClick={() => refetch()} className="mt-3" variant="secondary" size="sm"><RefreshCw className="h-4 w-4 mr-2" /> Tentar Novamente</Button></Alert>;
   if (!orders || orders.length === 0) return <div className="text-center py-12 bg-card rounded-lg border"><ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" /><p className="text-lg font-semibold">Nenhum pedido encontrado.</p><p className="text-sm text-muted-foreground">Verifique o status selecionado ou aguarde novos pedidos.</p></div>;
 
-  return <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{orders.map((order) => <OrderCard key={order.id} order={order} onViewDetails={onViewDetails} onAccept={handleAccept} onDecline={handleDecline} />)}</div>;
+  return <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{orders.map((order) => <OrderCard key={order.id} order={order} onViewDetails={handleViewDetails} onAccept={handleAccept} onDecline={handleDecline} />)}</div>;
 };
 
 const Orders = () => {
