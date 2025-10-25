@@ -131,11 +131,15 @@ const Orders = () => {
 
   useEffect(() => {
     const channel = supabase.channel('new-orders').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-      if (soundStatus === 'enabled' && audioRef.current) {
-        audioRef.current.play().catch(error => console.error("Erro ao tocar áudio:", error));
-      }
-      toast.info("🔔 Novo pedido recebido!", { description: "Um novo pedido está aguardando sua confirmação.", duration: 10000 });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      
+      const newOrder = payload.new as Order;
+      if (newOrder.status === 'pending') {
+        if (soundStatus === 'enabled' && audioRef.current) {
+          audioRef.current.play().catch(error => console.error("Erro ao tocar áudio:", error));
+        }
+        toast.info("🔔 Novo pedido recebido!", { description: "Um novo pedido está aguardando sua confirmação.", duration: 10000 });
+      }
     }).subscribe();
 
     return () => {
