@@ -150,15 +150,25 @@ const Orders = () => {
 
   // Effect to setup Supabase real-time channel
   useEffect(() => {
+    const playSound = () => {
+      if (soundStatus === 'enabled' && audioRef.current) {
+        audioRef.current.play().catch(error => console.error("Erro ao tocar áudio:", error));
+      }
+    };
+
     const channel = supabase.channel('new-orders').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       
       const newOrder = payload.new as Order;
       if (newOrder.status === 'pending') {
-        if (soundStatus === 'enabled' && audioRef.current) {
-          audioRef.current.play().catch(error => console.error("Erro ao tocar áudio:", error));
-        }
-        toast.info("🔔 Novo pedido recebido!", { description: "Um novo pedido está aguardando sua confirmação.", duration: 10000 });
+        toast.info("🔔 Novo pedido recebido!", { 
+          description: `Pedido de ${newOrder.customer?.name || 'um cliente'} aguardando confirmação.`,
+          duration: Infinity,
+          action: {
+            label: "Tocar Som",
+            onClick: () => playSound(),
+          },
+        });
       }
     }).subscribe();
 
