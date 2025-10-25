@@ -7,6 +7,7 @@ import { Terminal, ShoppingCart, ArrowRight } from "lucide-react";
 import { Tables } from '@/integrations/supabase/types';
 import { useState } from 'react';
 import { ProductDetailsModal } from '@/components/ProductDetailsModal';
+import { WeightProductModal } from '@/components/WeightProductModal';
 import { useCart } from '@/hooks/use-cart';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -64,11 +65,16 @@ const Menu = () => {
   
   const { totalItems, subtotal } = useCart();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
 
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
-    setIsModalOpen(true);
+    if (product.is_price_by_weight) {
+      setIsWeightModalOpen(true);
+    } else {
+      setIsDetailsModalOpen(true);
+    }
   };
 
   if (isLoading) {
@@ -115,8 +121,13 @@ const Menu = () => {
     <>
       <ProductDetailsModal 
         product={selectedProduct} 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        isOpen={isDetailsModalOpen} 
+        onClose={() => setIsDetailsModalOpen(false)} 
+      />
+      <WeightProductModal
+        product={selectedProduct}
+        isOpen={isWeightModalOpen}
+        onClose={() => setIsWeightModalOpen(false)}
       />
 
       <div className="container mx-auto px-4 py-8 max-w-5xl mb-20">
@@ -152,7 +163,10 @@ const Menu = () => {
                           <CardTitle className="text-xl mb-1">{product.name}</CardTitle>
                           <CardDescription className="text-sm mb-3 flex-grow">{product.description}</CardDescription>
                           <p className="text-lg font-bold text-primary text-right mt-2">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)}
+                            {product.is_price_by_weight 
+                              ? `${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)} / kg`
+                              : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)
+                            }
                           </p>
                         </div>
                       </Card>

@@ -9,6 +9,7 @@ export type CartItem = {
   quantity: number;
   notes?: string;
   image_url?: string | null;
+  is_price_by_weight?: boolean;
 };
 
 interface CartContextType {
@@ -34,6 +35,13 @@ export const CartProvider = ({ children }: { children: React.ReactNode }) => {
 
   const addItem = useCallback((item: Omit<CartItem, 'id'>) => {
     setItems(prevItems => {
+      // If it's a weighted item, always add as a new unique item
+      if (item.is_price_by_weight) {
+        const newItem: CartItem = { ...item, id: generateUniqueId() };
+        toast.success(`${item.name} adicionado ao carrinho.`);
+        return [...prevItems, newItem];
+      }
+
       // Check if item already exists (based on product_id and notes)
       const existingItemIndex = prevItems.findIndex(
         i => i.product_id === item.product_id && i.notes === item.notes
