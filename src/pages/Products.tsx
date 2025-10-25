@@ -11,16 +11,11 @@ import { toast } from "sonner";
 import { Plus, Edit, Trash2, List, Terminal } from 'lucide-react';
 import { useState } from 'react';
 import { AddProductModal } from '@/components/AddProductModal';
+import { EditProductModal } from '@/components/EditProductModal';
 import { CategoryManager } from '@/components/CategoryManager';
+import { Tables } from '@/integrations/supabase/types';
 
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  image_url: string | null;
-  is_available: boolean | null;
-  restaurant_id: string;
-};
+type Product = Tables<'products'>;
 
 const fetchProducts = async () => {
   const { data: restaurantData, error: restaurantError } = await supabase
@@ -46,11 +41,18 @@ const fetchProducts = async () => {
 const Products = () => {
   const queryClient = useQueryClient();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const { data: products, isLoading, isError, error } = useQuery<Product[]>({
     queryKey: ['products'],
     queryFn: fetchProducts,
   });
+
+  const handleEditClick = (product: Product) => {
+    setEditingProduct(product);
+    setIsEditModalOpen(true);
+  };
 
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, is_available }: { id: string, is_available: boolean }) => {
@@ -72,6 +74,11 @@ const Products = () => {
   return (
     <>
       <AddProductModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+      <EditProductModal 
+        isOpen={isEditModalOpen} 
+        onClose={() => setIsEditModalOpen(false)} 
+        product={editingProduct} 
+      />
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
         <Tabs defaultValue="products">
           <TabsList>
@@ -154,7 +161,9 @@ const Products = () => {
                           />
                         </div>
                         <div className="flex gap-2">
-                          <Button variant="outline" className="w-full"><Edit className="mr-2 h-4 w-4" /> Editar</Button>
+                          <Button variant="outline" className="w-full" onClick={() => handleEditClick(product)}>
+                            <Edit className="mr-2 h-4 w-4" /> Editar
+                          </Button>
                           <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4" /></Button>
                         </div>
                       </div>
