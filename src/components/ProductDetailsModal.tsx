@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription, // Importado
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -96,6 +97,9 @@ export const ProductDetailsModal = ({ product, isOpen, onClose }: ProductDetails
             <DialogTitle className="text-2xl font-bold text-white drop-shadow-md">
               {product.name}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Detalhes e opções de personalização para {product.name}.
+            </DialogDescription>
           </div>
         </div>
         

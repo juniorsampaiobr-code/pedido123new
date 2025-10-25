@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription, // Importado
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
@@ -116,7 +117,6 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
         const file = newProduct.image_file;
         const filePath = `${restaurantId}/${Date.now()}-${file.name}`;
         
-        // ALTERADO: Usando o bucket 'avatars' em vez de 'product_images'
         const { error: uploadError } = await supabase.storage
           .from('avatars') 
           .upload(filePath, file);
@@ -124,7 +124,7 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
         if (uploadError) throw new Error(`Erro no upload da imagem: ${uploadError.message}`);
 
         const { data: publicUrlData } = supabase.storage
-          .from('avatars') // ALTERADO: Usando o bucket 'avatars'
+          .from('avatars')
           .getPublicUrl(filePath);
         
         imageUrl = publicUrlData.publicUrl;
@@ -150,7 +150,7 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
       form.reset();
     },
     onError: (error) => {
-      toast.error(`Erro ao criar produto: Erro no upload da imagem: ${error.message}`);
+      toast.error(`Erro ao criar produto: ${error.message}`);
     },
   });
 
@@ -163,6 +163,9 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
           <DialogTitle>Novo Produto</DialogTitle>
+          <DialogDescription>
+            Adicione um novo item ao seu cardápio.
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

@@ -15,7 +15,7 @@ import Cashier from "./pages/Cashier";
 import Payments from "./pages/Payments";
 import Delivery from "./pages/Delivery";
 import Checkout from "./pages/Checkout";
-import OrderSuccess from "./pages/OrderSuccess"; // Importando OrderSuccess
+import OrderSuccess from "./pages/OrderSuccess";
 import NotFound from "./pages/NotFound";
 import { CartProvider } from "./hooks/use-cart";
 
@@ -26,7 +26,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <HashRouter>
+      <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <CartProvider>
           <Routes>
             <Route path="/" element={<Index />} />
@@ -41,7 +41,7 @@ const App = () => (
             <Route path="/payments" element={<Payments />} />
             <Route path="/delivery" element={<Delivery />} />
             <Route path="/checkout" element={<Checkout />} />
-            <Route path="/order-success/:orderId" element={<OrderSuccess />} /> {/* Nova Rota de Sucesso */}
+            <Route path="/order-success/:orderId" element={<OrderSuccess />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
