@@ -13,8 +13,11 @@ import Settings from "./pages/Settings";
 import Hours from "./pages/Hours";
 import Cashier from "./pages/Cashier";
 import Payments from "./pages/Payments";
-import Delivery from "./pages/Delivery"; // Adicionando import de volta
+import Delivery from "./pages/Delivery";
+import Checkout from "./pages/Checkout";
+import OrderSuccess from "./pages/OrderSuccess"; // Importando OrderSuccess
 import NotFound from "./pages/NotFound";
+import { CartProvider } from "./hooks/use-cart";
 
 const queryClient = new QueryClient();
 
@@ -24,21 +27,25 @@ const App = () => (
       <Toaster />
       <Sonner />
       <HashRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/menu" element={<Menu />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/hours" element={<Hours />} />
-          <Route path="/cashier" element={<Cashier />} />
-          <Route path="/payments" element={<Payments />} />
-          <Route path="/delivery" element={<Delivery />} /> {/* Adicionando rota de volta */}
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <CartProvider>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/menu" element={<Menu />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/hours" element={<Hours />} />
+            <Route path="/cashier" element={<Cashier />} />
+            <Route path="/payments" element={<Payments />} />
+            <Route path="/delivery" element={<Delivery />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/order-success/:orderId" element={<OrderSuccess />} /> {/* Nova Rota de Sucesso */}
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </CartProvider>
       </HashRouter>
     </TooltipProvider>
   </QueryClientProvider>

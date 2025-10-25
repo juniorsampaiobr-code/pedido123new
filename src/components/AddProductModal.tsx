@@ -115,14 +115,16 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
       if (newProduct.image_file) {
         const file = newProduct.image_file;
         const filePath = `${restaurantId}/${Date.now()}-${file.name}`;
+        
+        // ALTERADO: Usando o bucket 'avatars' em vez de 'product_images'
         const { error: uploadError } = await supabase.storage
-          .from('product_images')
+          .from('avatars') 
           .upload(filePath, file);
 
         if (uploadError) throw new Error(`Erro no upload da imagem: ${uploadError.message}`);
 
         const { data: publicUrlData } = supabase.storage
-          .from('product_images')
+          .from('avatars') // ALTERADO: Usando o bucket 'avatars'
           .getPublicUrl(filePath);
         
         imageUrl = publicUrlData.publicUrl;
@@ -148,7 +150,7 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
       form.reset();
     },
     onError: (error) => {
-      toast.error(`Erro ao criar produto: ${error.message}`);
+      toast.error(`Erro ao criar produto: Erro no upload da imagem: ${error.message}`);
     },
   });
 

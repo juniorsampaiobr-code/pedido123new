@@ -3,9 +3,22 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal } from "lucide-react";
+import { Terminal, ShoppingCart, ArrowRight } from "lucide-react";
+import { Tables } from '@/integrations/supabase/types';
+import { useState } from 'react';
+import { ProductDetailsModal } from '@/components/ProductDetailsModal';
+import { useCart } from '@/hooks/use-cart';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
-const fetchMenuData = async () => {
+type Product = Tables<'products'>;
+type Restaurant = Tables<'restaurants'>;
+
+type CategoryWithProducts = Tables<'categories'> & {
+  products: Product[];
+};
+
+const fetchMenuData = async (): Promise<{ restaurant: Restaurant, menu: CategoryWithProducts[] }> => {
   const { data: restaurantData, error: restaurantError } = await supabase
     .from('restaurants')
     .select('*')
@@ -40,7 +53,7 @@ const fetchMenuData = async () => {
     products: (productsResult.data || []).filter(product => product.category_id === category.id)
   })).filter(category => category.products.length > 0);
 
-  return { restaurant: restaurantData, menu: productsByCategory };
+  return { restaurant: restaurantData, menu: productsByCategory as CategoryWithProducts[] };
 };
 
 const Menu = () => {
@@ -48,6 +61,15 @@ const Menu = () => {
     queryKey: ['menuData'],
     queryFn: fetchMenuData,
   });
+  
+  const { totalItems, subtotal } = useCart();
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleProductClick = (product: Product) => {
+    setSelectedProduct(product);
+    setIsModalOpen(true);
+  };
 
   if (isLoading) {
     return (
@@ -90,47 +112,77 @@ const Menu = () => {
   const { restaurant, menu } = data;
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl">
-      <header className="text-center mb-12">
-        {restaurant.logo_url && <img src={restaurant.logo_url} alt={restaurant.name} className="w-24 h-24 mx-auto rounded-full mb-4 object-cover border-4 border-card shadow-lg" />}
-        <h1 className="text-4xl font-bold tracking-tight">{restaurant.name}</h1>
-        <p className="text-muted-foreground mt-2">{restaurant.description}</p>
-      </header>
+    <>
+      <ProductDetailsModal 
+        product={selectedProduct} 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+      />
 
-      <main>
-        {menu.length === 0 ? (
-          <div className="text-center py-16">
-            <p className="text-muted-foreground text-lg">Nenhum item no cardápio no momento.</p>
-          </div>
-        ) : (
-          <div className="space-y-10">
-            {menu.map(category => (
-              <section key={category.id}>
-                <h2 className="text-3xl font-bold border-b-2 border-primary pb-2 mb-6">{category.name}</h2>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {category.products.map(product => (
-                    <Card key={product.id} className="overflow-hidden group hover:shadow-xl transition-shadow duration-300 flex flex-col">
-                      <img 
-                        src={product.image_url || '/placeholder.svg'} 
-                        alt={product.name} 
-                        className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" 
-                      />
-                      <div className="p-4 flex flex-col flex-grow">
-                        <CardTitle className="text-xl mb-1">{product.name}</CardTitle>
-                        <CardDescription className="text-sm mb-3 flex-grow">{product.description}</CardDescription>
-                        <p className="text-lg font-bold text-primary text-right mt-2">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)}
-                        </p>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        )}
-      </main>
-    </div>
+      <div className="container mx-auto px-4 py-8 max-w-5xl mb-20">
+        <header className="text-center mb-12">
+          {restaurant.logo_url && <img src={restaurant.logo_url} alt={restaurant.name} className="w-24 h-24 mx-auto rounded-full mb-4 object-cover border-4 border-card shadow-lg" />}
+          <h1 className="text-4xl font-bold tracking-tight">{restaurant.name}</h1>
+          <p className="text-muted-foreground mt-2">{restaurant.description}</p>
+        </header>
+
+        <main>
+          {menu.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-muted-foreground text-lg">Nenhum item no cardápio no momento.</p>
+            </div>
+          ) : (
+            <div className="space-y-10">
+              {menu.map(category => (
+                <section key={category.id}>
+                  <h2 className="text-3xl font-bold border-b-2 border-primary pb-2 mb-6">{category.name}</h2>
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {category.products.map(product => (
+                      <Card 
+                        key={product.id} 
+                        className="overflow-hidden group hover:shadow-xl transition-shadow duration-300 flex flex-col cursor-pointer"
+                        onClick={() => handleProductClick(product)}
+                      >
+                        <img 
+                          src={product.image_url || '/placeholder.svg'} 
+                          alt={product.name} 
+                          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" 
+                        />
+                        <div className="p-4 flex flex-col flex-grow">
+                          <CardTitle className="text-xl mb-1">{product.name}</CardTitle>
+                          <CardDescription className="text-sm mb-3 flex-grow">{product.description}</CardDescription>
+                          <p className="text-lg font-bold text-primary text-right mt-2">
+                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)}
+                          </p>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
+      
+      {/* Floating Cart Button */}
+      {totalItems > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-card shadow-2xl border-t">
+          <Link to="/checkout">
+            <Button className="w-full h-14 text-lg font-bold flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="h-5 w-5" />
+                {totalItems} {totalItems === 1 ? 'Item' : 'Itens'}
+              </div>
+              <div className="flex items-center gap-2">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}
+                <ArrowRight className="h-5 w-5 ml-2" />
+              </div>
+            </Button>
+          </Link>
+        </div>
+      )}
+    </>
   );
 };
 
