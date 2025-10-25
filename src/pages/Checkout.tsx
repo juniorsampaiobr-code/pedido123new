@@ -15,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, MapPin, Truck, Store, CreditCard, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Terminal, MapPin, Truck, Store, CreditCard, ArrowLeft, DollarSign, Smartphone, Package } from 'lucide-react';
 import { Tables, TablesInsert, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
