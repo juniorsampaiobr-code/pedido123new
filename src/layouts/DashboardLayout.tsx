@@ -6,12 +6,14 @@ import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
 import { toast } from "sonner";
 import { User } from '@supabase/supabase-js';
-import { Tables, Enums } from '@/integrations/supabase/types';
-import { ShoppingCart, Volume2, VolumeX, AlertCircle } from 'lucide-react';
+import { Tables } from '@/integrations/supabase/types';
+import { ShoppingCart, Volume2, VolumeX, AlertCircle, Loader2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type Order = Tables<'orders'> & { customer: Tables<'customers'> | null };
 type Restaurant = Tables<'restaurants'>;
 type SoundStatus = 'disabled' | 'enabled' | 'error';
+type AudioReadyState = 'loading' | 'ready' | 'error';
 
 const getPageTitle = (pathname: string) => {
   const page = navItems.find(item => item.href === pathname);
@@ -35,6 +37,7 @@ const DashboardLayout = () => {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioReadyState, setAudioReadyState] = useState<AudioReadyState>('loading');
 
   const [soundStatus, setSoundStatus] = useState<SoundStatus>(() => {
     const savedStatus = localStorage.getItem('soundNotificationStatus');
@@ -69,20 +72,33 @@ const DashboardLayout = () => {
 
   useEffect(() => {
     if (restaurant?.notification_sound_url) {
+      setAudioReadyState('loading');
       const audio = new Audio(restaurant.notification_sound_url);
-      audio.onerror = () => {
+      
+      const handleCanPlay = () => setAudioReadyState('ready');
+      const handleError = () => {
         toast.error("Erro ao carregar o som de notificação.", { description: "Verifique o arquivo em Configurações." });
+        setAudioReadyState('error');
         setSoundStatus('error');
       };
+
+      audio.addEventListener('canplaythrough', handleCanPlay);
+      audio.addEventListener('error', handleError);
+      
       audioRef.current = audio;
+
+      return () => {
+        audio.removeEventListener('canplaythrough', handleCanPlay);
+        audio.removeEventListener('error', handleError);
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
+      };
+    } else if (restaurant) {
+      setAudioReadyState('error');
     }
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, [restaurant?.notification_sound_url]);
+  }, [restaurant]);
 
   useEffect(() => {
     const channel = supabase.channel('new-orders').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
@@ -95,7 +111,7 @@ const DashboardLayout = () => {
           duration: 10000,
         });
         
-        if (soundStatus === 'enabled' && audioRef.current) {
+        if (soundStatus === 'enabled' && audioRef.current && audioReadyState === 'ready') {
           audioRef.current.play().catch(error => {
             console.error("Erro na reprodução automática de áudio:", error);
             toast.warning("Não foi possível tocar o som automaticamente.", {
@@ -114,7 +130,7 @@ const DashboardLayout = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient, soundStatus]);
+  }, [queryClient, soundStatus, audioReadyState]);
 
   const handleToggleSound = async () => {
     if (soundStatus === 'enabled') {
@@ -123,7 +139,7 @@ const DashboardLayout = () => {
       return;
     }
 
-    if (!audioRef.current) {
+    if (audioReadyState !== 'ready' || !audioRef.current) {
       toast.error("Som de notificação não está pronto ou configurado.");
       setSoundStatus('error');
       return;
@@ -143,14 +159,14 @@ const DashboardLayout = () => {
   };
 
   const handleTestSound = () => {
-    if (soundStatus === 'enabled' && audioRef.current) {
+    if (soundStatus === 'enabled' && audioRef.current && audioReadyState === 'ready') {
       audioRef.current.currentTime = 0;
       audioRef.current.play().catch(err => {
         toast.error("Não foi possível tocar o som de teste.");
         console.error(err);
       });
     } else {
-      toast.info("O som está desativado.", { description: "Clique no ícone de som para ativar as notificações." });
+      toast.info("O som está desativado ou não está pronto.", { description: "Clique no ícone de som para ativar as notificações." });
     }
   };
 
@@ -159,6 +175,8 @@ const DashboardLayout = () => {
   if (!user) {
     return <div className="flex h-screen items-center justify-center">Carregando...</div>;
   }
+
+  const isSoundControlDisabled = audioReadyState !== 'ready';
 
   return (
     <div className="flex min-h-screen bg-muted/40">
@@ -171,12 +189,23 @@ const DashboardLayout = () => {
               <h1 className="text-xl font-semibold">{getPageTitle(location.pathname)}</h1>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleTestSound} disabled={soundStatus !== 'enabled'}>Testar Som</Button>
-              <Button variant="outline" size="icon" onClick={handleToggleSound}>
-                {soundStatus === 'enabled' && <Volume2 className="h-4 w-4 text-green-500" />}
-                {soundStatus === 'disabled' && <VolumeX className="h-4 w-4" />}
-                {soundStatus === 'error' && <AlertCircle className="h-4 w-4 text-destructive" />}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handleTestSound} disabled={isSoundControlDisabled || soundStatus !== 'enabled'}>Testar Som</Button>
+                </TooltipTrigger>
+                {isSoundControlDisabled && <TooltipContent><p>Carregando som...</p></TooltipContent>}
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={handleToggleSound} disabled={isSoundControlDisabled}>
+                    {audioReadyState === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {audioReadyState === 'ready' && soundStatus === 'enabled' && <Volume2 className="h-4 w-4 text-green-500" />}
+                    {audioReadyState === 'ready' && soundStatus === 'disabled' && <VolumeX className="h-4 w-4" />}
+                    {audioReadyState === 'error' && <AlertCircle className="h-4 w-4 text-destructive" />}
+                  </Button>
+                </TooltipTrigger>
+                {isSoundControlDisabled && <TooltipContent><p>Carregando som...</p></TooltipContent>}
+              </Tooltip>
               <Button variant="outline" onClick={handleSignOut}>Sair</Button>
             </div>
           </div>
