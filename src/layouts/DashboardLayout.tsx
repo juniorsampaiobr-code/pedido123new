@@ -36,7 +36,7 @@ const DashboardLayout = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const [audioReadyState, setAudioReadyState] = useState<AudioReadyState>('loading');
 
   const [soundStatus, setSoundStatus] = useState<SoundStatus>(() => {
@@ -69,36 +69,6 @@ const DashboardLayout = () => {
     });
     return () => subscription.unsubscribe();
   }, [navigate]);
-
-  useEffect(() => {
-    if (restaurant?.notification_sound_url) {
-      setAudioReadyState('loading');
-      const audio = new Audio(restaurant.notification_sound_url);
-      
-      const handleCanPlay = () => setAudioReadyState('ready');
-      const handleError = () => {
-        toast.error("Erro ao carregar o som de notificação.", { description: "Verifique o arquivo em Configurações." });
-        setAudioReadyState('error');
-        setSoundStatus('error');
-      };
-
-      audio.addEventListener('canplaythrough', handleCanPlay);
-      audio.addEventListener('error', handleError);
-      
-      audioRef.current = audio;
-
-      return () => {
-        audio.removeEventListener('canplaythrough', handleCanPlay);
-        audio.removeEventListener('error', handleError);
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current = null;
-        }
-      };
-    } else if (restaurant) {
-      setAudioReadyState('error');
-    }
-  }, [restaurant]);
 
   useEffect(() => {
     const channel = supabase.channel('new-orders').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
@@ -213,6 +183,19 @@ const DashboardLayout = () => {
         </header>
         <Outlet />
       </div>
+      {restaurant?.notification_sound_url && (
+        <audio
+          ref={audioRef}
+          src={restaurant.notification_sound_url}
+          onCanPlayThrough={() => setAudioReadyState('ready')}
+          onError={() => {
+            toast.error("Erro ao carregar o som de notificação.", { description: "Verifique o arquivo em Configurações." });
+            setAudioReadyState('error');
+            setSoundStatus('error');
+          }}
+          className="hidden"
+        />
+      )}
     </div>
   );
 };
