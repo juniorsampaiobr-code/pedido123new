@@ -219,6 +219,13 @@ const Checkout = () => {
   const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
   const isCashPayment = selectedPaymentMethod?.name === 'Dinheiro';
 
+  // Pre-select first payment method if available
+  useEffect(() => {
+    if (paymentMethods.length > 0 && !selectedPaymentMethodId) {
+      form.setValue('payment_method_id', paymentMethods[0].id);
+    }
+  }, [paymentMethods, selectedPaymentMethodId, form]);
+
   // --- Delivery Fee Calculation (Mock based on fixed fee for now) ---
   useEffect(() => {
     // NOTE: For a real app, this would involve geolocation/distance calculation.
@@ -321,6 +328,14 @@ const Checkout = () => {
   const onSubmit = (data: CheckoutFormValues) => {
     orderMutation.mutate(data);
   };
+  
+  const onValidationFail = (errors: any) => {
+    // Verifica se há erros de validação e exibe um toast genérico
+    if (Object.keys(errors).length > 0) {
+      toast.error('Por favor, preencha todos os campos obrigatórios e corrija os erros.');
+      console.error("Validation Errors:", errors);
+    }
+  };
 
   if (items.length === 0) {
     return null; // Wait for redirect
@@ -374,7 +389,7 @@ const Checkout = () => {
           {/* Left Column: Form */}
           <div className="lg:col-span-2 space-y-6">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <form onSubmit={form.handleSubmit(onSubmit, onValidationFail)} className="space-y-6">
                 
                 {/* 1. Detalhes do Cliente */}
                 <Card>
