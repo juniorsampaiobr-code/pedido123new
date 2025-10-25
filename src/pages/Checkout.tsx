@@ -75,6 +75,7 @@ const checkoutSchema = z.object({
 }).superRefine((data, ctx) => {
   // Delivery address validation
   if (data.delivery_option === 'delivery') {
+    // Check if required fields are empty (after trimming whitespace)
     if (!data.street || data.street.trim() === '') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Rua é obrigatória.', path: ['street'] });
     }
@@ -87,6 +88,8 @@ const checkoutSchema = z.object({
     if (!data.city || data.city.trim() === '') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Cidade é obrigatória.', path: ['city'] });
     }
+    
+    // Check zip code length (it's already cleaned by the transform function)
     if (!data.zip_code || data.zip_code.length !== 8) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CEP é obrigatório e deve ter 8 dígitos.', path: ['zip_code'] });
     }
