@@ -55,11 +55,11 @@ const checkoutSchema = z.object({
   }),
   
   // Delivery Address (Required if delivery_option is 'delivery')
-  street: z.string().optional(),
-  number: z.string().optional(),
-  neighborhood: z.string().optional(),
-  city: z.string().optional(),
-  zip_code: z.string().optional().transform(cleanZipCode).refine(val => val.length === 8 || val.length === 0, {
+  street: z.string().optional().default(''),
+  number: z.string().optional().default(''),
+  neighborhood: z.string().optional().default(''),
+  city: z.string().optional().default(''),
+  zip_code: z.string().optional().default('').transform(cleanZipCode).refine(val => val.length === 8 || val.length === 0, {
     message: 'CEP inválido. Deve conter 8 dígitos.',
   }),
   
@@ -76,21 +76,21 @@ const checkoutSchema = z.object({
   // Delivery address validation
   if (data.delivery_option === 'delivery') {
     // Check if required fields are empty (after trimming whitespace)
-    if (!data.street || data.street.trim() === '') {
+    if (data.street.trim() === '') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Rua é obrigatória.', path: ['street'] });
     }
-    if (!data.number || data.number.trim() === '') {
+    if (data.number.trim() === '') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Número é obrigatório.', path: ['number'] });
     }
-    if (!data.neighborhood || data.neighborhood.trim() === '') {
+    if (data.neighborhood.trim() === '') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Bairro é obrigatório.', path: ['neighborhood'] });
     }
-    if (!data.city || data.city.trim() === '') {
+    if (data.city.trim() === '') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Cidade é obrigatória.', path: ['city'] });
     }
     
     // Check zip code length (it's already cleaned by the transform function)
-    if (!data.zip_code || data.zip_code.length !== 8) {
+    if (data.zip_code.length !== 8) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CEP é obrigatório e deve ter 8 dígitos.', path: ['zip_code'] });
     }
   }
