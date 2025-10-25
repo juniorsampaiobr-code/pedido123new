@@ -19,6 +19,14 @@ import { Terminal, MapPin, Truck, Store, CreditCard, ArrowLeft, CheckCircle } fr
 import { Tables, TablesInsert, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
