@@ -146,11 +146,12 @@ const DashboardLayout = () => {
     }
 
     try {
-      await audioRef.current.play();
-      audioRef.current.pause();
+      // Play the sound fully as a confirmation and to unlock audio context
       audioRef.current.currentTime = 0;
+      await audioRef.current.play();
+      
       setSoundStatus('enabled');
-      toast.success('Notificações sonoras ativadas!');
+      toast.success('Notificações sonoras ativadas!', { description: 'Você ouviu o som de teste.' });
     } catch (err) {
       console.error("Audio activation failed:", err);
       toast.error("Falha ao ativar o som.", { description: "Seu navegador pode ter bloqueado. Clique na página e tente novamente." });
