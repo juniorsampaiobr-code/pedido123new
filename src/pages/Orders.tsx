@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
@@ -9,11 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShoppingCart, Terminal, RefreshCw, Clock, CheckCircle, XCircle, Truck, Package, Utensils } from 'lucide-react';
+import { ShoppingCart, Terminal, RefreshCw, Clock, CheckCircle, XCircle, Truck, Package, Utensils, Check, X } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { OrderDetailsModal } from "@/components/OrderDetailsModal";
+import { toast } from "sonner";
 
 type Order = Tables<'orders'> & {
   customer: Tables<'customers'> | null;
@@ -55,13 +56,13 @@ const fetchOrders = async (status: Enums<'order_status'> | 'all'): Promise<Order
   return data as Order[];
 };
 
-const OrderCard = ({ order, onViewDetails }: { order: Order, onViewDetails: (order: Order) => void }) => {
+const OrderCard = ({ order, onViewDetails, onAccept, onDecline }: { order: Order, onViewDetails: (order: Order) => void, onAccept: (orderId: string) => void, onDecline: (orderId: string) => void }) => {
   const statusInfo = ORDER_STATUS_MAP[order.status || 'pending'];
   const customerName = order.customer?.name || 'Cliente Desconhecido';
   const orderNumber = order.created_at ? new Date(order.created_at).getTime().toString().slice(-4) : 'N/A';
 
   return (
-    <Card className="shadow-md hover:shadow-lg transition-shadow duration-300">
+    <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-lg font-bold flex items-center gap-2">
           Pedido #{orderNumber}
@@ -71,13 +72,25 @@ const OrderCard = ({ order, onViewDetails }: { order: Order, onViewDetails: (ord
           {statusInfo.label}
         </Badge>
       </CardHeader>
-      <CardContent className="space-y-2">
-        <p className="text-sm text-muted-foreground">Cliente: {customerName}</p>
-        <p className="text-2xl font-extrabold text-primary">
-          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total_amount)}
-        </p>
-        <div className="flex justify-end pt-2 border-t">
-          <Button variant="outline" size="sm" onClick={() => onViewDetails(order)}>Ver Detalhes</Button>
+      <CardContent className="space-y-2 flex-grow flex flex-col justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">Cliente: {customerName}</p>
+          <p className="text-2xl font-extrabold text-primary">
+            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total_amount)}
+          </p>
+        </div>
+        <div className="flex justify-end pt-2 border-t gap-2">
+          {order.status === 'pending' && (
+            <>
+              <Button variant="destructive" size="sm" onClick={() => onDecline(order.id)}>
+                <X className="h-4 w-4 mr-1" /> Recusar
+              </Button>
+              <Button variant="default" size="sm" onClick={() => onAccept(order.id)}>
+                <Check className="h-4 w-4 mr-1" /> Aceitar
+              </Button>
+            </>
+          )}
+          <Button variant="outline" size="sm" onClick={() => onViewDetails(order)}>Detalhes</Button>
         </div>
       </CardContent>
     </Card>
@@ -85,10 +98,37 @@ const OrderCard = ({ order, onViewDetails }: { order: Order, onViewDetails: (ord
 };
 
 const OrdersList = ({ status, onViewDetails }: { status: Enums<'order_status'> | 'all', onViewDetails: (order: Order) => void }) => {
+  const queryClient = useQueryClient();
   const { data: orders, isLoading, isError, error, refetch } = useQuery<Order[]>({
     queryKey: ['orders', status],
     queryFn: () => fetchOrders(status),
   });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: Enums<'order_status'> }) => {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId);
+      if (error) throw new Error(error.message);
+      return newStatus;
+    },
+    onSuccess: (newStatus) => {
+      toast.success(`Pedido ${newStatus === 'confirmed' ? 'aceito' : 'recusado'} com sucesso!`);
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: (err) => {
+      toast.error(`Erro ao atualizar pedido: ${err.message}`);
+    },
+  });
+
+  const handleAccept = (orderId: string) => {
+    updateStatusMutation.mutate({ orderId, newStatus: 'confirmed' });
+  };
+
+  const handleDecline = (orderId: string) => {
+    updateStatusMutation.mutate({ orderId, newStatus: 'cancelled' });
+  };
 
   if (isLoading) {
     return (
@@ -126,7 +166,13 @@ const OrdersList = ({ status, onViewDetails }: { status: Enums<'order_status'> |
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {orders.map((order) => (
-        <OrderCard key={order.id} order={order} onViewDetails={onViewDetails} />
+        <OrderCard 
+          key={order.id} 
+          order={order} 
+          onViewDetails={onViewDetails}
+          onAccept={handleAccept}
+          onDecline={handleDecline}
+        />
       ))}
     </div>
   );
@@ -134,8 +180,8 @@ const OrdersList = ({ status, onViewDetails }: { status: Enums<'order_status'> |
 
 const Orders = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<Enums<'order_status'> | 'all'>('pending');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -156,6 +202,38 @@ const Orders = () => {
     });
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  // Real-time subscription for new orders
+  useEffect(() => {
+    const channel = supabase.channel('new-orders')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        (payload) => {
+          console.log('Novo pedido recebido!', payload);
+          
+          // Play notification sound
+          const audio = new Audio('/notification.mp3');
+          audio.play().catch(error => console.error("Erro ao tocar áudio:", error));
+
+          // Show toast notification
+          toast.info("🔔 Novo pedido recebido!", {
+            description: "Um novo pedido está aguardando sua confirmação.",
+            duration: 10000,
+          });
+
+          // Refetch orders to update the UI
+          queryClient.invalidateQueries({ queryKey: ['orders', 'pending'] });
+          queryClient.invalidateQueries({ queryKey: ['orders', 'all'] });
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on component unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const handleViewDetails = (order: Order) => {
     setSelectedOrder(order);
@@ -205,7 +283,7 @@ const Orders = () => {
           </header>
 
           <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
-            <Tabs defaultValue="pending" onValueChange={(value) => setActiveTab(value as Enums<'order_status'> | 'all')}>
+            <Tabs defaultValue="pending" onValueChange={(value) => {}}>
               <TabsList className="w-full overflow-x-auto justify-start">
                 {statusTabs.map(tab => (
                   <TabsTrigger key={tab.value} value={tab.value} className="whitespace-nowrap">
