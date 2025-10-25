@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -184,6 +184,13 @@ const Orders = () => {
   const [user, setUser] = useState<User | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Preload the audio on component mount
+  useEffect(() => {
+    audioRef.current = new Audio('/notification.mp3');
+    audioRef.current.load();
+  }, []);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -213,8 +220,14 @@ const Orders = () => {
           console.log('Novo pedido recebido!', payload);
           
           // Play notification sound
-          const audio = new Audio('/notification.mp3');
-          audio.play().catch(error => console.error("Erro ao tocar áudio:", error));
+          if (audioRef.current) {
+            audioRef.current.play().catch(error => {
+              console.error("Erro ao tocar áudio:", error);
+              toast.warning("Clique na página para ativar as notificações sonoras.", {
+                description: "Os navegadores bloqueiam o som automático até que você interaja com o site.",
+              });
+            });
+          }
 
           // Show toast notification
           toast.info("🔔 Novo pedido recebido!", {
