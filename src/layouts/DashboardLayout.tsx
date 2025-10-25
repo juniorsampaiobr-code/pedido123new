@@ -9,6 +9,7 @@ import { User } from '@supabase/supabase-js';
 import { Tables } from '@/integrations/supabase/types';
 import { ShoppingCart, Volume2, VolumeX, AlertCircle, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { EnableSoundModal } from "@/components/EnableSoundModal";
 
 type Restaurant = Tables<'restaurants'>;
 type SoundStatus = 'disabled' | 'enabled' | 'error';
@@ -52,6 +53,7 @@ const DashboardLayout = () => {
   const [user, setUser] = useState<User | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [audioReadyState, setAudioReadyState] = useState<AudioReadyState>('loading');
+  const [isEnableSoundModalOpen, setIsEnableSoundModalOpen] = useState(false);
 
   const [soundStatus, setSoundStatus] = useState<SoundStatus>(() => {
     const savedStatus = localStorage.getItem('soundNotificationStatus');
@@ -71,6 +73,13 @@ const DashboardLayout = () => {
     },
     enabled: !!user,
   });
+
+  useEffect(() => {
+    const hasSeenModal = localStorage.getItem('hasSeenSoundPermissionModal');
+    if (!hasSeenModal && soundStatus !== 'enabled' && audioReadyState === 'ready') {
+      setIsEnableSoundModalOpen(true);
+    }
+  }, [soundStatus, audioReadyState]);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -108,6 +117,26 @@ const DashboardLayout = () => {
       });
     }
   }, [soundStatus, audioReadyState]);
+
+  const handleEnableSoundFromModal = async () => {
+    if (audioReadyState !== 'ready' || !audioRef.current) {
+      toast.error("O arquivo de som ainda não está pronto. Tente novamente em um momento.");
+      return;
+    }
+    try {
+      audioRef.current.currentTime = 0;
+      await audioRef.current.play();
+      setSoundStatus('enabled');
+      toast.success('Notificações sonoras ativadas!');
+      localStorage.setItem('hasSeenSoundPermissionModal', 'true');
+    } catch (err) {
+      console.error("Audio activation failed from modal:", err);
+      toast.error("Falha ao ativar o som.", { description: "Seu navegador pode ter bloqueado a reprodução. Por favor, tente ativar manualmente no ícone do cabeçalho." });
+      setSoundStatus('error');
+    } finally {
+      setIsEnableSoundModalOpen(false);
+    }
+  };
 
   const handleToggleSound = async () => {
     if (soundStatus === 'enabled') {
@@ -149,6 +178,10 @@ const DashboardLayout = () => {
 
   return (
     <SoundContext.Provider value={{ playSound, soundStatus }}>
+      <EnableSoundModal 
+        isOpen={isEnableSoundModalOpen} 
+        onEnable={handleEnableSoundFromModal} 
+      />
       <div className="flex min-h-screen bg-muted/40">
         <Sidebar />
         <div className="flex-1 flex flex-col">
