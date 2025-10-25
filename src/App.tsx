@@ -18,6 +18,7 @@ import Checkout from "./pages/Checkout";
 import OrderSuccess from "./pages/OrderSuccess";
 import NotFound from "./pages/NotFound";
 import { CartProvider } from "./hooks/use-cart";
+import DashboardLayout from "./layouts/DashboardLayout";
 
 const queryClient = new QueryClient();
 
@@ -29,20 +30,26 @@ const App = () => (
       <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <CartProvider>
           <Routes>
+            {/* Public Routes */}
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/menu" element={<Menu />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/hours" element={<Hours />} />
-            <Route path="/cashier" element={<Cashier />} />
-            <Route path="/payments" element={<Payments />} />
-            <Route path="/delivery" element={<Delivery />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/order-success/:orderId" element={<OrderSuccess />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+
+            {/* Dashboard Routes (Protected Layout) */}
+            <Route element={<DashboardLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/products" element={<Products />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/hours" element={<Hours />} />
+              <Route path="/cashier" element={<Cashier />} />
+              <Route path="/payments" element={<Payments />} />
+              <Route path="/delivery" element={<Delivery />} />
+            </Route>
+
+            {/* Catch-all Route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </CartProvider>

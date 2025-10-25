@@ -1,18 +1,14 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
-import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { toast } from "sonner";
-import { CreditCard, Key, ExternalLink, DollarSign, Smartphone, Package, Store } from 'lucide-react';
-import { User } from '@supabase/supabase-js';
+import { Key, ExternalLink, DollarSign, Smartphone, Package, Store } from 'lucide-react';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import {
   Form,
@@ -23,11 +19,11 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 
 type PaymentMethod = Tables<'payment_methods'>;
 type PaymentSettings = Tables<'payment_settings'>;
-
-// --- Schemas ---
 
 const credentialsSchema = z.object({
   mercado_pago_public_key: z.string().optional(),
@@ -44,8 +40,6 @@ const methodsSchema = z.object({
 });
 
 type MethodsFormValues = z.infer<typeof methodsSchema>;
-
-// --- Data Fetching & Mock Data ---
 
 const fetchRestaurantId = async () => {
   const { data, error } = await supabase.from('restaurants').select('id').limit(1).single();
@@ -83,7 +77,6 @@ const DEFAULT_METHODS = [
   { name: 'Pagamento com cartão na entrega', description: 'Aceita pagamento com cartão de débito ou crédito na entrega', icon: Package },
 ];
 
-// Helper function to map icon name string back to Lucide component
 const getIconComponent = (iconName: string) => {
   switch (iconName) {
     case 'DollarSign': return DollarSign;
@@ -93,8 +86,6 @@ const getIconComponent = (iconName: string) => {
     default: return Store;
   }
 };
-
-// --- Components ---
 
 interface PaymentMethodItemProps {
   method: PaymentMethod;
@@ -130,40 +121,14 @@ const PaymentMethodItem = ({ method, index, control, icon: Icon }: PaymentMethod
   );
 };
 
-// --- Main Page ---
-
 const Payments = () => {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [user, setUser] = useState<User | null>(null);
 
-  // 1. Autenticação e Redirecionamento
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        navigate("/auth");
-      } else {
-        setUser(session.user);
-      }
-    };
-    checkSession();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') navigate("/");
-      else if (!session?.user) navigate("/auth");
-      else setUser(session.user);
-    });
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  // 2. Busca do ID do Restaurante
   const { data: restaurantId, isLoading: isLoadingRestaurantId } = useQuery<string>({
     queryKey: ['restaurantId'],
     queryFn: fetchRestaurantId,
-    enabled: !!user,
   });
 
-  // 3. Busca de Credenciais e Métodos
   const { data: settings, isLoading: isLoadingSettings } = useQuery<PaymentSettings | null>({
     queryKey: ['paymentSettings', restaurantId],
     queryFn: () => fetchPaymentSettings(restaurantId!),
@@ -176,7 +141,6 @@ const Payments = () => {
     enabled: !!restaurantId,
   });
 
-  // 4. Formulário de Credenciais (Mercado Pago)
   const credentialsForm = useForm<CredentialsFormValues>({
     resolver: zodResolver(credentialsSchema),
     defaultValues: {
@@ -186,22 +150,19 @@ const Payments = () => {
     mode: 'onBlur',
   });
 
-  // Sincroniza dados de settings com o formulário de credenciais
   useEffect(() => {
     if (settings) {
       credentialsForm.reset({
         mercado_pago_public_key: settings.mercado_pago_public_key || '',
-        mercado_pago_access_token: '', // Sempre limpa o token por segurança
+        mercado_pago_access_token: '',
       });
     }
   }, [settings, credentialsForm]);
-
 
   const credentialsMutation = useMutation({
     mutationFn: async (data: CredentialsFormValues) => {
       if (!restaurantId) throw new Error('ID do restaurante não disponível.');
       
-      // Chamada ao Edge Function para salvar a chave pública e verificar o token
       const response = await supabase.functions.invoke('save-mp-credentials', {
         body: JSON.stringify({
           restaurant_id: restaurantId,
@@ -223,10 +184,9 @@ const Payments = () => {
     onSuccess: () => {
       toast.success('Credenciais do Mercado Pago salvas com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['paymentSettings'] });
-      credentialsForm.reset({ mercado_pago_access_token: '' }); // Limpa o campo do token
+      credentialsForm.reset({ mercado_pago_access_token: '' });
     },
     onError: (err) => {
-      // Captura o erro lançado pela mutationFn, que pode ser 'ID do restaurante não disponível.'
       toast.error(`Erro ao salvar credenciais: ${err.message}`);
     },
   });
@@ -235,9 +195,6 @@ const Payments = () => {
     credentialsMutation.mutate(data);
   };
 
-  // 5. Formulário de Métodos de Pagamento
-  
-  // Função para garantir que os métodos padrão existam no banco de dados
   const ensureDefaultMethods = useMutation({
     mutationFn: async (restaurantId: string) => {
       const existingMethods = await fetchPaymentMethods(restaurantId);
@@ -249,14 +206,14 @@ const Payments = () => {
           restaurant_id: restaurantId,
           name: defaultMethod.name,
           description: defaultMethod.description,
-          icon: defaultMethod.icon.displayName, // Usamos o nome do ícone como string
+          icon: defaultMethod.icon.displayName,
           is_active: true,
         }));
 
       if (methodsToInsert.length > 0) {
         const { error } = await supabase.from('payment_methods').insert(methodsToInsert);
         if (error) throw new Error(error.message);
-        await refetchMethods(); // Refetch para atualizar a lista
+        await refetchMethods();
       }
     },
     onError: (err) => {
@@ -270,14 +227,12 @@ const Payments = () => {
     }
   }, [restaurantId, methods, isLoadingMethods, ensureDefaultMethods]);
 
-
   const methodsForm = useForm<MethodsFormValues>({
     resolver: zodResolver(methodsSchema),
     defaultValues: { methods: [] },
     mode: 'onBlur',
   });
 
-  // Sincroniza dados de methods com o formulário de métodos
   useEffect(() => {
     if (methods && methods.length > 0) {
       methodsForm.reset({
@@ -285,7 +240,6 @@ const Payments = () => {
       });
     }
   }, [methods, methodsForm]);
-
 
   const updateMethodsMutation = useMutation({
     mutationFn: async (data: MethodsFormValues) => {
@@ -313,18 +267,14 @@ const Payments = () => {
     updateMethodsMutation.mutate(data);
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
-
-  if (!user || isLoadingRestaurantId) {
+  if (isLoadingRestaurantId) {
     return <div className="flex h-screen items-center justify-center">Carregando...</div>;
   }
   
   if (!restaurantId) {
     return (
-      <div className="flex h-screen items-center justify-center p-4">
-        <Card className="max-w-md text-center">
+      <main className="flex-1 p-4 sm:p-6 md:p-8">
+        <Card className="max-w-md text-center mx-auto">
           <CardHeader>
             <CardTitle>Restaurante Não Encontrado</CardTitle>
           </CardHeader>
@@ -337,179 +287,154 @@ const Payments = () => {
             </Link>
           </CardContent>
         </Card>
-      </div>
+      </main>
     );
   }
 
   const isDataLoading = isLoadingSettings || isLoadingMethods;
 
   return (
-    <div className="flex min-h-screen bg-muted/40">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <header className="border-b bg-background sticky top-0 z-40">
-          <div className="container max-w-none mx-auto px-8 h-16 flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <CreditCard className="h-6 w-6" />
-              <h1 className="text-xl font-semibold">Pagamentos</h1>
-            </div>
-            <Button variant="outline" onClick={handleSignOut}>
-              Sair
-            </Button>
-          </div>
-        </header>
-
-        <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
-          <div className="max-w-3xl mx-auto space-y-8">
-            
-            {/* Credenciais Mercado Pago */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-2xl font-bold flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Key className="h-6 w-6 text-primary" />
-                    Credenciais Mercado Pago
-                  </div>
-                  <a 
-                    href="https://www.mercadopago.com.br/developers/panel/credentials" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                  >
-                    <Button variant="outline" size="sm">
-                      Pegue sua credencial do mercado pago aqui! <ExternalLink className="h-4 w-4 ml-2" />
-                    </Button>
-                  </a>
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Configure suas chaves de API do Mercado Pago
-                </p>
-              </CardHeader>
-              <CardContent>
-                {isDataLoading ? (
-                  <div className="space-y-4">
-                    <Skeleton className="h-4 w-1/4" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-4 w-1/4" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-12 w-full mt-4" />
-                  </div>
-                ) : (
-                  <Form {...credentialsForm}>
-                    <form onSubmit={credentialsForm.handleSubmit(handleCredentialsSubmit)} className="space-y-4">
-                      
-                      {/* Public Key */}
-                      <FormField
-                        control={credentialsForm.control}
-                        name="mercado_pago_public_key"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Public Key</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                placeholder="TEST-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
-                                className="h-12"
-                              />
-                            </FormControl>
-                            <p className="text-xs text-muted-foreground">Chave pública para identificação da aplicação</p>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {/* Access Token */}
-                      <FormField
-                        control={credentialsForm.control}
-                        name="mercado_pago_access_token"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Access Token</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                type="password"
-                                placeholder="TEST-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
-                                className="h-12"
-                              />
-                            </FormControl>
-                            <p className="text-xs text-muted-foreground">Token de acesso para processar pagamentos (mantido em segredo)</p>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <Button 
-                        type="submit" 
-                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg mt-6"
-                        disabled={credentialsMutation.isPending}
-                      >
-                        {credentialsMutation.isPending ? 'Salvando...' : 'Salvar Credenciais'}
-                      </Button>
-                    </form>
-                  </Form>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Métodos de Pagamento */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-2xl font-bold">Métodos de Pagamento</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Configure os métodos de pagamento aceitos pelo seu estabelecimento
-                </p>
-              </CardHeader>
-              <CardContent>
-                {isDataLoading || ensureDefaultMethods.isPending ? (
-                  <div className="space-y-4">
-                    {[...Array(4)].map((_, i) => (
-                      <div key={i} className="flex items-center justify-between py-4 border-b last:border-b-0">
-                        <div className="flex items-center gap-4">
-                          <Skeleton className="h-10 w-10 rounded-md" />
-                          <div>
-                            <Skeleton className="h-4 w-32 mb-1" />
-                            <Skeleton className="h-3 w-48" />
-                          </div>
-                        </div>
-                        <Skeleton className="h-6 w-10 rounded-full" />
-                      </div>
-                    ))}
-                    <Skeleton className="h-12 w-full mt-4" />
-                  </div>
-                ) : (
-                  <Form {...methodsForm}>
-                    <form onSubmit={methodsForm.handleSubmit(handleMethodsSubmit)} className="space-y-4">
-                      {methodsForm.watch('methods').map((method, index) => {
-                        const dbMethod = methods?.find(m => m.id === method.id);
-                        const Icon = dbMethod?.icon ? getIconComponent(dbMethod.icon) : Store;
-                        
-                        return (
-                          <PaymentMethodItem
-                            key={method.id}
-                            method={dbMethod!}
-                            index={index}
-                            control={methodsForm.control}
-                            icon={Icon}
+    <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
+      <div className="max-w-3xl mx-auto space-y-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Key className="h-6 w-6 text-primary" />
+                Credenciais Mercado Pago
+              </div>
+              <a 
+                href="https://www.mercadopago.com.br/developers/panel/credentials" 
+                target="_blank" 
+                rel="noopener noreferrer"
+              >
+                <Button variant="outline" size="sm">
+                  Pegue sua credencial do mercado pago aqui! <ExternalLink className="h-4 w-4 ml-2" />
+                </Button>
+              </a>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Configure suas chaves de API do Mercado Pago
+            </p>
+          </CardHeader>
+          <CardContent>
+            {isDataLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-4 w-1/4" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-4 w-1/4" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-12 w-full mt-4" />
+              </div>
+            ) : (
+              <Form {...credentialsForm}>
+                <form onSubmit={credentialsForm.handleSubmit(handleCredentialsSubmit)} className="space-y-4">
+                  <FormField
+                    control={credentialsForm.control}
+                    name="mercado_pago_public_key"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Public Key</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            placeholder="TEST-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
+                            className="h-12"
                           />
-                        );
-                      })}
-                      
-                      <Button 
-                        type="submit" 
-                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg mt-6"
-                        disabled={updateMethodsMutation.isPending}
-                      >
-                        {updateMethodsMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
-                      </Button>
-                    </form>
-                  </Form>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </main>
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">Chave pública para identificação da aplicação</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={credentialsForm.control}
+                    name="mercado_pago_access_token"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Access Token</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            type="password"
+                            placeholder="TEST-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
+                            className="h-12"
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">Token de acesso para processar pagamentos (mantido em segredo)</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg mt-6"
+                    disabled={credentialsMutation.isPending}
+                  >
+                    {credentialsMutation.isPending ? 'Salvando...' : 'Salvar Credenciais'}
+                  </Button>
+                </form>
+              </Form>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold">Métodos de Pagamento</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Configure os métodos de pagamento aceitos pelo seu estabelecimento
+            </p>
+          </CardHeader>
+          <CardContent>
+            {isDataLoading || ensureDefaultMethods.isPending ? (
+              <div className="space-y-4">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="flex items-center justify-between py-4 border-b last:border-b-0">
+                    <div className="flex items-center gap-4">
+                      <Skeleton className="h-10 w-10 rounded-md" />
+                      <div>
+                        <Skeleton className="h-4 w-32 mb-1" />
+                        <Skeleton className="h-3 w-48" />
+                      </div>
+                    </div>
+                    <Skeleton className="h-6 w-10 rounded-full" />
+                  </div>
+                ))}
+                <Skeleton className="h-12 w-full mt-4" />
+              </div>
+            ) : (
+              <Form {...methodsForm}>
+                <form onSubmit={methodsForm.handleSubmit(handleMethodsSubmit)} className="space-y-4">
+                  {methodsForm.watch('methods').map((method, index) => {
+                    const dbMethod = methods?.find(m => m.id === method.id);
+                    const Icon = dbMethod?.icon ? getIconComponent(dbMethod.icon) : Store;
+                    
+                    return (
+                      <PaymentMethodItem
+                        key={method.id}
+                        method={dbMethod!}
+                        index={index}
+                        control={methodsForm.control}
+                        icon={Icon}
+                      />
+                    );
+                  })}
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg mt-6"
+                    disabled={updateMethodsMutation.isPending}
+                  >
+                    {updateMethodsMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
+                  </Button>
+                </form>
+              </Form>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </main>
   );
 };
 

@@ -1,11 +1,6 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Sidebar } from "@/components/Sidebar";
 import {
   ShoppingCart,
   Package,
@@ -14,6 +9,7 @@ import {
   Copy,
   ExternalLink,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const DashboardStatCard = ({ icon: Icon, title, value, description }: { icon: React.ElementType, title: string, value: string, description: string }) => (
   <Card>
@@ -29,45 +25,6 @@ const DashboardStatCard = ({ icon: Icon, title, value, description }: { icon: Re
 );
 
 const Dashboard = () => {
-  const navigate = useNavigate();
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        navigate("/auth");
-      } else {
-        setUser(session.user);
-      }
-    };
-
-    checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (event === 'SIGNED_OUT') {
-          navigate("/");
-        } else if (session?.user) {
-          setUser(session.user);
-        } else {
-          navigate("/auth");
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  const handleSignOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast.error("Erro ao fazer logout");
-    } else {
-      toast.success("Logout realizado com sucesso!");
-    }
-  };
-
   const menuLink = `${window.location.origin}${window.location.pathname}#/menu`;
 
   const copyLink = () => {
@@ -75,113 +32,93 @@ const Dashboard = () => {
     toast.success("Link copiado para a área de transferência!");
   };
 
-  if (!user) {
-    return <div className="flex h-screen items-center justify-center">Carregando...</div>;
-  }
-
   return (
-    <div className="flex min-h-screen bg-muted/40">
-      <Sidebar />
-      <div className="flex-1 flex flex-col">
-        <header className="border-b bg-background sticky top-0 z-40">
-          <div className="container max-w-none mx-auto px-8 h-16 flex justify-between items-center">
-            <div>
-              {/* Header content can go here if needed, or it can be removed for a cleaner look */}
-            </div>
-            <Button variant="outline" onClick={handleSignOut}>
-              Sair
-            </Button>
-          </div>
-        </header>
-        
-        <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
-          <div className="mb-4">
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">Bem-vindo ao painel de controle do Pedido 123</p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <DashboardStatCard
-              title="Pedidos Hoje"
-              value="0"
-              description="Nenhum pedido hoje"
-              icon={ShoppingCart}
-            />
-            <DashboardStatCard
-              title="Produtos"
-              value="2"
-              description="Total de produtos"
-              icon={Package}
-            />
-            <DashboardStatCard
-              title="Vendas do Mês"
-              value="R$ 291,00"
-              description="Receita mensal"
-              icon={LineChart}
-            />
-            <DashboardStatCard
-              title="Clientes"
-              value="1"
-              description="Total de clientes"
-              icon={Users}
-            />
-          </div>
-
-          <div className="grid gap-8 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Primeiros Passos</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold flex-shrink-0">1</div>
-                  <div>
-                    <h3 className="font-semibold">Configure sua loja</h3>
-                    <p className="text-sm text-muted-foreground">Adicione informações sobre seu restaurante ou estabelecimento</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold flex-shrink-0">2</div>
-                  <div>
-                    <h3 className="font-semibold">Cadastre seus produtos</h3>
-                    <p className="text-sm text-muted-foreground">Crie categorias e adicione os produtos do seu cardápio</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold flex-shrink-0">3</div>
-                  <div>
-                    <h3 className="font-semibold">Compartilhe seu link</h3>
-                    <p className="text-sm text-muted-foreground">Envie o link da sua loja para seus clientes começarem a fazer pedidos</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Compartilhe seu Link</CardTitle>
-                <p className="text-sm text-muted-foreground pt-1">Envie este link para seus clientes fazerem pedidos</p>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center space-x-2">
-                  <div className="flex-1 bg-muted rounded-md px-3 py-2 text-sm text-muted-foreground overflow-x-auto whitespace-nowrap">
-                    {menuLink}
-                  </div>
-                  <Button variant="outline" size="icon" onClick={copyLink}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <a href={menuLink} target="_blank" rel="noopener noreferrer">
-                    <Button variant="outline" size="icon">
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
-                  </a>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
+    <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
+      <div className="mb-4">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground">Bem-vindo ao painel de controle do Pedido 123</p>
       </div>
-    </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <DashboardStatCard
+          title="Pedidos Hoje"
+          value="0"
+          description="Nenhum pedido hoje"
+          icon={ShoppingCart}
+        />
+        <DashboardStatCard
+          title="Produtos"
+          value="2"
+          description="Total de produtos"
+          icon={Package}
+        />
+        <DashboardStatCard
+          title="Vendas do Mês"
+          value="R$ 291,00"
+          description="Receita mensal"
+          icon={LineChart}
+        />
+        <DashboardStatCard
+          title="Clientes"
+          value="1"
+          description="Total de clientes"
+          icon={Users}
+        />
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Primeiros Passos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-start gap-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold flex-shrink-0">1</div>
+              <div>
+                <h3 className="font-semibold">Configure sua loja</h3>
+                <p className="text-sm text-muted-foreground">Adicione informações sobre seu restaurante ou estabelecimento</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold flex-shrink-0">2</div>
+              <div>
+                <h3 className="font-semibold">Cadastre seus produtos</h3>
+                <p className="text-sm text-muted-foreground">Crie categorias e adicione os produtos do seu cardápio</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold flex-shrink-0">3</div>
+              <div>
+                <h3 className="font-semibold">Compartilhe seu link</h3>
+                <p className="text-sm text-muted-foreground">Envie o link da sua loja para seus clientes começarem a fazer pedidos</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Compartilhe seu Link</CardTitle>
+            <p className="text-sm text-muted-foreground pt-1">Envie este link para seus clientes fazerem pedidos</p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center space-x-2">
+              <div className="flex-1 bg-muted rounded-md px-3 py-2 text-sm text-muted-foreground overflow-x-auto whitespace-nowrap">
+                {menuLink}
+              </div>
+              <Button variant="outline" size="icon" onClick={copyLink}>
+                <Copy className="h-4 w-4" />
+              </Button>
+              <a href={menuLink} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="icon">
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </main>
   );
 };
 

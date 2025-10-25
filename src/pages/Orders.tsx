@@ -1,15 +1,14 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShoppingCart, Terminal, RefreshCw, Clock, CheckCircle, XCircle, Truck, Package, Utensils, Check, X, Volume2, VolumeX, AlertCircle } from 'lucide-react';
+import { ShoppingCart, Terminal, RefreshCw, Clock, CheckCircle, XCircle, Truck, Package, Utensils, Check, X } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
@@ -17,8 +16,6 @@ import { OrderDetailsModal } from "@/components/OrderDetailsModal";
 import { toast } from "sonner";
 
 type Order = Tables<'orders'> & { customer: Tables<'customers'> | null };
-type Restaurant = Tables<'restaurants'>;
-type SoundStatus = 'disabled' | 'enabled' | 'error';
 
 const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: React.ElementType, color: string }> = {
   pending: { label: 'Pendente', icon: Clock, color: 'bg-yellow-500 hover:bg-yellow-600' },
@@ -100,136 +97,22 @@ const OrdersList = ({ status, onViewDetails, restaurantId }: { status: Enums<'or
 };
 
 const Orders = () => {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [user, setUser] = useState<User | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  
-  const [soundStatus, setSoundStatus] = useState<SoundStatus>(() => {
-    const savedStatus = localStorage.getItem('soundNotificationStatus');
-    return (savedStatus as SoundStatus) || 'disabled';
-  });
+  const [restaurantId, setRestaurantId] = useState<string | null>(null);
 
-  useEffect(() => {
-    localStorage.setItem('soundNotificationStatus', soundStatus);
-  }, [soundStatus]);
-
-  const { data: restaurant } = useQuery<Restaurant>({
-    queryKey: ['restaurantForOrders'],
+  useQuery({
+    queryKey: ['restaurantIdForOrdersPage'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('restaurants').select('id, notification_sound_url').limit(1).single();
+      const { data, error } = await supabase.from('restaurants').select('id').limit(1).single();
       if (error) throw new Error(error.message);
-      return data;
+      setRestaurantId(data.id);
+      return data.id;
     },
-    enabled: !!user,
   });
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) navigate("/auth"); else setUser(session.user);
-    };
-    checkSession();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') navigate("/"); else if (!session?.user) navigate("/auth"); else setUser(session.user);
-    });
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  useEffect(() => {
-    if (restaurant?.notification_sound_url) {
-      const audio = new Audio(restaurant.notification_sound_url);
-      audio.onerror = () => {
-        toast.error("Erro ao carregar o som de notificação.", { description: "Verifique o arquivo em Configurações." });
-        setSoundStatus('error');
-      };
-      audioRef.current = audio;
-    }
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, [restaurant?.notification_sound_url]);
-
-  useEffect(() => {
-    const channel = supabase.channel('new-orders').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      
-      const newOrder = payload.new as Order;
-      if (newOrder.status === 'pending') {
-        toast.info("🔔 Novo pedido recebido!", { 
-          description: `Pedido de ${newOrder.customer?.name || 'um cliente'} aguardando confirmação.`,
-          duration: 10000,
-        });
-        
-        if (soundStatus === 'enabled' && audioRef.current) {
-          audioRef.current.play().catch(error => {
-            console.error("Erro na reprodução automática de áudio:", error);
-            toast.warning("Não foi possível tocar o som automaticamente.", {
-              description: "Clique para tocar o som do novo pedido.",
-              action: {
-                label: "Tocar Som",
-                onClick: () => audioRef.current?.play(),
-              },
-              duration: Infinity,
-            });
-          });
-        }
-      }
-    }).subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient, soundStatus]);
-
-  const handleToggleSound = async () => {
-    if (soundStatus === 'enabled') {
-      setSoundStatus('disabled');
-      toast.info('Notificações sonoras desativadas.');
-      return;
-    }
-
-    if (!audioRef.current) {
-      toast.error("Som de notificação não está pronto ou configurado.");
-      setSoundStatus('error');
-      return;
-    }
-
-    try {
-      await audioRef.current.play();
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setSoundStatus('enabled');
-      toast.success('Notificações sonoras ativadas!');
-    } catch (err) {
-      console.error("Audio activation failed:", err);
-      toast.error("Falha ao ativar o som.", { description: "Seu navegador pode ter bloqueado. Clique na página e tente novamente." });
-      setSoundStatus('error');
-    }
-  };
-
-  const handleTestSound = () => {
-    if (soundStatus === 'enabled' && audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(err => {
-        toast.error("Não foi possível tocar o som de teste.");
-        console.error(err);
-      });
-    } else {
-      toast.info("O som está desativado.", { description: "Clique no ícone de som para ativar as notificações." });
-    }
-  };
 
   const handleViewDetails = (order: Order) => { setSelectedOrder(order); setIsModalOpen(true); };
   const handleCloseModal = () => { setIsModalOpen(false); setSelectedOrder(null); };
-  const handleSignOut = async () => { await supabase.auth.signOut(); };
-
-  if (!user) return <div className="flex h-screen items-center justify-center">Carregando...</div>;
 
   const statusTabs: { value: Enums<'order_status'> | 'all', label: string }[] = [
     { value: 'all', label: 'Todos' }, { value: 'pending', label: 'Pendentes' }, { value: 'confirmed', label: 'Confirmados' },
@@ -240,35 +123,16 @@ const Orders = () => {
   return (
     <>
       <OrderDetailsModal order={selectedOrder} isOpen={isModalOpen} onClose={handleCloseModal} />
-      <div className="flex min-h-screen bg-muted/40">
-        <Sidebar />
-        <div className="flex-1 flex flex-col">
-          <header className="border-b bg-background sticky top-0 z-40">
-            <div className="container max-w-none mx-auto px-8 h-16 flex justify-between items-center">
-              <div className="flex items-center gap-4"><ShoppingCart className="h-6 w-6" /><h1 className="text-xl font-semibold">Pedidos</h1></div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={handleTestSound} disabled={soundStatus !== 'enabled'}>Testar Som</Button>
-                <Button variant="outline" size="icon" onClick={handleToggleSound}>
-                  {soundStatus === 'enabled' && <Volume2 className="h-4 w-4 text-green-500" />}
-                  {soundStatus === 'disabled' && <VolumeX className="h-4 w-4" />}
-                  {soundStatus === 'error' && <AlertCircle className="h-4 w-4 text-destructive" />}
-                </Button>
-                <Button variant="outline" onClick={handleSignOut}>Sair</Button>
-              </div>
-            </div>
-          </header>
-          <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
-            {restaurant?.id ? (
-              <Tabs defaultValue="pending">
-                <TabsList className="w-full overflow-x-auto justify-start">{statusTabs.map(tab => <TabsTrigger key={tab.value} value={tab.value} className="whitespace-rap">{tab.label}</TabsTrigger>)}</TabsList>
-                {statusTabs.map(tab => <TabsContent key={tab.value} value={tab.value} className="mt-6"><OrdersList status={tab.value} onViewDetails={handleViewDetails} restaurantId={restaurant.id!} /></TabsContent>)}
-              </Tabs>
-            ) : (
-              <div className="text-center py-12"><Skeleton className="h-12 w-12 mx-auto mb-4" /><p>Carregando dados do restaurante...</p></div>
-            )}
-          </main>
-        </div>
-      </div>
+      <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
+        {restaurantId ? (
+          <Tabs defaultValue="pending">
+            <TabsList className="w-full overflow-x-auto justify-start">{statusTabs.map(tab => <TabsTrigger key={tab.value} value={tab.value} className="whitespace-nowrap">{tab.label}</TabsTrigger>)}</TabsList>
+            {statusTabs.map(tab => <TabsContent key={tab.value} value={tab.value} className="mt-6"><OrdersList status={tab.value} onViewDetails={handleViewDetails} restaurantId={restaurantId} /></TabsContent>)}
+          </Tabs>
+        ) : (
+          <div className="text-center py-12"><Skeleton className="h-12 w-12 mx-auto mb-4" /><p>Carregando dados do restaurante...</p></div>
+        )}
+      </main>
     </>
   );
 };
