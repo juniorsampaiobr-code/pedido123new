@@ -9,6 +9,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from "sonner";
@@ -219,21 +220,20 @@ const Settings = () => {
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                <FormItem>
-                  <FormLabel>Arquivo de Som (MP3)</FormLabel>
-                  <FormControl>
-                    <label className="flex items-center justify-center w-full h-12 px-4 border-2 border-dashed rounded-md cursor-pointer hover:bg-muted">
-                      <Upload className="w-4 h-4 mr-2" />
-                      <span>{soundFile?.name || 'Escolher Arquivo MP3'}</span>
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept=".mp3"
-                        onChange={(e) => setSoundFile(e.target.files?.[0] || null)}
-                      />
-                    </label>
-                  </FormControl>
-                </FormItem>
+                <div className="space-y-2">
+                  <Label htmlFor="sound-upload">Arquivo de Som (MP3)</Label>
+                  <label className="flex items-center justify-center w-full h-12 px-4 border-2 border-dashed rounded-md cursor-pointer hover:bg-muted">
+                    <Upload className="w-4 h-4 mr-2" />
+                    <span>{soundFile?.name || 'Escolher Arquivo MP3'}</span>
+                    <input
+                      id="sound-upload"
+                      type="file"
+                      className="hidden"
+                      accept=".mp3"
+                      onChange={(e) => setSoundFile(e.target.files?.[0] || null)}
+                    />
+                  </label>
+                </div>
                 <Button 
                   onClick={handleSoundSave} 
                   className="w-full h-12 text-lg" 
