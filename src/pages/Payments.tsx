@@ -136,7 +136,6 @@ const Payments = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
-  const [restaurantId, setRestaurantId] = useState<string | null>(null);
 
   // 1. Autenticação e Redirecionamento
   useEffect(() => {
@@ -158,11 +157,10 @@ const Payments = () => {
   }, [navigate]);
 
   // 2. Busca do ID do Restaurante
-  useQuery({
+  const { data: restaurantId, isLoading: isLoadingRestaurantId } = useQuery<string>({
     queryKey: ['restaurantId'],
     queryFn: fetchRestaurantId,
-    enabled: !!user && !restaurantId,
-    onSuccess: (id) => setRestaurantId(id),
+    enabled: !!user,
   });
 
   // 3. Busca de Credenciais e Métodos
@@ -228,6 +226,7 @@ const Payments = () => {
       credentialsForm.reset({ mercado_pago_access_token: '' }); // Limpa o campo do token
     },
     onError: (err) => {
+      // Captura o erro lançado pela mutationFn, que pode ser 'ID do restaurante não disponível.'
       toast.error(`Erro ao salvar credenciais: ${err.message}`);
     },
   });
@@ -318,11 +317,31 @@ const Payments = () => {
     await supabase.auth.signOut();
   };
 
-  if (!user) {
+  if (!user || isLoadingRestaurantId) {
     return <div className="flex h-screen items-center justify-center">Carregando...</div>;
   }
+  
+  if (!restaurantId) {
+    return (
+      <div className="flex h-screen items-center justify-center p-4">
+        <Card className="max-w-md text-center">
+          <CardHeader>
+            <CardTitle>Restaurante Não Encontrado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">
+              Não foi possível carregar o ID do restaurante. Por favor, verifique se o seu restaurante está configurado corretamente na página de Configurações.
+            </p>
+            <Link to="/settings">
+              <Button className="mt-4">Ir para Configurações</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-  const isDataLoading = isLoadingSettings || isLoadingMethods || !restaurantId;
+  const isDataLoading = isLoadingSettings || isLoadingMethods;
 
   return (
     <div className="flex min-h-screen bg-muted/40">
@@ -366,7 +385,7 @@ const Payments = () => {
                 </p>
               </CardHeader>
               <CardContent>
-                {isLoadingSettings ? (
+                {isDataLoading ? (
                   <div className="space-y-4">
                     <Skeleton className="h-4 w-1/4" />
                     <Skeleton className="h-10 w-full" />
@@ -441,7 +460,7 @@ const Payments = () => {
                 </p>
               </CardHeader>
               <CardContent>
-                {isLoadingMethods || ensureDefaultMethods.isPending ? (
+                {isDataLoading || ensureDefaultMethods.isPending ? (
                   <div className="space-y-4">
                     {[...Array(4)].map((_, i) => (
                       <div key={i} className="flex items-center justify-between py-4 border-b last:border-b-0">
