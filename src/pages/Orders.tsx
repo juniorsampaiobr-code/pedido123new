@@ -107,13 +107,11 @@ const Orders = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
-  // Load sound status from localStorage on initial render
   const [soundStatus, setSoundStatus] = useState<SoundStatus>(() => {
     const savedStatus = localStorage.getItem('soundNotificationStatus');
     return (savedStatus as SoundStatus) || 'disabled';
   });
 
-  // Save sound status to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('soundNotificationStatus', soundStatus);
   }, [soundStatus]);
@@ -128,7 +126,6 @@ const Orders = () => {
     enabled: !!user,
   });
 
-  // Effect to setup user session
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -141,7 +138,6 @@ const Orders = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Effect to setup the Audio object
   useEffect(() => {
     if (restaurant?.notification_sound_url) {
       const audio = new Audio(restaurant.notification_sound_url);
@@ -159,14 +155,7 @@ const Orders = () => {
     };
   }, [restaurant?.notification_sound_url]);
 
-  // Effect to setup Supabase real-time channel
   useEffect(() => {
-    const playSound = () => {
-      if (soundStatus === 'enabled' && audioRef.current) {
-        audioRef.current.play().catch(error => console.error("Erro ao tocar áudio:", error));
-      }
-    };
-
     const channel = supabase.channel('new-orders').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       
@@ -174,12 +163,22 @@ const Orders = () => {
       if (newOrder.status === 'pending') {
         toast.info("🔔 Novo pedido recebido!", { 
           description: `Pedido de ${newOrder.customer?.name || 'um cliente'} aguardando confirmação.`,
-          duration: Infinity,
-          action: {
-            label: "Tocar Som",
-            onClick: () => playSound(),
-          },
+          duration: 10000,
         });
+        
+        if (soundStatus === 'enabled' && audioRef.current) {
+          audioRef.current.play().catch(error => {
+            console.error("Erro na reprodução automática de áudio:", error);
+            toast.warning("Não foi possível tocar o som automaticamente.", {
+              description: "Clique para tocar o som do novo pedido.",
+              action: {
+                label: "Tocar Som",
+                onClick: () => audioRef.current?.play(),
+              },
+              duration: Infinity,
+            });
+          });
+        }
       }
     }).subscribe();
 
@@ -216,6 +215,7 @@ const Orders = () => {
 
   const handleTestSound = () => {
     if (soundStatus === 'enabled' && audioRef.current) {
+      audioRef.current.currentTime = 0;
       audioRef.current.play().catch(err => {
         toast.error("Não foi possível tocar o som de teste.");
         console.error(err);
@@ -260,7 +260,7 @@ const Orders = () => {
           <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
             {restaurant?.id ? (
               <Tabs defaultValue="pending">
-                <TabsList className="w-full overflow-x-auto justify-start">{statusTabs.map(tab => <TabsTrigger key={tab.value} value={tab.value} className="whitespace-nowrap">{tab.label}</TabsTrigger>)}</TabsList>
+                <TabsList className="w-full overflow-x-auto justify-start">{statusTabs.map(tab => <TabsTrigger key={tab.value} value={tab.value} className="whitespace-rap">{tab.label}</TabsTrigger>)}</TabsList>
                 {statusTabs.map(tab => <TabsContent key={tab.value} value={tab.value} className="mt-6"><OrdersList status={tab.value} onViewDetails={handleViewDetails} restaurantId={restaurant.id!} /></TabsContent>)}
               </Tabs>
             ) : (
