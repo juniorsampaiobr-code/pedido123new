@@ -18,6 +18,7 @@ import { toast } from "sonner";
 
 type Order = Tables<'orders'> & { customer: Tables<'customers'> | null };
 type Restaurant = Tables<'restaurants'>;
+type SoundStatus = 'disabled' | 'enabled' | 'error';
 
 const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: React.ElementType, color: string }> = {
   pending: { label: 'Pendente', icon: Clock, color: 'bg-yellow-500 hover:bg-yellow-600' },
@@ -105,7 +106,17 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [soundStatus, setSoundStatus] = useState<'disabled' | 'enabled' | 'error'>('disabled');
+  
+  // Load sound status from localStorage on initial render
+  const [soundStatus, setSoundStatus] = useState<SoundStatus>(() => {
+    const savedStatus = localStorage.getItem('soundNotificationStatus');
+    return (savedStatus as SoundStatus) || 'disabled';
+  });
+
+  // Save sound status to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('soundNotificationStatus', soundStatus);
+  }, [soundStatus]);
 
   const { data: restaurant } = useQuery<Restaurant>({
     queryKey: ['restaurantForOrders'],
