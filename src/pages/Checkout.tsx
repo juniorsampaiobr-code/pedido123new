@@ -27,6 +27,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { PhoneInput } from '@/components/PhoneInput'; // Importando o novo componente
 
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
@@ -433,7 +434,7 @@ const Checkout = () => {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Telefone *</FormLabel>
-                            <Input placeholder="(99) 99999-9999" {...field} />
+                            <PhoneInput {...field} />
                             <FormMessage />
                           </FormItem>
                         )}
