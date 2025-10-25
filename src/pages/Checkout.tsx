@@ -15,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, MapPin, Truck, Store, CreditCard, ArrowLeft, DollarSign, Smartphone, Package } from 'lucide-react';
+import { Terminal, MapPin, Truck, Store, CreditCard, ArrowLeft, DollarSign, Smartphone, Package, Loader2 } from 'lucide-react';
 import { Tables, TablesInsert, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -35,29 +35,19 @@ type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
 type DeliveryZone = Tables<'delivery_zones'>;
 
-// Helper function to clean phone number
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
-// Helper function to clean zip code
 const cleanZipCode = (zipCode: string) => zipCode.replace(/\D/g, '');
-// Helper function to clean CPF/CNPJ
 const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
 
-// --- Schemas ---
-
 const checkoutSchema = z.object({
-  // Customer Details
   name: z.string().min(1, 'Nome é obrigatório.'),
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(cleanPhoneNumber).refine(val => val.length >= 10, {
     message: 'O telefone deve ter pelo menos 10 dígitos (incluindo DDD).',
   }),
   email: z.string().email('Email inválido.').optional().or(z.literal('')),
-  
-  // Delivery/Pickup
   delivery_option: z.enum(['delivery', 'pickup'], {
     required_error: 'Selecione uma opção de entrega.',
   }),
-  
-  // Delivery Address (Required if delivery_option is 'delivery')
   street: z.string().optional().default(''),
   number: z.string().optional().default(''),
   neighborhood: z.string().optional().default(''),
@@ -65,54 +55,26 @@ const checkoutSchema = z.object({
   zip_code: z.string().optional().default('').transform(cleanZipCode).refine(val => val.length === 8 || val.length === 0, {
     message: 'CEP inválido. Deve conter 8 dígitos.',
   }),
-  
-  // Payment
   payment_method_id: z.string().min(1, 'Selecione uma forma de pagamento.'),
   notes: z.string().optional(),
-  
-  // Online Payment Fields (Only used if method is 'Pagamento Online')
-  card_number: z.string().optional().default(''), // Adicionado default
   cpf_cnpj: z.string().optional().default('').transform(cleanCpfCnpj).refine(val => val.length === 0 || val.length === 11 || val.length === 14, {
     message: 'CPF deve ter 11 dígitos ou CNPJ 14 dígitos.',
   }),
-  
-  // Change for cash payment
   change_for: z.preprocess(
     (val) => String(val).replace(',', '.'),
     z.coerce.number().optional().nullable(),
   ),
 }).superRefine((data, ctx) => {
-  // Delivery address validation
   if (data.delivery_option === 'delivery') {
-    // Check if required fields are empty (after trimming whitespace)
-    if (data.street.trim() === '') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Rua é obrigatória.', path: ['street'] });
-    }
-    if (data.number.trim() === '') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Número é obrigatório.', path: ['number'] });
-    }
-    if (data.neighborhood.trim() === '') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Bairro é obrigatório.', path: ['neighborhood'] });
-    }
-    if (data.city.trim() === '') {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Cidade é obrigatória.', path: ['city'] });
-    }
-    
-    // Check zip code length (it's already cleaned by the transform function)
-    if (data.zip_code.length !== 8) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CEP é obrigatório e deve ter 8 dígitos.', path: ['zip_code'] });
-    }
-  }
-  
-  // Let's ensure the CPF/CNPJ validation is strict if a value is provided, even if optional.
-  if (data.cpf_cnpj.length > 0 && data.cpf_cnpj.length !== 11 && data.cpf_cnpj.length !== 14) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CPF deve ter 11 dígitos ou CNPJ 14 dígitos.', path: ['cpf_cnpj'] });
+    if (data.street.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Rua é obrigatória.', path: ['street'] });
+    if (data.number.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Número é obrigatório.', path: ['number'] });
+    if (data.neighborhood.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Bairro é obrigatório.', path: ['neighborhood'] });
+    if (data.city.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Cidade é obrigatória.', path: ['city'] });
+    if (data.zip_code.length !== 8) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CEP é obrigatório e deve ter 8 dígitos.', path: ['zip_code'] });
   }
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
-
-// --- Data Fetching ---
 
 const fetchInitialData = async () => {
   const { data: restaurantData, error: restaurantError } = await supabase
@@ -128,18 +90,8 @@ const fetchInitialData = async () => {
   const restaurantId = restaurantData.id;
 
   const [methodsResult, zonesResult] = await Promise.all([
-    supabase
-      .from('payment_methods')
-      .select('*')
-      .eq('restaurant_id', restaurantId)
-      .eq('is_active', true)
-      .order('name', { ascending: true }),
-    supabase
-      .from('delivery_zones')
-      .select('*')
-      .eq('restaurant_id', restaurantId)
-      .eq('is_active', true)
-      .order('minimum_order', { ascending: true }), // minimum_order holds max_distance_km
+    supabase.from('payment_methods').select('*').eq('restaurant_id', restaurantId).eq('is_active', true).order('name', { ascending: true }),
+    supabase.from('delivery_zones').select('*').eq('restaurant_id', restaurantId).eq('is_active', true).order('minimum_order', { ascending: true }),
   ]);
 
   if (methodsResult.error) throw new Error(`Erro ao buscar métodos de pagamento: ${methodsResult.error.message}`);
@@ -152,7 +104,6 @@ const fetchInitialData = async () => {
   };
 };
 
-// Helper function to map icon name string back to Lucide component
 const getIconComponent = (iconName: string) => {
   switch (iconName) {
     case 'DollarSign': return DollarSign;
@@ -163,93 +114,49 @@ const getIconComponent = (iconName: string) => {
   }
 };
 
-// --- Components ---
-
 const OrderSummary = ({ subtotal, deliveryFee, total, items }: ReturnType<typeof useCart>) => (
   <Card className="sticky top-4">
-    <CardHeader>
-      <CardTitle className="text-xl">Seu Pedido</CardTitle>
-    </CardHeader>
+    <CardHeader><CardTitle className="text-xl">Seu Pedido</CardTitle></CardHeader>
     <CardContent className="space-y-3">
       <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
         {items.map(item => (
           <div key={item.id} className="flex justify-between text-sm">
-            <span className="text-muted-foreground">
-              {item.quantity}x {item.name}
-              {item.notes && <span className="block text-xs italic">({item.notes})</span>}
-            </span>
-            <span className="font-medium">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.quantity)}
-            </span>
+            <span className="text-muted-foreground">{item.quantity}x {item.name}{item.notes && <span className="block text-xs italic">({item.notes})</span>}</span>
+            <span className="font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.price * item.quantity)}</span>
           </div>
         ))}
       </div>
-      
       <Separator />
-      
       <div className="space-y-1 text-sm">
-        <div className="flex justify-between">
-          <span>Subtotal:</span>
-          <span className="font-medium">
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}
-          </span>
-        </div>
-        <div className="flex justify-between">
-          <span>Taxa de Entrega:</span>
-          <span className="font-medium text-primary">
-            {deliveryFee > 0 ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee) : 'Grátis'}
-          </span>
-        </div>
+        <div className="flex justify-between"><span>Subtotal:</span><span className="font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span></div>
+        <div className="flex justify-between"><span>Taxa de Entrega:</span><span className="font-medium text-primary">{deliveryFee > 0 ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee) : 'Grátis'}</span></div>
       </div>
-      
       <Separator />
-      
-      <div className="flex justify-between text-lg font-bold">
-        <span>Total:</span>
-        <span className="text-primary">
-          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
-        </span>
-      </div>
+      <div className="flex justify-between text-lg font-bold"><span>Total:</span><span className="text-primary">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}</span></div>
     </CardContent>
   </Card>
 );
-
-// --- Main Component ---
 
 const Checkout = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const cart = useCart();
   const { items, subtotal, deliveryFee, total, setDeliveryFee, clearCart } = cart;
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
-  // HOOK 1: Fetch initial data (Restaurant, Methods, Zones) - Called unconditionally
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['checkoutInitialData'],
     queryFn: fetchInitialData,
   });
 
-  const restaurantId = data?.restaurant?.id;
+  const restaurant = data?.restaurant;
   const paymentMethods = data?.paymentMethods || [];
   const deliveryZones = data?.deliveryZones || [];
 
-  // HOOK 2: Form Setup - Called unconditionally
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
-      name: '',
-      phone: '',
-      email: '',
-      delivery_option: 'delivery',
-      street: '',
-      number: '',
-      neighborhood: '',
-      city: '',
-      zip_code: '',
-      payment_method_id: '',
-      notes: '',
-      card_number: '', 
-      cpf_cnpj: '',    
-      change_for: null,
+      name: '', phone: '', email: '', delivery_option: 'delivery', street: '', number: '', neighborhood: '', city: '', zip_code: '', payment_method_id: '', notes: '', cpf_cnpj: '', change_for: null,
     },
     mode: 'onBlur',
   });
@@ -257,31 +164,25 @@ const Checkout = () => {
   const deliveryOption = form.watch('delivery_option');
   const selectedPaymentMethodId = form.watch('payment_method_id');
   const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
-  
+  const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online' || selectedPaymentMethod?.name === 'PIX';
   const isCashPayment = selectedPaymentMethod?.name === 'Dinheiro';
-  const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online'; 
 
-  // HOOK 3: Redirection if cart is empty - Called unconditionally
   useEffect(() => {
-    if (items.length === 0) {
-      // Use setTimeout to ensure the toast is displayed before navigation
+    if (items.length === 0 && !isProcessingPayment) {
       const timer = setTimeout(() => {
         toast.info('Seu carrinho está vazio. Adicione itens para continuar.');
         navigate('/menu');
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [items.length, navigate]);
+  }, [items.length, navigate, isProcessingPayment]);
 
-
-  // HOOK 4: Pre-select first payment method if available
   useEffect(() => {
     if (paymentMethods.length > 0 && !selectedPaymentMethodId) {
       form.setValue('payment_method_id', paymentMethods[0].id);
     }
   }, [paymentMethods, selectedPaymentMethodId, form]);
 
-  // HOOK 5: Delivery Fee Calculation
   useEffect(() => {
     if (deliveryOption === 'delivery') {
       const lowestFee = deliveryZones.length > 0 ? deliveryZones[0].delivery_fee : 5.00;
@@ -291,473 +192,102 @@ const Checkout = () => {
     }
   }, [deliveryOption, deliveryZones, setDeliveryFee]);
 
-  // HOOK 6: Order Submission Mutation
   const orderMutation = useMutation({
     mutationFn: async (formData: CheckoutFormValues) => {
-      if (!restaurantId) throw new Error('Dados do restaurante indisponíveis.');
+      if (!restaurant) throw new Error('Dados do restaurante indisponíveis.');
 
-      // 1. Find or Create Customer
       let customerId: string;
       const cleanedPhone = cleanPhoneNumber(formData.phone);
-      
-      const { data: existingCustomer } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('phone', cleanedPhone)
-        .limit(1)
-        .single();
+      const { data: existingCustomer } = await supabase.from('customers').select('id').eq('phone', cleanedPhone).limit(1).single();
 
       if (existingCustomer) {
         customerId = existingCustomer.id;
       } else {
-        const customerInsert: TablesInsert<'customers'> = {
-          name: formData.name,
-          phone: cleanedPhone, 
-          email: formData.email || null,
-          address: formData.delivery_option === 'delivery' 
-            ? `${formData.street}, ${formData.number}, ${formData.neighborhood}, ${formData.city} - ${formData.zip_code}`
-            : null,
-        };
-        const { data: newCustomer, error: customerError } = await supabase
-          .from('customers')
-          .insert(customerInsert)
-          .select('id')
-          .single();
-        
+        const { data: newCustomer, error: customerError } = await supabase.from('customers').insert({
+          name: formData.name, phone: cleanedPhone, email: formData.email || null,
+          address: formData.delivery_option === 'delivery' ? `${formData.street}, ${formData.number}, ${formData.neighborhood}, ${formData.city} - ${formData.zip_code}` : null,
+        }).select('id').single();
         if (customerError) throw new Error(`Erro ao criar cliente: ${customerError.message}`);
         customerId = newCustomer.id;
       }
 
-      // 2. Create Order
-      const orderInsert: TablesInsert<'orders'> = {
-        restaurant_id: restaurantId,
-        customer_id: customerId,
-        status: 'pending' as Enums<'order_status'>,
-        total_amount: total,
-        delivery_fee: deliveryFee,
-        notes: formData.notes,
-        delivery_address: formData.delivery_option === 'delivery' 
-          ? `${formData.street}, ${formData.number}, ${formData.neighborhood}, ${formData.city} - ${formData.zip_code}`
-          : 'Retirada no Local',
-      };
-
-      const { data: newOrder, error: orderError } = await supabase
-        .from('orders')
-        .insert(orderInsert)
-        .select('id')
-        .single();
+      const orderStatus = isOnlinePayment ? 'pending_payment' : 'pending';
+      const { data: newOrder, error: orderError } = await supabase.from('orders').insert({
+        restaurant_id: restaurant.id, customer_id: customerId, status: orderStatus as Enums<'order_status'>,
+        total_amount: total, delivery_fee: deliveryFee, notes: formData.notes,
+        delivery_address: formData.delivery_option === 'delivery' ? `${formData.street}, ${formData.number}, ${formData.neighborhood}, ${formData.city} - ${formData.zip_code}` : 'Retirada no Local',
+      }).select('id').single();
 
       if (orderError) throw new Error(`Erro ao criar pedido: ${orderError.message}`);
       const orderId = newOrder.id;
 
-      // 3. Create Order Items
       const itemsInsert: TablesInsert<'order_items'>[] = items.map(item => ({
-        order_id: orderId,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: item.price,
-        subtotal: item.price * item.quantity,
-        notes: item.notes,
+        order_id: orderId, product_id: item.product_id, quantity: item.quantity,
+        unit_price: item.price, subtotal: item.price * item.quantity, notes: item.notes,
       }));
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(itemsInsert);
-
+      const { error: itemsError } = await supabase.from('order_items').insert(itemsInsert);
       if (itemsError) throw new Error(`Erro ao adicionar itens do pedido: ${itemsError.message}`);
-      
+
+      if (isOnlinePayment) {
+        setIsProcessingPayment(true);
+        toast.info("Redirecionando para o pagamento...");
+        const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
+          body: { orderId, items, totalAmount: total, restaurantName: restaurant.name },
+        });
+        if (preferenceError) throw new Error(preferenceError.message);
+        window.location.href = preferenceData.init_point;
+      }
+
       return orderId;
     },
     onSuccess: (orderId) => {
-      toast.success(`Pedido #${orderId.slice(-4)} realizado com sucesso!`);
-      // REMOVED clearCart() HERE
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      navigate(`/order-success/${orderId}`); 
+      if (!isOnlinePayment) {
+        toast.success(`Pedido #${orderId.slice(-4)} realizado com sucesso!`);
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        navigate(`/order-success/${orderId}`);
+      }
     },
     onError: (err) => {
       toast.error(`Erro ao finalizar pedido: ${err.message}`);
+      setIsProcessingPayment(false);
     },
   });
 
-  const onSubmit = (data: CheckoutFormValues) => {
-    orderMutation.mutate(data);
-  };
-  
+  const onSubmit = (data: CheckoutFormValues) => orderMutation.mutate(data);
   const onValidationFail = (errors: any) => {
     if (Object.keys(errors).length > 0) {
       toast.error('Por favor, preencha todos os campos obrigatórios e corrija os erros.');
-      console.error("Validation Errors:", JSON.stringify(errors, null, 2));
     }
   };
 
-  // --- Conditional Rendering (After all hooks are called) ---
+  if (items.length === 0 && !isProcessingPayment) return <div className="flex h-screen items-center justify-center">Redirecionando...</div>;
+  if (isLoading) return <div className="container mx-auto p-4 max-w-6xl"><Skeleton className="h-10 w-48 mb-6" /><div className="grid lg:grid-cols-3 gap-8"><div className="lg:col-span-2 space-y-6"><Skeleton className="h-64 w-full" /><Skeleton className="h-64 w-full" /></div><div className="lg:col-span-1"><Skeleton className="h-96 w-full sticky top-4" /></div></div></div>;
+  if (isError) return <div className="container mx-auto p-4 max-w-6xl"><Alert variant="destructive"><Terminal className="h-4 w-4" /><AlertTitle>Erro de Conexão</AlertTitle><AlertDescription>{error instanceof Error ? error.message : "Não foi possível carregar os dados."}</AlertDescription></Alert></div>;
 
-  // Se o carrinho estiver vazio, mostre um estado de carregamento enquanto o useEffect redireciona.
-  if (items.length === 0) {
-    return <div className="flex h-screen items-center justify-center">Redirecionando para o cardápio...</div>;
-  }
-
-  // Se estiver carregando dados iniciais
-  if (isLoading) {
-    return (
-      <div className="container mx-auto p-4 max-w-6xl">
-        <Skeleton className="h-10 w-48 mb-6" />
-        <div className="grid lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-64 w-full" />
-          </div>
-          <div className="lg:col-span-1"><Skeleton className="h-96 w-full sticky top-4" /></div>
-        </div>
-      </div>
-    );
-  }
-
-  // Se houver erro nos dados iniciais
-  if (isError) {
-    return (
-      <div className="container mx-auto p-4 max-w-6xl">
-        <Alert variant="destructive">
-          <Terminal className="h-4 w-4" />
-          <AlertTitle>Erro de Conexão</AlertTitle>
-          <AlertDescription>
-            {error instanceof Error ? error.message : "Não foi possível carregar os dados necessários para o checkout."}
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
+  const isSubmitting = orderMutation.isPending || isProcessingPayment;
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 max-w-6xl flex items-center">
-          <Link to="/menu">
-            <Button variant="ghost" size="icon" className="mr-4">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
+          <Link to="/menu"><Button variant="ghost" size="icon" className="mr-4"><ArrowLeft className="h-5 w-5" /></Button></Link>
           <h1 className="text-2xl font-bold">Finalizar Pedido</h1>
         </div>
       </header>
-
       <main className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="grid lg:grid-cols-3 gap-8">
-          
-          {/* Left Column: Form */}
           <div className="lg:col-span-2 space-y-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit, onValidationFail)} className="space-y-6">
-                
-                {/* 1. Detalhes do Cliente */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-xl">1. Seus Dados</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Nome Completo *</FormLabel>
-                          <Input placeholder="Seu nome" {...field} />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="phone"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Telefone *</FormLabel>
-                            <PhoneInput {...field} />
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="email"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Email (Opcional)</FormLabel>
-                            <Input placeholder="seu@email.com" {...field} />
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* 2. Opção de Entrega */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-xl">2. Entrega</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="delivery_option"
-                      render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="flex flex-col space-y-1"
-                            >
-                              <FormItem className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer">
-                                <FormControl>
-                                  <RadioGroupItem value="delivery" />
-                                </FormControl>
-                                <Truck className="h-5 w-5 text-primary" />
-                                <FormLabel className="font-normal flex-1 cursor-pointer">
-                                  Delivery (Entrega em domicílio)
-                                </FormLabel>
-                              </FormItem>
-                              <FormItem className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer">
-                                <FormControl>
-                                  <RadioGroupItem value="pickup" />
-                                </FormControl>
-                                <Store className="h-5 w-5 text-primary" />
-                                <FormLabel className="font-normal flex-1 cursor-pointer">
-                                  Retirada no Local
-                                </FormLabel>
-                              </FormItem>
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {deliveryOption === 'delivery' && (
-                      <div className="space-y-4 pt-4 border-t">
-                        <h3 className="font-semibold flex items-center gap-2">
-                          <MapPin className="h-4 w-4" /> Endereço de Entrega *
-                        </h3>
-                        <div className="grid grid-cols-3 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="street"
-                            render={({ field }) => (
-                              <FormItem className="col-span-2">
-                                <FormLabel>Rua</FormLabel>
-                                <Input {...field} />
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="number"
-                            render={({ field }) => (
-                              <FormItem className="col-span-1">
-                                <FormLabel>Número</FormLabel>
-                                <Input {...field} />
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="neighborhood"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Bairro</FormLabel>
-                                <Input {...field} />
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="city"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Cidade</FormLabel>
-                                <Input {...field} />
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <FormField
-                          control={form.control}
-                          name="zip_code"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>CEP</FormLabel>
-                              <ZipCodeInput {...field} />
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        {deliveryFee > 0 && (
-                          <Alert className="mt-4">
-                            <Truck className="h-4 w-4" />
-                            <AlertTitle>Taxa de Entrega Aplicada</AlertTitle>
-                            <AlertDescription>
-                              Taxa de entrega para esta área: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}
-                            </AlertDescription>
-                          </Alert>
-                        )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* 3. Pagamento */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-xl">3. Pagamento</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="payment_method_id"
-                      render={({ field }) => (
-                        <FormItem className="space-y-3">
-                          <FormControl>
-                            <RadioGroup
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                              className="flex flex-col space-y-2"
-                            >
-                              {paymentMethods.map(method => {
-                                const Icon = getIconComponent(method.icon || 'Store');
-
-                                return (
-                                  <FormItem 
-                                    key={method.id} 
-                                    className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"
-                                  >
-                                    <FormControl>
-                                      <RadioGroupItem value={method.id} />
-                                    </FormControl>
-                                    <Icon className="h-5 w-5 text-primary" />
-                                    <FormLabel className="font-normal flex-1 cursor-pointer">
-                                      {method.name}
-                                      <span className="block text-xs text-muted-foreground">{method.description}</span>
-                                    </FormLabel>
-                                  </FormItem>
-                                );
-                              })}
-                            </RadioGroup>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    {/* Campos de Pagamento Online */}
-                    {isOnlinePayment && (
-                      <div className="space-y-4 pt-4 border-t">
-                        <h3 className="font-semibold flex items-center gap-2">
-                          <CreditCard className="h-4 w-4" /> Detalhes do Cartão
-                        </h3>
-                        <FormField
-                          control={form.control}
-                          name="card_number"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Número do Cartão *</FormLabel>
-                              <Input 
-                                placeholder="XXXX XXXX XXXX XXXX" 
-                                {...field} 
-                                // NOTE: Em uma integração real, este campo usaria um campo seguro (iframe/SDK)
-                              />
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="cpf_cnpj"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>CPF/CNPJ *</FormLabel>
-                              <CpfCnpjInput {...field} />
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        {/* Outros campos de cartão (validade, CVV) seriam adicionados aqui */}
-                      </div>
-                    )}
-
-                    {/* Troco para pagamento em dinheiro */}
-                    {isCashPayment && (
-                      <FormField
-                        control={form.control}
-                        name="change_for"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Precisa de troco para quanto? (R$)</FormLabel>
-                            <Input 
-                              type="number" 
-                              step="0.01" 
-                              placeholder={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(total)}
-                              {...field} 
-                              value={field.value === null || field.value === undefined ? '' : String(field.value)}
-                              onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)}
-                            />
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-
-                    {/* Notas do Pedido */}
-                    <FormField
-                      control={form.control}
-                      name="notes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Observações do Pedido (Opcional)</FormLabel>
-                          <Textarea placeholder="Ex: Tocar a campainha duas vezes..." {...field} rows={2} />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </CardContent>
-                </Card>
-
-                {/* Final Button (Mobile/Bottom) */}
-                <div className="lg:hidden sticky bottom-0 bg-card p-4 border-t shadow-2xl">
-                  <Button 
-                    type="submit" 
-                    className="w-full h-12 text-lg"
-                    disabled={orderMutation.isPending}
-                  >
-                    {orderMutation.isPending ? 'Finalizando Pedido...' : `Finalizar Pedido - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}`}
-                  </Button>
-                </div>
-                
-                {/* Final Button (Desktop) */}
-                <div className="hidden lg:block">
-                  <Button 
-                    type="submit" 
-                    className="w-full h-12 text-lg"
-                    disabled={orderMutation.isPending}
-                  >
-                    {orderMutation.isPending ? 'Finalizando Pedido...' : `Finalizar Pedido - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}`}
-                  </Button>
-                </div>
+                <Card><CardHeader><CardTitle className="text-xl">1. Seus Dados</CardTitle></CardHeader><CardContent className="space-y-4"><FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nome Completo *</FormLabel><Input placeholder="Seu nome" {...field} /><FormMessage /></FormItem>)} /><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>Telefone *</FormLabel><PhoneInput {...field} /><FormMessage /></FormItem>)} /><FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email (Opcional)</FormLabel><Input placeholder="seu@email.com" {...field} /><FormMessage /></FormItem>)} /></div></CardContent></Card>
+                <Card><CardHeader><CardTitle className="text-xl">2. Entrega</CardTitle></CardHeader><CardContent className="space-y-4"><FormField control={form.control} name="delivery_option" render={({ field }) => (<FormItem className="space-y-3"><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-col space-y-1"><FormItem className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value="delivery" /></FormControl><Truck className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">Delivery</FormLabel></FormItem><FormItem className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value="pickup" /></FormControl><Store className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">Retirada no Local</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem>)} />{deliveryOption === 'delivery' && (<div className="space-y-4 pt-4 border-t"><h3 className="font-semibold flex items-center gap-2"><MapPin className="h-4 w-4" /> Endereço de Entrega *</h3><div className="grid grid-cols-3 gap-4"><FormField control={form.control} name="street" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Rua</FormLabel><Input {...field} /><FormMessage /></FormItem>)} /><FormField control={form.control} name="number" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Número</FormLabel><Input {...field} /><FormMessage /></FormItem>)} /></div><div className="grid grid-cols-2 gap-4"><FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro</FormLabel><Input {...field} /><FormMessage /></FormItem>)} /><FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade</FormLabel><Input {...field} /><FormMessage /></FormItem>)} /></div><FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP</FormLabel><ZipCodeInput {...field} /><FormMessage /></FormItem>)} />{deliveryFee > 0 && (<Alert className="mt-4"><Truck className="h-4 w-4" /><AlertTitle>Taxa de Entrega Aplicada</AlertTitle><AlertDescription>Taxa: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}</AlertDescription></Alert>)}</div>)}</CardContent></Card>
+                <Card><CardHeader><CardTitle className="text-xl">3. Pagamento</CardTitle></CardHeader><CardContent className="space-y-4"><FormField control={form.control} name="payment_method_id" render={({ field }) => (<FormItem className="space-y-3"><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-col space-y-2">{paymentMethods.map(method => { const Icon = getIconComponent(method.icon || 'Store'); return (<FormItem key={method.id} className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value={method.id} /></FormControl><Icon className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">{method.name}<span className="block text-xs text-muted-foreground">{method.description}</span></FormLabel></FormItem>);})}</RadioGroup></FormControl><FormMessage /></FormItem>)} />{isOnlinePayment && (<div className="space-y-4 pt-4 border-t"><h3 className="font-semibold flex items-center gap-2"><CreditCard className="h-4 w-4" /> Detalhes Adicionais</h3><FormField control={form.control} name="cpf_cnpj" render={({ field }) => (<FormItem><FormLabel>CPF/CNPJ (para a nota)</FormLabel><CpfCnpjInput {...field} /><FormMessage /></FormItem>)} /></div>)}{isCashPayment && (<FormField control={form.control} name="change_for" render={({ field }) => (<FormItem><FormLabel>Precisa de troco para quanto? (R$)</FormLabel><Input type="number" step="0.01" placeholder={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(total)} {...field} value={field.value === null || field.value === undefined ? '' : String(field.value)} onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)} /><FormMessage /></FormItem>)} />)}<FormField control={form.control} name="notes" render={({ field }) => (<FormItem><FormLabel>Observações do Pedido (Opcional)</FormLabel><Textarea placeholder="Ex: Tocar a campainha duas vezes..." {...field} rows={2} /><FormMessage /></FormItem>)} /></CardContent></Card>
+                <div className="lg:hidden sticky bottom-0 bg-card p-4 border-t shadow-2xl"><Button type="submit" className="w-full h-12 text-lg" disabled={isSubmitting}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : `Finalizar Pedido - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}`}</Button></div>
+                <div className="hidden lg:block"><Button type="submit" className="w-full h-12 text-lg" disabled={isSubmitting}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : `Finalizar Pedido - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}`}</Button></div>
               </form>
             </Form>
           </div>
-
-          {/* Right Column: Summary */}
-          <div className="lg:col-span-1 hidden lg:block">
-            <OrderSummary {...cart} />
-          </div>
+          <div className="lg:col-span-1 hidden lg:block"><OrderSummary {...cart} /></div>
         </div>
       </main>
     </div>
