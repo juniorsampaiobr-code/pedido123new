@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { toast } from "sonner";
-import { Key, ExternalLink, DollarSign, Smartphone, Package, Store } from 'lucide-react';
+import { Key, ExternalLink, DollarSign, Smartphone, Package, Store, CreditCard } from 'lucide-react';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import {
   Form,
