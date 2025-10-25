@@ -118,13 +118,13 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
         const filePath = `${restaurantId}/${Date.now()}-${file.name}`;
         
         const { error: uploadError } = await supabase.storage
-          .from('products') // Alterado de 'avatars' para 'products'
+          .from('products')
           .upload(filePath, file);
 
         if (uploadError) throw new Error(`Erro no upload da imagem: ${uploadError.message}`);
 
         const { data: publicUrlData } = supabase.storage
-          .from('products') // Alterado de 'avatars' para 'products'
+          .from('products')
           .getPublicUrl(filePath);
         
         imageUrl = publicUrlData.publicUrl;
@@ -150,7 +150,6 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
       form.reset();
     },
     onError: (error) => {
-      // Mensagem de erro mais genérica para capturar erros de upload ou inserção
       toast.error(`Erro ao criar produto: ${error.message}`);
     },
   });
@@ -161,7 +160,7 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[525px]">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Novo Produto</DialogTitle>
           <DialogDescription>
@@ -169,93 +168,16 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome *</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nome do produto" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descrição</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Ingredientes, detalhes, etc." {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="price"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Preço (R$) unitário *</FormLabel>
-                  <FormControl>
-                    <Input type="text" placeholder="0,00" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="category_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Categoria</FormLabel>
-                  <div className="flex gap-2">
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingCategories}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione uma categoria" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories?.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button type="button" variant="outline" size="icon" onClick={() => toast.info("Função para adicionar categoria em breve.")}>
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="space-y-2">
-              <FormLabel>Imagem do Produto</FormLabel>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="space-y-4 py-2 pb-4 max-h-[70vh] overflow-y-auto pr-4">
               <FormField
                 control={form.control}
-                name="image_file"
+                name="name"
                 render={({ field }) => (
                   <FormItem>
+                    <FormLabel>Nome *</FormLabel>
                     <FormControl>
-                      <label className="flex items-center justify-center w-full h-12 px-4 border-2 border-dashed rounded-md cursor-pointer hover:bg-muted">
-                        <Upload className="w-4 h-4 mr-2" />
-                        <span>{field.value?.name || 'Escolher Imagem'}</span>
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          onChange={(e) => field.onChange(e.target.files?.[0])}
-                        />
-                      </label>
+                      <Input placeholder="Nome do produto" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -263,42 +185,123 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
               />
               <FormField
                 control={form.control}
-                name="image_url"
+                name="description"
                 render={({ field }) => (
                   <FormItem>
+                    <FormLabel>Descrição</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ou cole a URL da imagem" {...field} />
+                      <Textarea placeholder="Ingredientes, detalhes, etc." {...field} />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Preço (R$) unitário *</FormLabel>
+                      <FormControl>
+                        <Input type="text" placeholder="0,00" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="category_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Categoria</FormLabel>
+                      <div className="flex gap-2">
+                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoadingCategories}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione uma categoria" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {categories?.map((cat) => (
+                              <SelectItem key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button type="button" variant="outline" size="icon" onClick={() => toast.info("Função para adicionar categoria em breve.")}>
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="space-y-2">
+                <FormLabel>Imagem do Produto</FormLabel>
+                <FormField
+                  control={form.control}
+                  name="image_file"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <label className="flex items-center justify-center w-full h-12 px-4 border-2 border-dashed rounded-md cursor-pointer hover:bg-muted">
+                          <Upload className="w-4 h-4 mr-2" />
+                          <span>{field.value?.name || 'Escolher Imagem'}</span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            onChange={(e) => field.onChange(e.target.files?.[0])}
+                          />
+                        </label>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="image_url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input placeholder="Ou cole a URL da imagem" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={form.control}
+                name="is_price_by_weight"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                    <FormLabel>Produto pesável (preço por kg)</FormLabel>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="is_available"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                    <FormLabel>Produto disponível</FormLabel>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
                   </FormItem>
                 )}
               />
             </div>
-            <FormField
-              control={form.control}
-              name="is_price_by_weight"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                  <FormLabel>Produto pesável (preço por kg)</FormLabel>
-                  <FormControl>
-                    <Switch checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="is_available"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                  <FormLabel>Produto disponível</FormLabel>
-                  <FormControl>
-                    <Switch checked={field.value} onCheckedChange={field.onChange} />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-            <DialogFooter>
+            <DialogFooter className="pt-4 border-t">
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancelar</Button>
               </DialogClose>
