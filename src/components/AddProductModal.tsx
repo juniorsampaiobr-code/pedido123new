@@ -118,13 +118,13 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
         const filePath = `${restaurantId}/${Date.now()}-${file.name}`;
         
         const { error: uploadError } = await supabase.storage
-          .from('avatars') 
+          .from('products') // Alterado de 'avatars' para 'products'
           .upload(filePath, file);
 
         if (uploadError) throw new Error(`Erro no upload da imagem: ${uploadError.message}`);
 
         const { data: publicUrlData } = supabase.storage
-          .from('avatars')
+          .from('products') // Alterado de 'avatars' para 'products'
           .getPublicUrl(filePath);
         
         imageUrl = publicUrlData.publicUrl;
