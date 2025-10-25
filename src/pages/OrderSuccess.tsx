@@ -1,11 +1,21 @@
 import { Link, useParams } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { OrderStatusTracker } from '@/components/OrderStatusTracker';
 import { ArrowLeft } from 'lucide-react';
+import { useCart } from '@/hooks/use-cart';
 
 const OrderSuccess = () => {
   const { orderId } = useParams<{ orderId: string }>();
+  const { clearCart } = useCart();
+
+  // Clear the cart once the order is successfully placed and we land on this page
+  useEffect(() => {
+    if (orderId) {
+      clearCart();
+    }
+  }, [orderId, clearCart]);
 
   if (!orderId) {
     return (

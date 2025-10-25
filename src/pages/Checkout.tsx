@@ -370,7 +370,7 @@ const Checkout = () => {
     },
     onSuccess: (orderId) => {
       toast.success(`Pedido #${orderId.slice(-4)} realizado com sucesso!`);
-      clearCart();
+      // REMOVED clearCart() HERE
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       navigate(`/order-success/${orderId}`); 
     },
