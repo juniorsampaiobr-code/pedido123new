@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/form';
 import { PhoneInput } from '@/components/PhoneInput';
 import { ZipCodeInput } from '@/components/ZipCodeInput';
-import { CpfCnpjInput } from '@/components/CpfCnpjInput'; // Novo componente
+import { CpfCnpjInput } from '@/components/CpfCnpjInput';
 
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
@@ -71,8 +71,8 @@ const checkoutSchema = z.object({
   notes: z.string().optional(),
   
   // Online Payment Fields (Only used if method is 'Pagamento Online')
-  card_number: z.string().optional(),
-  cpf_cnpj: z.string().optional().transform(cleanCpfCnpj).refine(val => val.length === 0 || val.length === 11 || val.length === 14, {
+  card_number: z.string().optional().default(''), // Adicionado default
+  cpf_cnpj: z.string().optional().default('').transform(cleanCpfCnpj).refine(val => val.length === 0 || val.length === 11 || val.length === 14, {
     message: 'CPF deve ter 11 dígitos ou CNPJ 14 dígitos.',
   }),
   
@@ -104,14 +104,23 @@ const checkoutSchema = z.object({
     }
   }
   
-  // Online Payment validation
-  const isOnlinePayment = data.payment_method_id && data.payment_method_id === data.payment_method_id; // We need the actual method name/type here, but for now, let's assume the ID is enough if we know which one is 'Pagamento Online'
+  // Conditional validation for Online Payment fields
+  // NOTE: We cannot reliably check the payment method name here without fetching data inside superRefine, 
+  // which is complex. We rely on the client-side component logic to determine if it's online payment.
+  // For now, we assume if the user selected a method, the fields are visible and should be validated.
+  // Since we don't have the payment method data available directly in the schema refinement, 
+  // we will rely on the component logic to handle visibility and assume the fields are optional 
+  // unless the component logic makes them required.
   
-  // Since we don't have the method name here, we rely on the component logic to determine if it's online payment.
-  // For now, we will skip mandatory validation here, as the actual payment processing would handle card details.
-  // If we assume the first method named 'Pagamento Online' is the one:
-  // NOTE: This is a placeholder. In a real scenario, we would fetch the method name/type inside superRefine if needed, 
-  // or rely on the client-side component logic to show/hide fields.
+  // **Temporary fix: Assuming 'Pagamento Online' is the method that requires these fields.**
+  // Since we don't have the method name here, we skip mandatory validation for card_number and cpf_cnpj 
+  // in the Zod schema itself, relying on the component to handle required state if needed.
+  // The previous issue was likely due to `undefined` values, which we fixed by adding `.default('')`.
+  
+  // Let's ensure the CPF/CNPJ validation is strict if a value is provided, even if optional.
+  if (data.cpf_cnpj.length > 0 && data.cpf_cnpj.length !== 11 && data.cpf_cnpj.length !== 14) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CPF deve ter 11 dígitos ou CNPJ 14 dígitos.', path: ['cpf_cnpj'] });
+  }
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -386,16 +395,14 @@ const Checkout = () => {
   });
 
   const onSubmit = (data: CheckoutFormValues) => {
-    // NOTE: If isOnlinePayment is true, we would process the payment here before creating the order.
-    // For now, we proceed directly to order creation.
     orderMutation.mutate(data);
   };
   
   const onValidationFail = (errors: any) => {
-    // Verifica se há erros de validação e exibe um toast genérico
+    // Melhorando o log de erros para debug
     if (Object.keys(errors).length > 0) {
       toast.error('Por favor, preencha todos os campos obrigatórios e corrija os erros.');
-      console.error("Validation Errors:", errors);
+      console.error("Validation Errors:", JSON.stringify(errors, null, 2));
     }
   };
 
