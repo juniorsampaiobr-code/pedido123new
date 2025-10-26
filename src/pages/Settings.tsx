@@ -21,7 +21,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { LocationPickerMap } from '@/components/LocationPickerMap';
 import { ZipCodeInput } from '@/components/ZipCodeInput';
 
@@ -63,16 +63,35 @@ const fetchRestaurantData = async (): Promise<Restaurant> => {
   return data;
 };
 
+// Componente memoizado do mapa para evitar re-renderizações desnecessárias
+const MemoizedLocationPickerMap = memo(({ center, markerPosition, onLocationChange }: { 
+  center: [number, number], 
+  markerPosition: [number, number], 
+  onLocationChange: (lat: number, lng: number) => void 
+}) => {
+  return (
+    <LocationPickerMap 
+      center={center}
+      markerPosition={markerPosition}
+      onLocationChange={onLocationChange}
+    />
+  );
+});
+
+MemoizedLocationPickerMap.displayName = 'MemoizedLocationPickerMap';
+
 const Settings = () => {
   const queryClient = useQueryClient();
   const [soundFile, setSoundFile] = useState<File | null>(null);
   const [searchCep, setSearchCep] = useState('');
   const [searchNumber, setSearchNumber] = useState('');
   const [isSearchingCep, setIsSearchingCep] = useState(false);
+  const [showMap, setShowMap] = useState(false); // Controla quando mostrar o mapa
 
   const { data: restaurant, isLoading, isError, error } = useQuery<Restaurant>({
     queryKey: ['restaurantSettings'],
     queryFn: fetchRestaurantData,
+    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
   const form = useForm<RestaurantFormValues>({
@@ -112,6 +131,11 @@ const Settings = () => {
         latitude: restaurant.latitude ?? null,
         longitude: restaurant.longitude ?? null,
       });
+      
+      // Mostra o mapa apenas após carregar os dados
+      if (restaurant.latitude && restaurant.longitude) {
+        setShowMap(true);
+      }
     }
   }, [restaurant, form.reset]);
 
@@ -172,6 +196,7 @@ const Settings = () => {
         const { lat, lon } = nominatimData[0];
         form.setValue('latitude', parseFloat(lat), { shouldValidate: true });
         form.setValue('longitude', parseFloat(lon), { shouldValidate: true });
+        setShowMap(true); // Mostra o mapa após obter coordenadas
         toast.success("Endereço e mapa atualizados com sucesso!");
       } else {
         toast.warning("Endereço encontrado, mas não foi possível obter as coordenadas exatas. Ajuste o pino no mapa manualmente.");
@@ -313,11 +338,13 @@ const Settings = () => {
                   <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP</FormLabel><FormControl><ZipCodeInput {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
 
                   <div className="pt-4 border-t">
-                    <LocationPickerMap 
-                      center={markerPosition}
-                      markerPosition={markerPosition}
-                      onLocationChange={handleMapLocationChange}
-                    />
+                    {showMap && (
+                      <MemoizedLocationPickerMap 
+                        center={markerPosition}
+                        markerPosition={markerPosition}
+                        onLocationChange={handleMapLocationChange}
+                      />
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

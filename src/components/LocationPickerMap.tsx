@@ -1,7 +1,7 @@
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { useEffect } from 'react';
+import { useEffect, memo } from 'react';
 
 // Corrige um problema comum com o ícone do marcador em bundlers como o Vite
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -40,7 +40,7 @@ const MapClickHandler = ({ onLocationChange }: { onLocationChange: (lat: number,
   return null;
 };
 
-export const LocationPickerMap = ({ center, markerPosition, onLocationChange }: LocationPickerMapProps) => {
+const LocationPickerMapComponent = ({ center, markerPosition, onLocationChange }: LocationPickerMapProps) => {
   return (
     <MapContainer center={center} zoom={15} scrollWheelZoom={false} className="h-96 w-full rounded-lg z-0">
       <TileLayer
@@ -62,3 +62,5 @@ export const LocationPickerMap = ({ center, markerPosition, onLocationChange }: 
     </MapContainer>
   );
 };
+
+export const LocationPickerMap = memo(LocationPickerMapComponent);
