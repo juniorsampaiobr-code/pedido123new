@@ -49,25 +49,6 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
 
   const radiusInMeters = radiusKm * 1000;
 
-  const handleMouseDown = useCallback((e: L.LeafletMouseEvent) => {
-    const circle = circleRef.current;
-    if (!circle) return;
-
-    // Verifica se o clique ocorreu dentro do círculo
-    const centerLatLng = circle.getLatLng();
-    const distanceToCenter = centerLatLng.distanceTo(e.latlng);
-
-    // Se o clique estiver dentro do raio (ou ligeiramente fora para facilitar)
-    if (distanceToCenter <= circle.getRadius() * 1.1) {
-      setIsResizing(true);
-      map.dragging.disable();
-      map.on('mousemove', handleMouseMove);
-      map.on('mouseup', handleMouseUp);
-      // Adiciona classe de cursor para indicar redimensionamento
-      map.getContainer().style.cursor = 'crosshair';
-    }
-  }, [map]);
-
   const handleMouseMove = useCallback((e: L.LeafletMouseEvent) => {
     if (!isResizing || !circleRef.current) return;
 
@@ -86,24 +67,35 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
   const handleMouseUp = useCallback(() => {
     setIsResizing(false);
     map.dragging.enable();
-    map.off('mousemove', handleMouseMove);
-    map.off('mouseup', handleMouseUp);
+    L.DomEvent.off(map.getContainer(), 'mousemove', handleMouseMove);
+    L.DomEvent.off(map.getContainer(), 'mouseup', handleMouseUp);
     map.getContainer().style.cursor = ''; // Restaura o cursor
   }, [map, handleMouseMove]);
+
+  const handleMouseDown = useCallback((e: L.LeafletMouseEvent) => {
+    L.DomEvent.stop(e); // Previne que o evento se propague para o mapa (evita arrastar o mapa)
+    setIsResizing(true);
+    map.dragging.disable();
+    
+    // Anexa os manipuladores de movimento e soltura ao container do mapa
+    L.DomEvent.on(map.getContainer(), 'mousemove', handleMouseMove);
+    L.DomEvent.on(map.getContainer(), 'mouseup', handleMouseUp);
+    map.getContainer().style.cursor = 'crosshair';
+  }, [map, handleMouseMove, handleMouseUp]);
 
   useEffect(() => {
     const circle = circleRef.current;
     if (circle) {
-      // Adiciona o listener de mousedown para iniciar o redimensionamento
+      // Anexa o manipulador de mousedown diretamente ao elemento SVG do círculo
       circle.on('mousedown', handleMouseDown);
     }
     return () => {
       if (circle) {
         circle.off('mousedown', handleMouseDown);
       }
-      map.off('mousemove', handleMouseMove);
-      map.off('mouseup', handleMouseUp);
-      map.getContainer().style.cursor = '';
+      // Garante que os listeners globais sejam removidos
+      L.DomEvent.off(map.getContainer(), 'mousemove', handleMouseMove);
+      L.DomEvent.off(map.getContainer(), 'mouseup', handleMouseUp);
     };
   }, [map, handleMouseDown, handleMouseMove, handleMouseUp]);
 
