@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from "sonner";
-import { Upload, Music } from 'lucide-react';
+import { Upload, Music, Search, Loader2 } from 'lucide-react';
 import { TablesUpdate, Tables } from '@/integrations/supabase/types';
 import {
   Form,
@@ -65,6 +65,8 @@ const fetchRestaurantData = async (): Promise<Restaurant> => {
 const Settings = () => {
   const queryClient = useQueryClient();
   const [soundFile, setSoundFile] = useState<File | null>(null);
+  const [searchAddress, setSearchAddress] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   const { data: restaurant, isLoading, isError, error } = useQuery<Restaurant>({
     queryKey: ['restaurantSettings'],
@@ -102,6 +104,53 @@ const Settings = () => {
     }
     return DEFAULT_CENTER;
   }, [lat, lng]);
+
+  const handleAddressSearch = async () => {
+    if (!searchAddress) {
+      toast.warning("Por favor, digite um endereço para buscar.");
+      return;
+    }
+    setIsSearching(true);
+    const loadingToast = toast.loading("Buscando endereço...");
+
+    try {
+      const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAddress)}`;
+      const response = await fetch(searchUrl);
+      if (!response.ok) throw new Error("Falha na busca do endereço.");
+      
+      const data = await response.json();
+      if (data.length === 0) {
+        toast.error("Endereço não encontrado.");
+        return;
+      }
+
+      const { lat, lon } = data[0];
+      
+      // Busca reversa para obter detalhes do endereço
+      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+      const reverseResponse = await fetch(reverseUrl);
+      if (!reverseResponse.ok) throw new Error("Falha ao obter detalhes do endereço.");
+
+      const reverseData = await reverseResponse.json();
+      const address = reverseData.address;
+
+      form.setValue('latitude', parseFloat(lat), { shouldValidate: true });
+      form.setValue('longitude', parseFloat(lon), { shouldValidate: true });
+      form.setValue('street', address.road || '', { shouldValidate: true });
+      form.setValue('number', address.house_number || '', { shouldValidate: true });
+      form.setValue('neighborhood', address.suburb || address.city_district || '', { shouldValidate: true });
+      form.setValue('city', address.city || address.town || '', { shouldValidate: true });
+      form.setValue('zip_code', address.postcode || '', { shouldValidate: true });
+
+      toast.success("Endereço encontrado e campos atualizados!");
+
+    } catch (err: any) {
+      toast.error(`Erro na busca: ${err.message}`);
+    } finally {
+      setIsSearching(false);
+      toast.dismiss(loadingToast);
+    }
+  };
 
   const restaurantMutation = useMutation({
     mutationFn: (data: RestaurantFormValues) => {
@@ -169,7 +218,23 @@ const Settings = () => {
                   <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Descrição</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="logo_url" render={({ field }) => (<FormItem><FormLabel>URL do Logo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                   
-                  <h3 className="text-lg font-semibold pt-4 border-t mt-6">Endereço</h3>
+                  <h3 className="text-lg font-semibold pt-4 border-t mt-6">Endereço e Localização</h3>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="address-search">Buscar Endereço</Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        id="address-search"
+                        placeholder="Digite o endereço, ex: Av. Paulista, 1578, São Paulo"
+                        value={searchAddress}
+                        onChange={(e) => setSearchAddress(e.target.value)}
+                      />
+                      <Button type="button" onClick={handleAddressSearch} disabled={isSearching}>
+                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="md:col-span-2"><FormLabel>Rua</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name="number" render={({ field }) => (<FormItem className="md:col-span-1"><FormLabel>Número</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
@@ -180,9 +245,8 @@ const Settings = () => {
                   </div>
                   <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
 
-                  <h3 className="text-lg font-semibold pt-4 border-t mt-6">Localização do Restaurante</h3>
-                  <p className="text-sm text-muted-foreground -mt-4 mb-4">
-                    Clique no mapa ou arraste o marcador para definir a localização exata.
+                  <p className="text-sm text-muted-foreground pt-4 border-t">
+                    Clique no mapa ou arraste o marcador para ajustar a localização exata.
                   </p>
                   
                   <LocationPickerMap 
