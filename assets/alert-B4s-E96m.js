@@ -1,0 +1,6 @@
+import{c as o,r,j as s,d as l,l as d}from"./index-zkuE9Bm6.js";/**
+ * @license lucide-react v0.462.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const p=o("Terminal",[["polyline",{points:"4 17 10 11 4 5",key:"akl6gq"}],["line",{x1:"12",x2:"20",y1:"19",y2:"19",key:"q2wloq"}]]),n=d("relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground",{variants:{variant:{default:"bg-background text-foreground",destructive:"border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive"}},defaultVariants:{variant:"default"}}),c=r.forwardRef(({className:e,variant:t,...a},i)=>s.jsx("div",{ref:i,role:"alert",className:l(n({variant:t}),e),...a}));c.displayName="Alert";const v=r.forwardRef(({className:e,...t},a)=>s.jsx("h5",{ref:a,className:l("mb-1 font-medium leading-none tracking-tight",e),...t}));v.displayName="AlertTitle";const g=r.forwardRef(({className:e,...t},a)=>s.jsx("div",{ref:a,className:l("text-sm [&_p]:leading-relaxed",e),...t}));g.displayName="AlertDescription";export{c as A,p as T,v as a,g as b};
