@@ -51,6 +51,7 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
   const safeRadiusKm = typeof radiusKm === 'number' && !isNaN(radiusKm) ? radiusKm : 0.1;
   const radiusInMeters = safeRadiusKm * 1000;
 
+  // 1. Manipulador de Movimento (Move)
   const handleMouseMove = useCallback((e: L.LeafletMouseEvent) => {
     if (!isResizing || !circleRef.current) return;
 
@@ -66,35 +67,30 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
     onRadiusChange(newRadiusKm);
   }, [isResizing, onRadiusChange]);
 
+  // 2. Manipulador de Soltura (Up)
   const handleMouseUp = useCallback(() => {
     setIsResizing(false);
     map.dragging.enable();
-    L.DomEvent.off(map.getContainer(), 'mousemove', handleMouseMove);
-    L.DomEvent.off(map.getContainer(), 'mouseup', handleMouseUp);
+    map.off('mousemove', handleMouseMove);
+    map.off('mouseup', handleMouseUp);
     map.getContainer().style.cursor = ''; // Restaura o cursor
   }, [map, handleMouseMove]);
 
+  // 3. Manipulador de Clique (Down) - Inicia o redimensionamento
   const handleMouseDown = useCallback((e: L.LeafletMouseEvent) => {
-    const circle = circleRef.current;
-    if (!circle) return;
-
-    // Verifica se o clique ocorreu dentro do círculo (ou perto)
-    const centerLatLng = circle.getLatLng();
-    const distanceToCenter = centerLatLng.distanceTo(e.latlng);
-
-    // Se o clique estiver dentro do raio (ou ligeiramente fora para facilitar)
-    if (distanceToCenter <= circle.getRadius() * 1.1) {
-      L.DomEvent.stop(e); // Previne que o evento se propague para o mapa (evita arrastar o mapa)
-      setIsResizing(true);
-      map.dragging.disable();
-      
-      // Anexa os manipuladores de movimento e soltura ao container do mapa
-      L.DomEvent.on(map.getContainer(), 'mousemove', handleMouseMove);
-      L.DomEvent.on(map.getContainer(), 'mouseup', handleMouseUp);
-      map.getContainer().style.cursor = 'crosshair';
-    }
+    // Previne que o evento se propague para o mapa (evita arrastar o mapa)
+    L.DomEvent.stop(e); 
+    
+    setIsResizing(true);
+    map.dragging.disable();
+    
+    // Anexa os manipuladores de movimento e soltura ao MAPA
+    map.on('mousemove', handleMouseMove);
+    map.on('mouseup', handleMouseUp);
+    map.getContainer().style.cursor = 'crosshair';
   }, [map, handleMouseMove, handleMouseUp]);
 
+  // 4. Efeito para anexar o listener de mousedown ao círculo
   useEffect(() => {
     const circle = circleRef.current;
     if (circle) {
@@ -105,9 +101,9 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
       if (circle) {
         circle.off('mousedown', handleMouseDown);
       }
-      // Garante que os listeners globais sejam removidos
-      L.DomEvent.off(map.getContainer(), 'mousemove', handleMouseMove);
-      L.DomEvent.off(map.getContainer(), 'mouseup', handleMouseUp);
+      // Garante que os listeners globais sejam removidos na desmontagem
+      map.off('mousemove', handleMouseMove);
+      map.off('mouseup', handleMouseUp);
     };
   }, [map, handleMouseDown, handleMouseMove, handleMouseUp]);
 
@@ -155,7 +151,6 @@ export const DeliveryZoneEditorMap = ({ restaurantCenter, zones, onZoneRadiusCha
 
       {/* Círculos das Zonas de Entrega Existentes */}
       {sortedZones.map((zone, index) => {
-        // Se max_distance_km for null ou 0, não renderiza o círculo
         if (!zone.max_distance_km || zone.max_distance_km <= 0) return null;
         
         const color = zoneColors[index % zoneColors.length];
