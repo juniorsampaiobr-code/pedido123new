@@ -94,7 +94,7 @@ export type Database = {
           delivery_fee: number
           id: string
           is_active: boolean | null
-          minimum_order: number | null
+          max_distance_km: number | null
           name: string
           restaurant_id: string
           updated_at: string | null
@@ -104,7 +104,7 @@ export type Database = {
           delivery_fee: number
           id?: string
           is_active?: boolean | null
-          minimum_order?: number | null
+          max_distance_km?: number | null
           name: string
           restaurant_id: string
           updated_at?: string | null
@@ -114,7 +114,7 @@ export type Database = {
           delivery_fee?: number
           id?: string
           is_active?: boolean | null
-          minimum_order?: number | null
+          max_distance_km?: number | null
           name?: string
           restaurant_id?: string
           updated_at?: string | null
@@ -336,6 +336,9 @@ export type Database = {
           neighborhood: string | null
           city: string | null
           zip_code: string | null
+          latitude: number | null
+          longitude: number | null
+          notification_sound_url: string | null
         }
         Insert: {
           address?: string | null
@@ -354,6 +357,9 @@ export type Database = {
           neighborhood?: string | null
           city?: string | null
           zip_code?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          notification_sound_url?: string | null
         }
         Update: {
           address?: string | null
@@ -372,6 +378,9 @@ export type Database = {
           neighborhood?: string | null
           city?: string | null
           zip_code?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          notification_sound_url?: string | null
         }
         Relationships: []
       }

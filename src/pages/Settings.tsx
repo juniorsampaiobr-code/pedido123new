@@ -37,6 +37,14 @@ const restaurantSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email('Email inválido.').optional().or(z.literal('')),
   is_active: z.boolean().default(true),
+  latitude: z.preprocess(
+    (val) => String(val).replace(',', '.'),
+    z.coerce.number({ invalid_type_error: 'Latitude deve ser um número.' }).optional().nullable(),
+  ),
+  longitude: z.preprocess(
+    (val) => String(val).replace(',', '.'),
+    z.coerce.number({ invalid_type_error: 'Longitude deve ser um número.' }).optional().nullable(),
+  ),
 });
 
 type RestaurantFormValues = z.infer<typeof restaurantSchema>;
@@ -76,6 +84,8 @@ const Settings = () => {
       phone: restaurant?.phone || '',
       email: restaurant?.email || '',
       is_active: restaurant?.is_active ?? true,
+      latitude: restaurant?.latitude ?? null,
+      longitude: restaurant?.longitude ?? null,
     },
     mode: 'onBlur',
   });
@@ -145,6 +155,7 @@ const Settings = () => {
                   <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nome do Restaurante *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Descrição</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="logo_url" render={({ field }) => (<FormItem><FormLabel>URL do Logo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  
                   <h3 className="text-lg font-semibold pt-4 border-t mt-6">Endereço</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="md:col-span-2"><FormLabel>Rua</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
@@ -155,6 +166,16 @@ const Settings = () => {
                     <FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
                   <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+
+                  <h3 className="text-lg font-semibold pt-4 border-t mt-6">Localização do Restaurante</h3>
+                  <p className="text-sm text-muted-foreground -mt-4 mb-4">
+                    Defina as coordenadas exatas do seu restaurante para calcular a distância de entrega.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="latitude" render={({ field }) => (<FormItem><FormLabel>Latitude</FormLabel><FormControl><Input {...field} placeholder="-22.7627908" value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="longitude" render={({ field }) => (<FormItem><FormLabel>Longitude</FormLabel><FormControl><Input {...field} placeholder="-47.408315" value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                  </div>
+
                   <h3 className="text-lg font-semibold pt-4 border-t mt-6">Contato</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>Telefone</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />

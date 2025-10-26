@@ -8,8 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from "sonner";
-import { MapPin, Plus, Trash2, Terminal } from 'lucide-react';
-import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { Plus, Trash2, Terminal } from 'lucide-react';
+import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Form,
@@ -21,21 +21,7 @@ import {
 } from '@/components/ui/form';
 import { useEffect, useState } from 'react';
 
-type Restaurant = Tables<'restaurants'>;
 type DeliveryZone = Tables<'delivery_zones'>;
-
-const coordinateSchema = z.object({
-  latitude: z.preprocess(
-    (val) => String(val).replace(',', '.'),
-    z.coerce.number({ invalid_type_error: 'Latitude deve ser um número.' }).optional().nullable(),
-  ),
-  longitude: z.preprocess(
-    (val) => String(val).replace(',', '.'),
-    z.coerce.number({ invalid_type_error: 'Longitude deve ser um número.' }).optional().nullable(),
-  ),
-});
-
-type CoordinateFormValues = z.infer<typeof coordinateSchema>;
 
 const zoneSchema = z.object({
   id: z.string().optional(),
@@ -56,16 +42,16 @@ const zonesFormSchema = z.object({
 
 type ZonesFormValues = z.infer<typeof zonesFormSchema>;
 
-const fetchRestaurantData = async (): Promise<Restaurant> => {
+const fetchRestaurantId = async (): Promise<string> => {
   const { data, error } = await supabase
     .from('restaurants')
-    .select('id, latitude, longitude')
+    .select('id')
     .limit(1)
     .single();
 
-  if (error) throw new Error(`Erro ao buscar dados do restaurante: ${error.message}`);
+  if (error) throw new Error(`Erro ao buscar ID do restaurante: ${error.message}`);
   if (!data) throw new Error('Nenhum restaurante encontrado.');
-  return data as Restaurant;
+  return data.id;
 };
 
 const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]> => {
@@ -83,10 +69,10 @@ const Delivery = () => {
   const queryClient = useQueryClient();
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
 
-  const { data: restaurantData, isLoading: isLoadingRestaurant } = useQuery<Restaurant>({
-    queryKey: ['restaurantCoordinates'],
-    queryFn: fetchRestaurantData,
-    onSuccess: (data) => setRestaurantId(data.id),
+  useQuery<string>({
+    queryKey: ['restaurantIdForDelivery'],
+    queryFn: fetchRestaurantId,
+    onSuccess: (id) => setRestaurantId(id),
   });
 
   const { data: deliveryZones, isLoading: isLoadingZones, isError: isErrorZones, error: errorZones } = useQuery<DeliveryZone[]>({
@@ -94,53 +80,6 @@ const Delivery = () => {
     queryFn: () => fetchDeliveryZones(restaurantId!),
     enabled: !!restaurantId,
   });
-
-  const coordForm = useForm<CoordinateFormValues>({
-    resolver: zodResolver(coordinateSchema),
-    defaultValues: {
-      latitude: undefined,
-      longitude: undefined,
-    },
-    mode: 'onBlur',
-  });
-
-  useEffect(() => {
-    if (restaurantData) {
-      coordForm.reset({
-        latitude: restaurantData.latitude ?? undefined,
-        longitude: restaurantData.longitude ?? undefined,
-      });
-    }
-  }, [restaurantData, coordForm]);
-
-  const coordMutation = useMutation({
-    mutationFn: async (data: CoordinateFormValues) => {
-      if (!restaurantId) throw new Error('ID do restaurante não disponível.');
-      
-      const updateData: TablesUpdate<'restaurants'> = {
-        latitude: data.latitude,
-        longitude: data.longitude,
-      };
-
-      const { error } = await supabase
-        .from('restaurants')
-        .update(updateData)
-        .eq('id', restaurantId);
-
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: () => {
-      toast.success('Coordenadas atualizadas com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['restaurantCoordinates'] });
-    },
-    onError: (err) => {
-      toast.error(`Erro ao salvar coordenadas: ${err.message}`);
-    },
-  });
-
-  const handleCoordSubmit = (data: CoordinateFormValues) => {
-    coordMutation.mutate(data);
-  };
 
   const zonesForm = useForm<ZonesFormValues>({
     resolver: zodResolver(zonesFormSchema),
@@ -204,79 +143,6 @@ const Delivery = () => {
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
       <div className="max-w-3xl mx-auto space-y-8">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold flex items-center gap-2">
-              <MapPin className="h-6 w-6 text-primary" />
-              Localização do Restaurante
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Defina as coordenadas exatas do seu restaurante para calcular a distância de entrega.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {isLoadingRestaurant ? (
-              <div className="grid grid-cols-2 gap-4">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-1/2 col-span-2" />
-              </div>
-            ) : (
-              <Form {...coordForm}>
-                <form onSubmit={coordForm.handleSubmit(handleCoordSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                      control={coordForm.control}
-                      name="latitude"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Latitude</FormLabel>
-                          <FormControl>
-                            <Input 
-                              {...field} 
-                              type="text"
-                              placeholder="-22.7627908" 
-                              value={field.value === undefined || field.value === null ? '' : String(field.value)}
-                              onChange={(e) => field.onChange(e.target.value)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={coordForm.control}
-                      name="longitude"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Longitude</FormLabel>
-                          <FormControl>
-                            <Input 
-                              {...field} 
-                              type="text"
-                              placeholder="-47.408315" 
-                              value={field.value === undefined || field.value === null ? '' : String(field.value)}
-                              onChange={(e) => field.onChange(e.target.value)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <Button 
-                    type="submit" 
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                    disabled={coordMutation.isPending}
-                  >
-                    {coordMutation.isPending ? 'Salvando...' : 'Atualizar Coordenadas'}
-                  </Button>
-                </form>
-              </Form>
-            )}
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl font-bold">Faixas de Distância</CardTitle>
