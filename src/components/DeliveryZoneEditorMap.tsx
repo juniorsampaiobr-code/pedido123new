@@ -54,6 +54,14 @@ const ResizableCircle = ({ index, center, radiusKm, color, name, fee, onRadiusCh
   const safeRadiusKm = typeof radiusKm === 'number' && !isNaN(radiusKm) ? radiusKm : 0.1;
   const radiusInMeters = safeRadiusKm * 1000;
 
+  // Efeito para forçar a atualização do raio quando a prop radiusKm muda (via input do formulário)
+  useEffect(() => {
+    if (circleRef.current) {
+      circleRef.current.setRadius(radiusInMeters);
+    }
+  }, [radiusInMeters]);
+
+
   // 1. Manipulador de Movimento (Move) - Redimensionamento
   const handleMouseMove = useCallback((e: L.LeafletMouseEvent) => {
     if (!isResizingRef.current || !circleRef.current) return;
