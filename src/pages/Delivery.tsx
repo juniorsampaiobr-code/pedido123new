@@ -310,7 +310,12 @@ const Delivery = () => {
                                     placeholder="2" 
                                     {...distanceField} 
                                     value={distanceField.value === undefined || distanceField.value === null ? '' : String(distanceField.value)}
-                                    onChange={(e) => distanceField.onChange(e.target.value)}
+                                    onChange={(e) => {
+                                      // Atualiza o valor no formulário, garantindo que seja um número (ou string vazia)
+                                      const value = e.target.value;
+                                      const numericValue = value === '' ? '' : parseFloat(value.replace(',', '.'));
+                                      distanceField.onChange(numericValue);
+                                    }}
                                   />
                                 </FormControl>
                                 <FormMessage />
