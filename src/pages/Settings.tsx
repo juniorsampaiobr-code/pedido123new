@@ -153,10 +153,11 @@ const Settings = () => {
   };
 
   const restaurantMutation = useMutation({
-    mutationFn: (data: RestaurantFormValues) => {
+    mutationFn: async (data: RestaurantFormValues) => {
       if (!restaurant?.id) throw new Error('ID do restaurante não disponível.');
       const { id, ...updateData } = { ...data, id: restaurant.id };
-      return supabase.from('restaurants').update(updateData).eq('id', id).throwOnError();
+      const { error } = await supabase.from('restaurants').update(updateData).eq('id', id);
+      if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Configurações salvas com sucesso!');

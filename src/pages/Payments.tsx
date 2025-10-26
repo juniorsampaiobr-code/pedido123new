@@ -56,7 +56,7 @@ const fetchPaymentSettings = async (restaurantId: string): Promise<PaymentSettin
     .single();
 
   if (error && error.code !== 'PGRST116') throw new Error(error.message);
-  return data || null;
+  return data;
 };
 
 const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[]> => {

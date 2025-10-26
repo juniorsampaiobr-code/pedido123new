@@ -19,7 +19,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 type DeliveryZone = Tables<'delivery_zones'>;
 
@@ -67,12 +67,10 @@ const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]>
 
 const Delivery = () => {
   const queryClient = useQueryClient();
-  const [restaurantId, setRestaurantId] = useState<string | null>(null);
 
-  useQuery<string>({
+  const { data: restaurantId } = useQuery<string>({
     queryKey: ['restaurantIdForDelivery'],
     queryFn: fetchRestaurantId,
-    onSuccess: (id) => setRestaurantId(id),
   });
 
   const { data: deliveryZones, isLoading: isLoadingZones, isError: isErrorZones, error: errorZones } = useQuery<DeliveryZone[]>({

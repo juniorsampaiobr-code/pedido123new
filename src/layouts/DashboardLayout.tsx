@@ -14,6 +14,7 @@ import { EnableSoundModal } from "@/components/EnableSoundModal";
 type Restaurant = Tables<'restaurants'>;
 type SoundStatus = 'disabled' | 'enabled' | 'error';
 type AudioReadyState = 'loading' | 'ready' | 'error';
+type RestaurantForLayout = Pick<Restaurant, 'id' | 'notification_sound_url'>;
 
 interface SoundContextType {
   playSound: () => void;
@@ -67,7 +68,7 @@ const DashboardLayout = () => {
     localStorage.setItem('soundNotificationStatus', soundStatus);
   }, [soundStatus]);
 
-  const { data: restaurant } = useQuery<Restaurant>({
+  const { data: restaurant } = useQuery<RestaurantForLayout>({
     queryKey: ['restaurantForLayout'],
     queryFn: async () => {
       const { data, error } = await supabase.from('restaurants').select('id, notification_sound_url').limit(1).single();

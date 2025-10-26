@@ -4,7 +4,7 @@ import { Tables, Enums } from '@/integrations/supabase/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, Clock, CheckCircle, XCircle, Truck, Package, Utensils, Loader2 } from 'lucide-react';
+import { Terminal, Clock, CheckCircle, XCircle, Truck, Package, Utensils, Loader2, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type Order = Tables<'orders'> & {
@@ -19,6 +19,7 @@ const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: Rea
   delivering: { label: 'Em Entrega', icon: Truck, color: 'bg-indigo-500', description: 'Seu pedido saiu para entrega e está a caminho.' },
   delivered: { label: 'Entregue', icon: CheckCircle, color: 'bg-primary', description: 'Seu pedido foi entregue com sucesso!' },
   cancelled: { label: 'Cancelado', icon: XCircle, color: 'bg-destructive', description: 'Seu pedido foi cancelado. Entre em contato com o restaurante se houver dúvidas.' },
+  pending_payment: { label: 'Aguardando Pagamento', icon: DollarSign, color: 'bg-gray-500', description: 'Aguardando a confirmação do pagamento online.' },
 };
 
 const fetchOrderDetails = async (orderId: string): Promise<Order> => {

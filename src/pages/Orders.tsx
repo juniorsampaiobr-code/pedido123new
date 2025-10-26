@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShoppingCart, Terminal, RefreshCw, Clock, CheckCircle, XCircle, Truck, Package, Utensils, Check, X } from 'lucide-react';
+import { ShoppingCart, Terminal, RefreshCw, Clock, CheckCircle, XCircle, Truck, Package, Utensils, Check, X, DollarSign } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,7 @@ const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: Rea
   delivering: { label: 'Em Entrega', icon: Truck, color: 'bg-indigo-500 hover:bg-indigo-600' },
   delivered: { label: 'Entregue', icon: CheckCircle, color: 'bg-primary hover:bg-primary/90' },
   cancelled: { label: 'Cancelado', icon: XCircle, color: 'bg-destructive hover:bg-destructive/90' },
+  pending_payment: { label: 'Aguardando Pag.', icon: DollarSign, color: 'bg-gray-500 hover:bg-gray-600' },
 };
 
 const fetchOrders = async (restaurantId: string, status: Enums<'order_status'> | 'all'): Promise<Order[]> => {

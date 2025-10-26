@@ -20,6 +20,7 @@ const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string }> = {
   delivering: { label: 'Em Entrega' },
   delivered: { label: 'Entregue' },
   cancelled: { label: 'Cancelado' },
+  pending_payment: { label: 'Aguardando Pagamento' },
 };
 
 const fetchOrderItems = async (orderId: string): Promise<OrderItem[]> => {
