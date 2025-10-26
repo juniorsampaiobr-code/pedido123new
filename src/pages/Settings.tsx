@@ -122,7 +122,8 @@ const Settings = () => {
     const loadingToast = toast.loading("Buscando endereço...");
 
     try {
-      const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAddress)}`;
+      // Adicionamos addressdetails=1 para obter mais detalhes já na busca inicial
+      const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAddress)}&addressdetails=1`;
       const response = await fetch(searchUrl);
       if (!response.ok) throw new Error("Falha na busca do endereço.");
       
@@ -132,19 +133,14 @@ const Settings = () => {
         return;
       }
 
-      const { lat, lon } = data[0];
-      
-      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`;
-      const reverseResponse = await fetch(reverseUrl);
-      if (!reverseResponse.ok) throw new Error("Falha ao obter detalhes do endereço.");
-
-      const reverseData = await reverseResponse.json();
+      const result = data[0];
+      const { lat, lon, address } = result;
       
       form.setValue('latitude', parseFloat(lat), { shouldValidate: true });
       form.setValue('longitude', parseFloat(lon), { shouldValidate: true });
       
-      if (reverseData.address) {
-        updateAddressFields(reverseData.address);
+      if (address) {
+        updateAddressFields(address);
       }
 
       toast.success("Endereço encontrado e campos atualizados!");
