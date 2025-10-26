@@ -21,7 +21,8 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { LocationPickerMap } from '@/components/LocationPickerMap';
 
 type Restaurant = Tables<'restaurants'>;
 
@@ -89,6 +90,16 @@ const Settings = () => {
     },
     mode: 'onBlur',
   });
+
+  const lat = form.watch('latitude');
+  const lng = form.watch('longitude');
+
+  const currentPosition = useMemo((): [number, number] | null => {
+    if (typeof lat === 'number' && typeof lng === 'number') {
+      return [lat, lng];
+    }
+    return null;
+  }, [lat, lng]);
 
   const restaurantMutation = useMutation({
     mutationFn: (data: RestaurantFormValues) => {
@@ -169,8 +180,20 @@ const Settings = () => {
 
                   <h3 className="text-lg font-semibold pt-4 border-t mt-6">Localização do Restaurante</h3>
                   <p className="text-sm text-muted-foreground -mt-4 mb-4">
-                    Defina as coordenadas exatas do seu restaurante para calcular a distância de entrega.
+                    Clique no mapa ou arraste o marcador para definir a localização exata.
                   </p>
+                  
+                  {currentPosition && (
+                    <LocationPickerMap 
+                      center={currentPosition}
+                      markerPosition={currentPosition}
+                      onLocationChange={(newLat, newLng) => {
+                        form.setValue('latitude', newLat, { shouldValidate: true });
+                        form.setValue('longitude', newLng, { shouldValidate: true });
+                      }}
+                    />
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={form.control} name="latitude" render={({ field }) => (<FormItem><FormLabel>Latitude</FormLabel><FormControl><Input {...field} placeholder="-22.7627908" value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name="longitude" render={({ field }) => (<FormItem><FormLabel>Longitude</FormLabel><FormControl><Input {...field} placeholder="-47.408315" value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
