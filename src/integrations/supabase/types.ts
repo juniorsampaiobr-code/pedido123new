@@ -181,6 +181,8 @@ export type Database = {
       }
       delivery_zones: {
         Row: {
+          center_latitude: number | null
+          center_longitude: number | null
           created_at: string | null
           delivery_fee: number
           id: string
@@ -191,6 +193,8 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          center_latitude?: number | null
+          center_longitude?: number | null
           created_at?: string | null
           delivery_fee: number
           id?: string
@@ -201,6 +205,8 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          center_latitude?: number | null
+          center_longitude?: number | null
           created_at?: string | null
           delivery_fee?: number
           id?: string

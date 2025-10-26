@@ -37,6 +37,14 @@ const zoneSchema = z.object({
     (val) => String(val).replace(',', '.'),
     z.coerce.number({ invalid_type_error: 'Distância deve ser um número.' }).positive('A distância máxima deve ser maior que zero.')
   ),
+  center_latitude: z.preprocess(
+    (val) => String(val).replace(',', '.'),
+    z.coerce.number({ invalid_type_error: 'Latitude deve ser um número.' }).optional().nullable(),
+  ),
+  center_longitude: z.preprocess(
+    (val) => String(val).replace(',', '.'),
+    z.coerce.number({ invalid_type_error: 'Longitude deve ser um número.' }).optional().nullable(),
+  ),
 });
 
 const zonesFormSchema = z.object({
@@ -95,14 +103,23 @@ const Delivery = () => {
 
   const watchedZones = zonesForm.watch('zones');
 
+  const DEFAULT_CENTER: [number, number] = useMemo(() => {
+    if (typeof restaurant?.latitude === 'number' && typeof restaurant?.longitude === 'number') {
+      return [restaurant.latitude, restaurant.longitude];
+    }
+    // Default to São Paulo if coordinates are missing
+    return [-23.55052, -46.633308]; 
+  }, [restaurant]);
+
   useEffect(() => {
     if (deliveryZones) {
       const formattedZones = deliveryZones.map(zone => ({
         id: zone.id,
         name: zone.name || '',
         delivery_fee: zone.delivery_fee,
-        // Garante que max_distance_km seja um número, com fallback para 1
         max_distance_km: zone.max_distance_km && typeof zone.max_distance_km === 'number' ? zone.max_distance_km : 1,
+        center_latitude: zone.center_latitude,
+        center_longitude: zone.center_longitude,
       }));
       replace(formattedZones);
     }
@@ -117,6 +134,8 @@ const Delivery = () => {
         name: zone.name,
         delivery_fee: zone.delivery_fee,
         max_distance_km: zone.max_distance_km,
+        center_latitude: zone.center_latitude,
+        center_longitude: zone.center_longitude,
         is_active: true,
       }));
 
@@ -147,28 +166,33 @@ const Delivery = () => {
   };
 
   const handleZoneRadiusChange = useCallback((index: number, newRadiusKm: number) => {
-    // Atualiza o campo max_distance_km no formulário quando o usuário redimensiona o círculo no mapa
     update(index, {
       ...watchedZones[index],
       max_distance_km: parseFloat(newRadiusKm.toFixed(2)),
     });
   }, [update, watchedZones]);
 
+  const handleZoneCenterChange = useCallback((index: number, lat: number, lng: number) => {
+    update(index, {
+      ...watchedZones[index],
+      center_latitude: lat,
+      center_longitude: lng,
+    });
+    toast.info(`Centro da Zona ${index + 1} movido.`);
+  }, [update, watchedZones]);
+
   const handleNewZone = () => {
     appendZone({ 
       name: `Nova Zona ${zoneFields.length + 1}`, 
       delivery_fee: 5.00, 
-      max_distance_km: 2, // Garante que o valor inicial é um número
+      max_distance_km: 2,
+      center_latitude: DEFAULT_CENTER[0],
+      center_longitude: DEFAULT_CENTER[1],
     });
   };
 
   // Função para adicionar uma nova zona ao clicar no mapa
   const handleMapClick = useCallback((lat: number, lng: number) => {
-    // Nota: Como as zonas de entrega são baseadas na distância do centro do restaurante,
-    // o clique no mapa apenas aciona a criação de uma nova zona com um raio padrão.
-    // O centro da zona é sempre o restaurante.
-    
-    // Se o restaurante não tiver coordenadas, não faz sentido adicionar zonas.
     if (!restaurant?.latitude || !restaurant?.longitude) {
       toast.warning("Configure as coordenadas do restaurante em Configurações primeiro.");
       return;
@@ -177,20 +201,16 @@ const Delivery = () => {
     appendZone({ 
       name: `Zona ${zoneFields.length + 1} (Clique)`, 
       delivery_fee: 5.00, 
-      max_distance_km: 1, // Raio inicial de 1km
+      max_distance_km: 1,
+      center_latitude: lat, // Usa a coordenada do clique como centro inicial
+      center_longitude: lng,
     });
-    toast.info(`Nova zona de entrega adicionada. Ajuste o raio no mapa.`);
+    toast.info(`Nova zona de entrega adicionada no local do clique.`);
   }, [restaurant, zoneFields.length, appendZone]);
 
 
   const hasCoordinates = restaurant?.latitude && restaurant?.longitude;
-  const restaurantCenter: [number, number] = useMemo(() => {
-    if (typeof restaurant?.latitude === 'number' && typeof restaurant?.longitude === 'number') {
-      return [restaurant.latitude, restaurant.longitude];
-    }
-    // Default to São Paulo if coordinates are missing
-    return [-23.55052, -46.633308]; 
-  }, [restaurant]);
+  const restaurantCenter: [number, number] = DEFAULT_CENTER;
 
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
@@ -200,7 +220,7 @@ const Delivery = () => {
             <CardHeader>
               <CardTitle className="text-2xl font-bold">Mapa de Cobertura</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Visualize as faixas de entrega em tempo real. Arraste a borda do círculo para redimensionar a zona.
+                Visualize as faixas de entrega em tempo real. Arraste o pino central para mover a zona e a borda do círculo para redimensionar o raio.
                 <br />
                 <span className="font-semibold text-primary">Dica: Clique em qualquer lugar do mapa para adicionar uma nova zona.</span>
               </p>
@@ -213,7 +233,8 @@ const Delivery = () => {
                   restaurantCenter={restaurantCenter} 
                   zones={watchedZones as DeliveryZone[]} 
                   onZoneRadiusChange={handleZoneRadiusChange}
-                  onMapClick={handleMapClick} // Passando a nova função
+                  onZoneCenterChange={handleZoneCenterChange}
+                  onMapClick={handleMapClick}
                 />
               ) : (
                 <Alert>
@@ -236,7 +257,7 @@ const Delivery = () => {
             <CardHeader>
               <CardTitle className="text-2xl font-bold">Zonas de Entrega</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Defina a taxa de entrega com base na distância máxima em quilômetros (km) a partir do seu restaurante.
+                Defina a taxa de entrega com base na distância máxima em quilômetros (km) a partir do centro de cada zona.
               </p>
             </CardHeader>
             <CardContent>
@@ -317,6 +338,48 @@ const Delivery = () => {
                             )}
                           />
                         </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                                control={zonesForm.control}
+                                name={`zones.${index}.center_latitude`}
+                                render={({ field: latField }) => (
+                                    <FormItem>
+                                        <FormLabel>Latitude Central</FormLabel>
+                                        <FormControl>
+                                            <Input 
+                                                type="number" 
+                                                step="any" 
+                                                placeholder="Latitude" 
+                                                {...latField} 
+                                                value={latField.value === undefined || latField.value === null ? '' : String(latField.value)}
+                                                onChange={(e) => latField.onChange(e.target.value)}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={zonesForm.control}
+                                name={`zones.${index}.center_longitude`}
+                                render={({ field: lngField }) => (
+                                    <FormItem>
+                                        <FormLabel>Longitude Central</FormLabel>
+                                        <FormControl>
+                                            <Input 
+                                                type="number" 
+                                                step="any" 
+                                                placeholder="Longitude" 
+                                                {...lngField} 
+                                                value={lngField.value === undefined || lngField.value === null ? '' : String(lngField.value)}
+                                                onChange={(e) => lngField.onChange(e.target.value)}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
                         <Button 
                           type="button" 
                           variant="destructive" 
@@ -335,7 +398,7 @@ const Delivery = () => {
                       className="w-full"
                       onClick={handleNewZone}
                     >
-                      <Plus className="mr-2 h-4 w-4" /> Adicionar Nova Zona
+                      <Plus className="mr-2 h-4 w-4" /> Adicionar Nova Zona (Centro do Restaurante)
                     </Button>
 
                     <Button 
