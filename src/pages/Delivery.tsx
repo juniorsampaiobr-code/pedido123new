@@ -19,7 +19,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { DeliveryZoneEditorMap } from '@/components/DeliveryZoneEditorMap';
 
@@ -88,7 +88,7 @@ const Delivery = () => {
     mode: 'onChange', // Use onChange to update map instantly
   });
 
-  const { fields: zoneFields, append: appendZone, remove: removeZone, replace } = useFieldArray({
+  const { fields: zoneFields, append: appendZone, remove: removeZone, replace, update } = useFieldArray({
     control: zonesForm.control,
     name: "zones",
   });
@@ -145,10 +145,15 @@ const Delivery = () => {
     zonesMutation.mutate(data);
   };
 
-  const handleNewZoneCenter = () => {
-    // When clicking the map, we don't actually need to change the center of the zone, 
-    // as the current database schema assumes the center is the restaurant location.
-    // We just add a new zone entry to the form.
+  const handleZoneRadiusChange = useCallback((index: number, newRadiusKm: number) => {
+    // Atualiza o campo max_distance_km no formulário quando o usuário redimensiona o círculo no mapa
+    update(index, {
+      ...watchedZones[index],
+      max_distance_km: parseFloat(newRadiusKm.toFixed(2)),
+    });
+  }, [update, watchedZones]);
+
+  const handleNewZone = () => {
     appendZone({ 
       name: `Nova Zona ${zoneFields.length + 1}`, 
       delivery_fee: 5.00, 
@@ -173,7 +178,7 @@ const Delivery = () => {
             <CardHeader>
               <CardTitle className="text-2xl font-bold">Mapa de Cobertura</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Visualize as faixas de entrega em tempo real. Clique no mapa para adicionar uma nova zona.
+                Visualize as faixas de entrega em tempo real. Arraste a borda do círculo para redimensionar a zona.
               </p>
             </CardHeader>
             <CardContent>
@@ -183,7 +188,7 @@ const Delivery = () => {
                 <DeliveryZoneEditorMap 
                   restaurantCenter={restaurantCenter} 
                   zones={watchedZones as DeliveryZone[]} 
-                  onNewZoneCenter={handleNewZoneCenter}
+                  onZoneRadiusChange={handleZoneRadiusChange}
                 />
               ) : (
                 <Alert>
@@ -303,11 +308,7 @@ const Delivery = () => {
                       type="button" 
                       variant="outline" 
                       className="w-full"
-                      onClick={() => appendZone({ 
-                        name: `Nova Zona ${zoneFields.length + 1}`, 
-                        delivery_fee: 5.00, 
-                        max_distance_km: 1,
-                      })}
+                      onClick={handleNewZone}
                     >
                       <Plus className="mr-2 h-4 w-4" /> Adicionar Nova Zona
                     </Button>
