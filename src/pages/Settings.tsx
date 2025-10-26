@@ -322,7 +322,7 @@ const Settings = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label>Buscar Endereço por CEP e Número</Label>
+                    <Label>Buscar Endereço por CEP e Número *</Label>
                     <div className="flex gap-2">
                       <ZipCodeInput 
                         placeholder="Digite o CEP"
@@ -338,17 +338,20 @@ const Settings = () => {
                         {isSearchingCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                       </Button>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Preencha o CEP e o número e clique em buscar para preencher o endereço.
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="md:col-span-2"><FormLabel>Rua</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="number" render={({ field }) => (<FormItem className="md:col-span-1"><FormLabel>Número</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="md:col-span-2"><FormLabel>Rua</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="number" render={({ field }) => (<FormItem className="md:col-span-1"><FormLabel>Número</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
                   </div>
-                  <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP</FormLabel><FormControl><ZipCodeInput {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP</FormLabel><FormControl><ZipCodeInput {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
 
                   <p className="text-sm text-muted-foreground pt-4 border-t">
                     Clique no mapa ou arraste o marcador para ajustar a localização exata.
