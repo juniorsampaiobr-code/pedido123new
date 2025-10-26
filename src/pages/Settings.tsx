@@ -66,7 +66,7 @@ const fetchRestaurantData = async (): Promise<Restaurant> => {
 const Settings = () => {
   const queryClient = useQueryClient();
   const [soundFile, setSoundFile] = useState<File | null>(null);
-  const [searchAddress, setSearchAddress] = useState('');
+  const [searchCep, setSearchCep] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
   const { data: restaurant, isLoading, isError, error } = useQuery<Restaurant>({
@@ -127,45 +127,43 @@ const Settings = () => {
   }, [lat, lng]);
 
   const updateAddressFields = useCallback((address: any) => {
-    form.setValue('street', address.road || '', { shouldValidate: true });
+    form.setValue('street', address.road || address.logradouro || '', { shouldValidate: true });
     form.setValue('number', address.house_number || '', { shouldValidate: true });
-    form.setValue('neighborhood', address.suburb || address.city_district || '', { shouldValidate: true });
-    form.setValue('city', address.city || address.town || '', { shouldValidate: true });
-    form.setValue('zip_code', address.postcode || '', { shouldValidate: true });
+    form.setValue('neighborhood', address.suburb || address.bairro || '', { shouldValidate: true });
+    form.setValue('city', address.city || address.localidade || '', { shouldValidate: true });
+    form.setValue('zip_code', address.postcode || address.cep || '', { shouldValidate: true });
   }, [form]);
 
-  const handleAddressSearch = async () => {
-    if (!searchAddress) {
-      toast.warning("Por favor, digite um endereço para buscar.");
+  const handleCepSearch = async () => {
+    const cleanedCep = searchCep.replace(/\D/g, '');
+    if (cleanedCep.length !== 8) {
+      toast.warning("Por favor, digite um CEP válido com 8 dígitos.");
       return;
     }
     setIsSearching(true);
-    const loadingToast = toast.loading("Buscando endereço...");
+    const loadingToast = toast.loading("Buscando CEP...");
 
     try {
-      const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAddress)}`;
-      const response = await fetch(searchUrl);
-      if (!response.ok) throw new Error("Falha na busca do endereço.");
+      const response = await fetch(`https://viacep.com.br/ws/${cleanedCep}/json/`);
+      if (!response.ok) throw new Error("Falha na busca do CEP.");
       
       const data = await response.json();
-      if (data.length === 0) {
-        toast.error("Endereço não encontrado.");
+      if (data.erro) {
+        toast.error("CEP não encontrado.");
         return;
       }
 
-      const { lat, lon } = data[0];
-      
-      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`;
-      const reverseResponse = await fetch(reverseUrl);
-      if (!reverseResponse.ok) throw new Error("Falha ao obter detalhes do endereço.");
+      updateAddressFields(data);
 
-      const reverseData = await reverseResponse.json();
-      
-      form.setValue('latitude', parseFloat(lat), { shouldValidate: true });
-      form.setValue('longitude', parseFloat(lon), { shouldValidate: true });
-      
-      if (reverseData.address) {
-        updateAddressFields(reverseData.address);
+      // Agora, busca as coordenadas para o endereço encontrado para atualizar o mapa
+      const fullAddress = `${data.logradouro}, ${data.localidade}, ${data.uf}`;
+      const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`;
+      const nominatimResponse = await fetch(nominatimUrl);
+      const nominatimData = await nominatimResponse.json();
+      if (nominatimData.length > 0) {
+        const { lat, lon } = nominatimData[0];
+        form.setValue('latitude', parseFloat(lat), { shouldValidate: true });
+        form.setValue('longitude', parseFloat(lon), { shouldValidate: true });
       }
 
       toast.success("Endereço encontrado e campos atualizados!");
@@ -272,15 +270,15 @@ const Settings = () => {
                   <h3 className="text-lg font-semibold pt-4 border-t mt-6">Endereço e Localização</h3>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="address-search">Buscar Endereço</Label>
+                    <Label htmlFor="cep-search">Buscar por CEP</Label>
                     <div className="flex gap-2">
-                      <Input 
-                        id="address-search"
-                        placeholder="Digite o endereço, ex: Av. Paulista, 1578, São Paulo"
-                        value={searchAddress}
-                        onChange={(e) => setSearchAddress(e.target.value)}
+                      <ZipCodeInput 
+                        id="cep-search"
+                        placeholder="Digite o CEP"
+                        value={searchCep}
+                        onChange={(e) => setSearchCep(e.target.value)}
                       />
-                      <Button type="button" onClick={handleAddressSearch} disabled={isSearching}>
+                      <Button type="button" onClick={handleCepSearch} disabled={isSearching}>
                         {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                       </Button>
                     </div>
