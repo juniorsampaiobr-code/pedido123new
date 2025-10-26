@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, createContext, useContext, useCallback } from "react";
+import { useEffect, useState, useRef, createContext, useContext, useCallback, memo } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -49,7 +49,7 @@ const navItems = [
   { href: "/settings", label: "Configurações" },
 ];
 
-const DashboardLayout = () => {
+const DashboardLayoutComponent = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -76,6 +76,7 @@ const DashboardLayout = () => {
       return data;
     },
     enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
   useEffect(() => {
@@ -254,4 +255,5 @@ const DashboardLayout = () => {
   );
 };
 
+const DashboardLayout = memo(DashboardLayoutComponent);
 export default DashboardLayout;

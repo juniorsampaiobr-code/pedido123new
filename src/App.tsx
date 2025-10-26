@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -24,44 +24,57 @@ const OrderSuccess = lazy(() => import("./pages/OrderSuccess"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const DashboardLayout = lazy(() => import("./layouts/DashboardLayout"));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutos
+      cacheTime: 1000 * 60 * 10, // 10 minutos
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+});
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <CartProvider>
-          <Suspense fallback={<LoadingSpinner />}>
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/menu" element={<Menu />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/order-success/:orderId" element={<OrderSuccess />} />
+const App = () => {
+  const queryClientMemo = useMemo(() => queryClient, []);
 
-              {/* Dashboard Routes (Protected Layout) */}
-              <Route element={<DashboardLayout />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/orders" element={<Orders />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/hours" element={<Hours />} />
-                <Route path="/cashier" element={<Cashier />} />
-                <Route path="/payments" element={<Payments />} />
-                <Route path="/delivery" element={<Delivery />} />
-              </Route>
+  return (
+    <QueryClientProvider client={queryClientMemo}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <CartProvider>
+            <Suspense fallback={<LoadingSpinner />}>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/menu" element={<Menu />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/order-success/:orderId" element={<OrderSuccess />} />
 
-              {/* Catch-all Route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </CartProvider>
-      </HashRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+                {/* Dashboard Routes (Protected Layout) */}
+                <Route element={<DashboardLayout />}>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/products" element={<Products />} />
+                  <Route path="/orders" element={<Orders />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/hours" element={<Hours />} />
+                  <Route path="/cashier" element={<Cashier />} />
+                  <Route path="/payments" element={<Payments />} />
+                  <Route path="/delivery" element={<Delivery />} />
+                </Route>
+
+                {/* Catch-all Route */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </CartProvider>
+        </HashRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

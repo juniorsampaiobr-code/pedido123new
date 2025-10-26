@@ -1,16 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal, ShoppingCart, ArrowRight } from "lucide-react";
 import { Tables } from '@/integrations/supabase/types';
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ProductDetailsModal } from '@/components/ProductDetailsModal';
 import { WeightProductModal } from '@/components/WeightProductModal';
 import { useCart } from '@/hooks/use-cart';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { ProductCard } from '@/components/ProductCard';
+import { useDebounce } from '@/hooks/useDebounce';
 
 type Product = Tables<'products'>;
 type Restaurant = Tables<'restaurants'>;
@@ -61,21 +62,39 @@ const Menu = () => {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['menuData'],
     queryFn: fetchMenuData,
+    staleTime: 1000 * 60 * 5, // 5 minutos
+    cacheTime: 1000 * 60 * 10, // 10 minutos
   });
   
   const { totalItems, subtotal } = useCart();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  const handleProductClick = (product: Product) => {
+  const filteredMenu = useMemo(() => {
+    if (!data?.menu) return [];
+    
+    if (!debouncedSearchTerm) return data.menu;
+    
+    return data.menu.map(category => ({
+      ...category,
+      products: category.products.filter(product => 
+        product.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        (product.description && product.description.toLowerCase().includes(debouncedSearchTerm.toLowerCase()))
+      )
+    })).filter(category => category.products.length > 0);
+  }, [data?.menu, debouncedSearchTerm]);
+
+  const handleProductClick = useCallback((product: Product) => {
     setSelectedProduct(product);
     if (product.is_price_by_weight) {
       setIsWeightModalOpen(true);
     } else {
       setIsDetailsModalOpen(true);
     }
-  };
+  }, []);
 
   if (isLoading) {
     return (
@@ -115,7 +134,7 @@ const Menu = () => {
     );
   }
 
-  const { restaurant, menu } = data;
+  const { restaurant } = data;
 
   return (
     <>
@@ -131,45 +150,56 @@ const Menu = () => {
       />
 
       <div className="container mx-auto px-4 py-8 max-w-5xl mb-20">
-        <header className="text-center mb-12">
-          {restaurant.logo_url && <img src={restaurant.logo_url} alt={restaurant.name} className="w-24 h-24 mx-auto rounded-full mb-4 object-cover border-4 border-card shadow-lg" />}
-          <h1 className="text-4xl font-bold tracking-tight">{restaurant.name}</h1>
-          <p className="text-muted-foreground mt-2">{restaurant.description}</p>
+        <header className="text-center mb-8">
+          {restaurant.logo_url && (
+            <div className="w-24 h-24 mx-auto rounded-full mb-4 overflow-hidden border-4 border-card shadow-lg">
+              <LazyImage 
+                src={restaurant.logo_url} 
+                alt={restaurant.name} 
+                className="w-full h-full object-cover" 
+              />
+            </div>
+          )}
+          <h1 className="text-3xl font-bold tracking-tight mb-2">{restaurant.name}</h1>
+          <p className="text-muted-foreground">{restaurant.description}</p>
         </header>
 
+        <div className="mb-8">
+          <input
+            type="text"
+            placeholder="Buscar produtos..."
+            className="w-full p-3 border rounded-lg"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
         <main>
-          {menu.length === 0 ? (
+          {filteredMenu.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-muted-foreground text-lg">Nenhum item no cardápio no momento.</p>
+              <p className="text-muted-foreground text-lg">
+                {debouncedSearchTerm ? 'Nenhum produto encontrado.' : 'Nenhum item no cardápio no momento.'}
+              </p>
             </div>
           ) : (
             <div className="space-y-10">
-              {menu.map(category => (
+              {filteredMenu.map(category => (
                 <section key={category.id}>
-                  <h2 className="text-3xl font-bold border-b-2 border-primary pb-2 mb-6">{category.name}</h2>
+                  <h2 className="text-2xl font-bold border-b-2 border-primary pb-2 mb-6">
+                    {category.name}
+                  </h2>
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {category.products.map(product => (
-                      <Card 
-                        key={product.id} 
-                        className="overflow-hidden group hover:shadow-xl transition-shadow duration-300 flex flex-col cursor-pointer"
+                      <ProductCard
+                        key={product.id}
+                        id={product.id}
+                        name={product.name}
+                        description={product.description}
+                        price={product.price}
+                        image_url={product.image_url}
+                        is_price_by_weight={product.is_price_by_weight}
                         onClick={() => handleProductClick(product)}
-                      >
-                        <img 
-                          src={product.image_url || '/placeholder.svg'} 
-                          alt={product.name} 
-                          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" 
-                        />
-                        <div className="p-4 flex flex-col flex-grow">
-                          <CardTitle className="text-xl mb-1">{product.name}</CardTitle>
-                          <CardDescription className="text-sm mb-3 flex-grow">{product.description}</CardDescription>
-                          <p className="text-lg font-bold text-primary text-right mt-2">
-                            {product.is_price_by_weight 
-                              ? `${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)} / kg`
-                              : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)
-                            }
-                          </p>
-                        </div>
-                      </Card>
+                      />
                     ))}
                   </div>
                 </section>
