@@ -21,8 +21,9 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { LocationPickerMap } from '@/components/LocationPickerMap';
+import { ZipCodeInput } from '@/components/ZipCodeInput';
 
 type Restaurant = Tables<'restaurants'>;
 
@@ -75,23 +76,43 @@ const Settings = () => {
 
   const form = useForm<RestaurantFormValues>({
     resolver: zodResolver(restaurantSchema),
-    values: {
-      name: restaurant?.name || '',
-      description: restaurant?.description || '',
-      logo_url: restaurant?.logo_url || '',
-      street: restaurant?.street || '',
-      number: restaurant?.number || '',
-      neighborhood: restaurant?.neighborhood || '',
-      city: restaurant?.city || '',
-      zip_code: restaurant?.zip_code || '',
-      phone: restaurant?.phone || '',
-      email: restaurant?.email || '',
-      is_active: restaurant?.is_active ?? true,
-      latitude: restaurant?.latitude ?? null,
-      longitude: restaurant?.longitude ?? null,
+    defaultValues: {
+      name: '',
+      description: '',
+      logo_url: '',
+      street: '',
+      number: '',
+      neighborhood: '',
+      city: '',
+      zip_code: '',
+      phone: '',
+      email: '',
+      is_active: true,
+      latitude: null,
+      longitude: null,
     },
     mode: 'onBlur',
   });
+
+  useEffect(() => {
+    if (restaurant) {
+      form.reset({
+        name: restaurant.name || '',
+        description: restaurant.description || '',
+        logo_url: restaurant.logo_url || '',
+        street: restaurant.street || '',
+        number: restaurant.number || '',
+        neighborhood: restaurant.neighborhood || '',
+        city: restaurant.city || '',
+        zip_code: restaurant.zip_code || '',
+        phone: restaurant.phone || '',
+        email: restaurant.email || '',
+        is_active: restaurant.is_active ?? true,
+        latitude: restaurant.latitude ?? null,
+        longitude: restaurant.longitude ?? null,
+      });
+    }
+  }, [restaurant, form.reset]);
 
   const lat = form.watch('latitude');
   const lng = form.watch('longitude');
@@ -122,8 +143,7 @@ const Settings = () => {
     const loadingToast = toast.loading("Buscando endereço...");
 
     try {
-      // Adicionamos addressdetails=1 para obter mais detalhes já na busca inicial
-      const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAddress)}&addressdetails=1`;
+      const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAddress)}`;
       const response = await fetch(searchUrl);
       if (!response.ok) throw new Error("Falha na busca do endereço.");
       
@@ -133,14 +153,19 @@ const Settings = () => {
         return;
       }
 
-      const result = data[0];
-      const { lat, lon, address } = result;
+      const { lat, lon } = data[0];
+      
+      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`;
+      const reverseResponse = await fetch(reverseUrl);
+      if (!reverseResponse.ok) throw new Error("Falha ao obter detalhes do endereço.");
+
+      const reverseData = await reverseResponse.json();
       
       form.setValue('latitude', parseFloat(lat), { shouldValidate: true });
       form.setValue('longitude', parseFloat(lon), { shouldValidate: true });
       
-      if (address) {
-        updateAddressFields(address);
+      if (reverseData.address) {
+        updateAddressFields(reverseData.address);
       }
 
       toast.success("Endereço encontrado e campos atualizados!");
@@ -269,7 +294,7 @@ const Settings = () => {
                     <FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
-                  <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP</FormLabel><FormControl><ZipCodeInput {...field} /></FormControl><FormMessage /></FormItem>)} />
 
                   <p className="text-sm text-muted-foreground pt-4 border-t">
                     Clique no mapa ou arraste o marcador para ajustar a localização exata.
