@@ -73,7 +73,7 @@ const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]>
     .from('delivery_zones')
     .select('*')
     .eq('restaurant_id', restaurantId)
-    .order('delivery_fee', { ascending: true });
+    .order('max_distance_km', { ascending: true });
 
   if (error) throw new Error(`Erro ao buscar zonas de entrega: ${error.message}`);
   return data;
@@ -148,7 +148,7 @@ const Delivery = () => {
     mode: 'onBlur',
   });
 
-  const { fields: zoneFields, append: appendZone, remove: removeZone } = useFieldArray({
+  const { fields: zoneFields, append: appendZone, remove: removeZone, replace } = useFieldArray({
     control: zonesForm.control,
     name: "zones",
   });
@@ -159,11 +159,11 @@ const Delivery = () => {
         id: zone.id,
         name: zone.name || '',
         delivery_fee: zone.delivery_fee,
-        max_distance_km: zone.minimum_order || 1, 
+        max_distance_km: zone.max_distance_km || 1,
       }));
-      zonesForm.reset({ zones: formattedZones });
+      replace(formattedZones);
     }
-  }, [deliveryZones, zonesForm]);
+  }, [deliveryZones, replace]);
 
   const zonesMutation = useMutation({
     mutationFn: async (data: ZonesFormValues) => {
@@ -173,7 +173,7 @@ const Delivery = () => {
         restaurant_id: restaurantId,
         name: zone.name || `Faixa até ${zone.max_distance_km} km`,
         delivery_fee: zone.delivery_fee,
-        minimum_order: zone.max_distance_km,
+        max_distance_km: zone.max_distance_km,
         is_active: true,
       }));
 

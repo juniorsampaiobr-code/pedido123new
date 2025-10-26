@@ -1,0 +1,1 @@
+ALTER TABLE public.delivery_zones RENAME COLUMN minimum_order TO max_distance_km;
