@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from "sonner";
-import { Upload, Music, Search, Loader2, MapPin } from 'lucide-react';
+import { Upload, Music, Search, Loader2 } from 'lucide-react';
 import { TablesUpdate, Tables } from '@/integrations/supabase/types';
 import {
   Form,
@@ -69,7 +69,6 @@ const Settings = () => {
   const [searchCep, setSearchCep] = useState('');
   const [searchNumber, setSearchNumber] = useState('');
   const [isSearchingCep, setIsSearchingCep] = useState(false);
-  const [isUpdatingMap, setIsUpdatingMap] = useState(false);
 
   const { data: restaurant, isLoading, isError, error } = useQuery<Restaurant>({
     queryKey: ['restaurantSettings'],
@@ -186,42 +185,6 @@ const Settings = () => {
     }
   };
 
-  const handleUpdateMapFromAddress = async () => {
-    const { street, number, city, neighborhood } = form.getValues();
-    const fullAddress = [street, number, neighborhood, city].filter(Boolean).join(', ');
-
-    if (!street || !city) {
-      toast.warning("Preencha pelo menos a rua e a cidade para atualizar o mapa.");
-      return;
-    }
-
-    setIsUpdatingMap(true);
-    const loadingToast = toast.loading("Atualizando localização no mapa...");
-
-    try {
-      const searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`;
-      const response = await fetch(searchUrl);
-      if (!response.ok) throw new Error("Falha na busca do endereço.");
-      
-      const data = await response.json();
-      if (data.length === 0) {
-        toast.error("Não foi possível encontrar as coordenadas para este endereço.");
-        return;
-      }
-
-      const { lat, lon } = data[0];
-      form.setValue('latitude', parseFloat(lat), { shouldValidate: true });
-      form.setValue('longitude', parseFloat(lon), { shouldValidate: true });
-      toast.success("Localização no mapa atualizada com sucesso!");
-
-    } catch (err: any) {
-      toast.error(`Erro ao atualizar mapa: ${err.message}`);
-    } finally {
-      setIsUpdatingMap(false);
-      toast.dismiss(loadingToast);
-    }
-  };
-
   const handleMapLocationChange = useCallback(async (newLat: number, newLng: number) => {
     form.setValue('latitude', newLat, { shouldValidate: true });
     form.setValue('longitude', newLng, { shouldValidate: true });
@@ -313,12 +276,8 @@ const Settings = () => {
                   <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Descrição</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="logo_url" render={({ field }) => (<FormItem><FormLabel>URL do Logo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                   
-                  <div className="flex justify-between items-center pt-4 border-t mt-6">
+                  <div className="pt-4 border-t mt-6">
                     <h3 className="text-lg font-semibold">Endereço e Localização</h3>
-                    <Button type="button" variant="outline" size="sm" onClick={handleUpdateMapFromAddress} disabled={isUpdatingMap}>
-                      {isUpdatingMap ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <MapPin className="h-4 w-4 mr-2" />}
-                      Atualizar Mapa
-                    </Button>
                   </div>
                   
                   <div className="space-y-2">
