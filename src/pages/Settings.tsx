@@ -67,6 +67,7 @@ const Settings = () => {
   const queryClient = useQueryClient();
   const [soundFile, setSoundFile] = useState<File | null>(null);
   const [searchCep, setSearchCep] = useState('');
+  const [searchNumber, setSearchNumber] = useState('');
   const [isSearchingCep, setIsSearchingCep] = useState(false);
   const [isUpdatingMap, setIsUpdatingMap] = useState(false);
 
@@ -135,16 +136,17 @@ const Settings = () => {
     form.setValue('zip_code', address.postcode || address.cep || '', { shouldValidate: true });
   }, [form]);
 
-  const handleCepSearch = async () => {
+  const handleAddressSearch = async () => {
     const cleanedCep = searchCep.replace(/\D/g, '');
-    if (cleanedCep.length !== 8) {
-      toast.warning("Por favor, digite um CEP válido com 8 dígitos.");
+    if (cleanedCep.length !== 8 || !searchNumber) {
+      toast.warning("Por favor, digite um CEP válido e o número da casa.");
       return;
     }
     setIsSearchingCep(true);
-    const loadingToast = toast.loading("Buscando CEP...");
+    const loadingToast = toast.loading("Buscando endereço e coordenadas...");
 
     try {
+      // Step 1: Fetch address from CEP
       const response = await fetch(`https://viacep.com.br/ws/${cleanedCep}/json/`);
       if (!response.ok) throw new Error("Falha na busca do CEP.");
       
@@ -154,19 +156,27 @@ const Settings = () => {
         return;
       }
 
-      updateAddressFields(data);
+      // Update form fields with data from ViaCEP and the provided number
+      form.setValue('street', data.logradouro, { shouldValidate: true });
+      form.setValue('number', searchNumber, { shouldValidate: true });
+      form.setValue('neighborhood', data.bairro, { shouldValidate: true });
+      form.setValue('city', data.localidade, { shouldValidate: true });
+      form.setValue('zip_code', data.cep, { shouldValidate: true });
 
-      const fullAddress = `${data.logradouro}, ${data.localidade}, ${data.uf}`;
+      // Step 2: Fetch coordinates using the full address
+      const fullAddress = `${data.logradouro}, ${searchNumber}, ${data.localidade}, ${data.uf}`;
       const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`;
       const nominatimResponse = await fetch(nominatimUrl);
       const nominatimData = await nominatimResponse.json();
+      
       if (nominatimData.length > 0) {
         const { lat, lon } = nominatimData[0];
         form.setValue('latitude', parseFloat(lat), { shouldValidate: true });
         form.setValue('longitude', parseFloat(lon), { shouldValidate: true });
+        toast.success("Endereço e mapa atualizados com sucesso!");
+      } else {
+        toast.warning("Endereço encontrado, mas não foi possível obter as coordenadas exatas. Ajuste o pino no mapa manualmente.");
       }
-
-      toast.success("Endereço encontrado e campos atualizados!");
 
     } catch (err: any) {
       toast.error(`Erro na busca: ${err.message}`);
@@ -312,15 +322,19 @@ const Settings = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="cep-search">Buscar por CEP</Label>
+                    <Label>Buscar Endereço por CEP e Número</Label>
                     <div className="flex gap-2">
                       <ZipCodeInput 
-                        id="cep-search"
                         placeholder="Digite o CEP"
                         value={searchCep}
                         onChange={(e) => setSearchCep(e.target.value)}
                       />
-                      <Button type="button" onClick={handleCepSearch} disabled={isSearchingCep}>
+                      <Input 
+                        placeholder="Número"
+                        value={searchNumber}
+                        onChange={(e) => setSearchNumber(e.target.value)}
+                      />
+                      <Button type="button" onClick={handleAddressSearch} disabled={isSearchingCep}>
                         {isSearchingCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                       </Button>
                     </div>
