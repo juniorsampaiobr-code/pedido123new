@@ -50,20 +50,21 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
   const radiusInMeters = radiusKm * 1000;
 
   const handleMouseDown = useCallback((e: L.LeafletMouseEvent) => {
-    // Verifica se o clique foi perto da borda para iniciar o redimensionamento
     const circle = circleRef.current;
     if (!circle) return;
 
-    const latLng = e.latlng;
+    // Verifica se o clique ocorreu dentro do círculo
     const centerLatLng = circle.getLatLng();
-    const distance = centerLatLng.distanceTo(latLng);
-    
-    // Se o clique estiver dentro de 10% da borda (ajuste este valor conforme necessário)
-    if (Math.abs(distance - circle.getRadius()) < circle.getRadius() * 0.1) {
+    const distanceToCenter = centerLatLng.distanceTo(e.latlng);
+
+    // Se o clique estiver dentro do raio (ou ligeiramente fora para facilitar)
+    if (distanceToCenter <= circle.getRadius() * 1.1) {
       setIsResizing(true);
       map.dragging.disable();
       map.on('mousemove', handleMouseMove);
       map.on('mouseup', handleMouseUp);
+      // Adiciona classe de cursor para indicar redimensionamento
+      map.getContainer().style.cursor = 'crosshair';
     }
   }, [map]);
 
@@ -87,6 +88,7 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
     map.dragging.enable();
     map.off('mousemove', handleMouseMove);
     map.off('mouseup', handleMouseUp);
+    map.getContainer().style.cursor = ''; // Restaura o cursor
   }, [map, handleMouseMove]);
 
   useEffect(() => {
@@ -101,6 +103,7 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
       }
       map.off('mousemove', handleMouseMove);
       map.off('mouseup', handleMouseUp);
+      map.getContainer().style.cursor = '';
     };
   }, [map, handleMouseDown, handleMouseMove, handleMouseUp]);
 
@@ -116,7 +119,7 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
         Até {radiusKm.toFixed(2)} km <br />
         Taxa: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(fee || 0)}
         <br />
-        <span className="font-bold">Arraste a borda para redimensionar</span>
+        <span className="font-bold">Clique e arraste para redimensionar</span>
       </Tooltip>
     </Circle>
   );
