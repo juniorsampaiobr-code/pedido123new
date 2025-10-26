@@ -101,7 +101,11 @@ const Delivery = () => {
     name: "zones",
   });
 
+  // Usamos useMemo para garantir que o array de zonas só mude se o conteúdo mudar,
+  // evitando re-renderizações desnecessárias do componente do mapa.
   const watchedZones = zonesForm.watch('zones');
+  const memoizedWatchedZones = useMemo(() => watchedZones, [watchedZones]);
+
 
   const DEFAULT_CENTER: [number, number] = useMemo(() => {
     if (typeof restaurant?.latitude === 'number' && typeof restaurant?.longitude === 'number') {
@@ -231,7 +235,7 @@ const Delivery = () => {
               ) : hasCoordinates ? (
                 <DeliveryZoneEditorMap 
                   restaurantCenter={restaurantCenter} 
-                  zones={watchedZones as DeliveryZone[]} 
+                  zones={memoizedWatchedZones as DeliveryZone[]} 
                   onZoneRadiusChange={handleZoneRadiusChange}
                   onZoneCenterChange={handleZoneCenterChange}
                   onMapClick={handleMapClick}
