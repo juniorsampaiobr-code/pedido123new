@@ -47,7 +47,9 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
   const circleRef = useRef<L.Circle>(null);
   const [isResizing, setIsResizing] = useState(false);
 
-  const radiusInMeters = radiusKm * 1000;
+  // Adiciona verificação de segurança
+  const safeRadiusKm = typeof radiusKm === 'number' && !isNaN(radiusKm) ? radiusKm : 0.1;
+  const radiusInMeters = safeRadiusKm * 1000;
 
   const handleMouseMove = useCallback((e: L.LeafletMouseEvent) => {
     if (!isResizing || !circleRef.current) return;
@@ -73,14 +75,24 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
   }, [map, handleMouseMove]);
 
   const handleMouseDown = useCallback((e: L.LeafletMouseEvent) => {
-    L.DomEvent.stop(e); // Previne que o evento se propague para o mapa (evita arrastar o mapa)
-    setIsResizing(true);
-    map.dragging.disable();
-    
-    // Anexa os manipuladores de movimento e soltura ao container do mapa
-    L.DomEvent.on(map.getContainer(), 'mousemove', handleMouseMove);
-    L.DomEvent.on(map.getContainer(), 'mouseup', handleMouseUp);
-    map.getContainer().style.cursor = 'crosshair';
+    const circle = circleRef.current;
+    if (!circle) return;
+
+    // Verifica se o clique ocorreu dentro do círculo (ou perto)
+    const centerLatLng = circle.getLatLng();
+    const distanceToCenter = centerLatLng.distanceTo(e.latlng);
+
+    // Se o clique estiver dentro do raio (ou ligeiramente fora para facilitar)
+    if (distanceToCenter <= circle.getRadius() * 1.1) {
+      L.DomEvent.stop(e); // Previne que o evento se propague para o mapa (evita arrastar o mapa)
+      setIsResizing(true);
+      map.dragging.disable();
+      
+      // Anexa os manipuladores de movimento e soltura ao container do mapa
+      L.DomEvent.on(map.getContainer(), 'mousemove', handleMouseMove);
+      L.DomEvent.on(map.getContainer(), 'mouseup', handleMouseUp);
+      map.getContainer().style.cursor = 'crosshair';
+    }
   }, [map, handleMouseMove, handleMouseUp]);
 
   useEffect(() => {
@@ -108,7 +120,7 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
     >
       <Tooltip sticky>
         {name} <br />
-        Até {radiusKm.toFixed(2)} km <br />
+        Até {safeRadiusKm.toFixed(2)} km <br />
         Taxa: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(fee || 0)}
         <br />
         <span className="font-bold">Clique e arraste para redimensionar</span>
@@ -143,6 +155,7 @@ export const DeliveryZoneEditorMap = ({ restaurantCenter, zones, onZoneRadiusCha
 
       {/* Círculos das Zonas de Entrega Existentes */}
       {sortedZones.map((zone, index) => {
+        // Se max_distance_km for null ou 0, não renderiza o círculo
         if (!zone.max_distance_km || zone.max_distance_km <= 0) return null;
         
         const color = zoneColors[index % zoneColors.length];

@@ -101,7 +101,8 @@ const Delivery = () => {
         id: zone.id,
         name: zone.name || '',
         delivery_fee: zone.delivery_fee,
-        max_distance_km: zone.max_distance_km || 1,
+        // Garante que max_distance_km seja um número, com fallback para 1
+        max_distance_km: zone.max_distance_km && typeof zone.max_distance_km === 'number' ? zone.max_distance_km : 1,
       }));
       replace(formattedZones);
     }
@@ -157,7 +158,7 @@ const Delivery = () => {
     appendZone({ 
       name: `Nova Zona ${zoneFields.length + 1}`, 
       delivery_fee: 5.00, 
-      max_distance_km: 2,
+      max_distance_km: 2, // Garante que o valor inicial é um número
     });
   };
 
