@@ -21,7 +21,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { LocationPickerMap } from '@/components/LocationPickerMap';
 
 type Restaurant = Tables<'restaurants'>;
@@ -105,6 +105,14 @@ const Settings = () => {
     return DEFAULT_CENTER;
   }, [lat, lng]);
 
+  const updateAddressFields = useCallback((address: any) => {
+    form.setValue('street', address.road || '', { shouldValidate: true });
+    form.setValue('number', address.house_number || '', { shouldValidate: true });
+    form.setValue('neighborhood', address.suburb || address.city_district || '', { shouldValidate: true });
+    form.setValue('city', address.city || address.town || '', { shouldValidate: true });
+    form.setValue('zip_code', address.postcode || '', { shouldValidate: true });
+  }, [form]);
+
   const handleAddressSearch = async () => {
     if (!searchAddress) {
       toast.warning("Por favor, digite um endereço para buscar.");
@@ -124,23 +132,11 @@ const Settings = () => {
         return;
       }
 
-      const { lat, lon } = data[0];
+      const { lat, lon, address } = data[0];
       
-      // Busca reversa para obter detalhes do endereço
-      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
-      const reverseResponse = await fetch(reverseUrl);
-      if (!reverseResponse.ok) throw new Error("Falha ao obter detalhes do endereço.");
-
-      const reverseData = await reverseResponse.json();
-      const address = reverseData.address;
-
       form.setValue('latitude', parseFloat(lat), { shouldValidate: true });
       form.setValue('longitude', parseFloat(lon), { shouldValidate: true });
-      form.setValue('street', address.road || '', { shouldValidate: true });
-      form.setValue('number', address.house_number || '', { shouldValidate: true });
-      form.setValue('neighborhood', address.suburb || address.city_district || '', { shouldValidate: true });
-      form.setValue('city', address.city || address.town || '', { shouldValidate: true });
-      form.setValue('zip_code', address.postcode || '', { shouldValidate: true });
+      updateAddressFields(address);
 
       toast.success("Endereço encontrado e campos atualizados!");
 
@@ -151,6 +147,30 @@ const Settings = () => {
       toast.dismiss(loadingToast);
     }
   };
+
+  const handleMapLocationChange = useCallback(async (newLat: number, newLng: number) => {
+    form.setValue('latitude', newLat, { shouldValidate: true });
+    form.setValue('longitude', newLng, { shouldValidate: true });
+
+    const loadingToast = toast.loading("Buscando endereço para a nova localização...");
+    try {
+      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}`;
+      const response = await fetch(reverseUrl);
+      if (!response.ok) throw new Error("Falha ao obter detalhes do endereço.");
+
+      const data = await response.json();
+      if (data.address) {
+        updateAddressFields(data.address);
+        toast.success("Endereço atualizado a partir do mapa.");
+      } else {
+        toast.warning("Não foi possível encontrar um endereço para esta localização.");
+      }
+    } catch (err: any) {
+      toast.error(`Erro ao buscar endereço: ${err.message}`);
+    } finally {
+      toast.dismiss(loadingToast);
+    }
+  }, [form, updateAddressFields]);
 
   const restaurantMutation = useMutation({
     mutationFn: async (data: RestaurantFormValues) => {
@@ -253,10 +273,7 @@ const Settings = () => {
                   <LocationPickerMap 
                     center={markerPosition}
                     markerPosition={markerPosition}
-                    onLocationChange={(newLat, newLng) => {
-                      form.setValue('latitude', newLat, { shouldValidate: true });
-                      form.setValue('longitude', newLng, { shouldValidate: true });
-                    }}
+                    onLocationChange={handleMapLocationChange}
                   />
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
