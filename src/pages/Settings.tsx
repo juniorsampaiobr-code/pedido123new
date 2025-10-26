@@ -134,8 +134,7 @@ const Settings = () => {
 
       const { lat, lon } = data[0];
       
-      // Busca reversa para obter detalhes mais precisos do endereço, incluindo o número
-      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`;
       const reverseResponse = await fetch(reverseUrl);
       if (!reverseResponse.ok) throw new Error("Falha ao obter detalhes do endereço.");
 
@@ -164,7 +163,7 @@ const Settings = () => {
 
     const loadingToast = toast.loading("Buscando endereço para a nova localização...");
     try {
-      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}`;
+      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLng}&addressdetails=1`;
       const response = await fetch(reverseUrl);
       if (!response.ok) throw new Error("Falha ao obter detalhes do endereço.");
 
