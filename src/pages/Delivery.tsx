@@ -19,9 +19,9 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useEffect } from 'react';
-import { DeliveryZoneMap } from '@/components/DeliveryZoneMap';
+import { useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { DeliveryZoneEditorMap } from '@/components/DeliveryZoneEditorMap';
 
 type DeliveryZone = Tables<'delivery_zones'>;
 type Restaurant = Tables<'restaurants'>;
@@ -85,7 +85,7 @@ const Delivery = () => {
   const zonesForm = useForm<ZonesFormValues>({
     resolver: zodResolver(zonesFormSchema),
     defaultValues: { zones: [] },
-    mode: 'onBlur',
+    mode: 'onChange', // Use onChange to update map instantly
   });
 
   const { fields: zoneFields, append: appendZone, remove: removeZone, replace } = useFieldArray({
@@ -119,12 +119,14 @@ const Delivery = () => {
         is_active: true,
       }));
 
+      // Delete existing zones
       const { error: deleteError } = await supabase
         .from('delivery_zones')
         .delete()
         .eq('restaurant_id', restaurant.id);
       if (deleteError) throw new Error(`Erro ao limpar zonas antigas: ${deleteError.message}`);
 
+      // Insert new/updated zones
       const { error: insertError } = await supabase
         .from('delivery_zones')
         .insert(updates as TablesInsert<'delivery_zones'>[]);
@@ -143,8 +145,25 @@ const Delivery = () => {
     zonesMutation.mutate(data);
   };
 
+  const handleNewZoneCenter = () => {
+    // When clicking the map, we don't actually need to change the center of the zone, 
+    // as the current database schema assumes the center is the restaurant location.
+    // We just add a new zone entry to the form.
+    appendZone({ 
+      name: `Nova Zona ${zoneFields.length + 1}`, 
+      delivery_fee: 5.00, 
+      max_distance_km: 2,
+    });
+  };
+
   const hasCoordinates = restaurant?.latitude && restaurant?.longitude;
-  const restaurantCenter: [number, number] = hasCoordinates ? [restaurant.latitude!, restaurant.longitude!] : [0, 0];
+  const restaurantCenter: [number, number] = useMemo(() => {
+    if (typeof restaurant?.latitude === 'number' && typeof restaurant?.longitude === 'number') {
+      return [restaurant.latitude, restaurant.longitude];
+    }
+    // Default to São Paulo if coordinates are missing
+    return [-23.55052, -46.633308]; 
+  }, [restaurant]);
 
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
@@ -154,14 +173,18 @@ const Delivery = () => {
             <CardHeader>
               <CardTitle className="text-2xl font-bold">Mapa de Cobertura</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Visualize as faixas de entrega em tempo real.
+                Visualize as faixas de entrega em tempo real. Clique no mapa para adicionar uma nova zona.
               </p>
             </CardHeader>
             <CardContent>
               {isLoadingRestaurant ? (
                 <Skeleton className="h-96 w-full" />
               ) : hasCoordinates ? (
-                <DeliveryZoneMap center={restaurantCenter} zones={watchedZones} />
+                <DeliveryZoneEditorMap 
+                  restaurantCenter={restaurantCenter} 
+                  zones={watchedZones as DeliveryZone[]} 
+                  onNewZoneCenter={handleNewZoneCenter}
+                />
               ) : (
                 <Alert>
                   <Settings className="h-4 w-4" />
@@ -183,7 +206,7 @@ const Delivery = () => {
             <CardHeader>
               <CardTitle className="text-2xl font-bold">Zonas de Entrega</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Defina a taxa de entrega com base na distância máxima em quilômetros (km).
+                Defina a taxa de entrega com base na distância máxima em quilômetros (km) a partir do seu restaurante.
               </p>
             </CardHeader>
             <CardContent>
@@ -205,6 +228,7 @@ const Delivery = () => {
                     
                     {zoneFields.map((field, index) => (
                       <div key={field.id} className="border p-4 rounded-lg space-y-4 relative">
+                        <h4 className="font-semibold text-lg">Zona {index + 1}</h4>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <FormField
                             control={zonesForm.control}
@@ -214,7 +238,7 @@ const Delivery = () => {
                                 <FormLabel>Nome da Zona *</FormLabel>
                                 <FormControl>
                                   <Input 
-                                    placeholder="Ex: Centro" 
+                                    placeholder="Ex: Até 2km" 
                                     {...nameField} 
                                   />
                                 </FormControl>
@@ -280,8 +304,8 @@ const Delivery = () => {
                       variant="outline" 
                       className="w-full"
                       onClick={() => appendZone({ 
-                        name: '', 
-                        delivery_fee: 0, 
+                        name: `Nova Zona ${zoneFields.length + 1}`, 
+                        delivery_fee: 5.00, 
                         max_distance_km: 1,
                       })}
                     >
