@@ -46,7 +46,7 @@ interface ResizableCircleProps {
 const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }: ResizableCircleProps) => {
   const map = useMap();
   const circleRef = useRef<L.Circle>(null);
-  const [isResizing, setIsResizing] = useState(false);
+  const isResizingRef = useRef(false);
 
   // Adiciona verificação de segurança
   const safeRadiusKm = typeof radiusKm === 'number' && !isNaN(radiusKm) ? radiusKm : 0.1;
@@ -54,7 +54,7 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
 
   // 1. Manipulador de Movimento (Move)
   const handleMouseMove = useCallback((e: L.LeafletMouseEvent) => {
-    if (!isResizing || !circleRef.current) return;
+    if (!isResizingRef.current || !circleRef.current) return;
 
     const circle = circleRef.current;
     const centerLatLng = circle.getLatLng();
@@ -66,11 +66,11 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
     // Atualiza o raio no estado do React (convertendo para KM)
     const newRadiusKm = Math.max(0.1, newDistanceMeters / 1000); // Mínimo de 0.1km
     onRadiusChange(newRadiusKm);
-  }, [isResizing, onRadiusChange]);
+  }, [onRadiusChange]);
 
   // 2. Manipulador de Soltura (Up)
   const handleMouseUp = useCallback(() => {
-    setIsResizing(false);
+    isResizingRef.current = false;
     map.dragging.enable();
     map.off('mousemove', handleMouseMove);
     map.off('mouseup', handleMouseUp);
@@ -82,7 +82,7 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
     // Previne que o evento se propague para o mapa (evita arrastar o mapa)
     L.DomEvent.stop(e); 
     
-    setIsResizing(true);
+    isResizingRef.current = true;
     map.dragging.disable();
     
     // Anexa os manipuladores de movimento e soltura ao MAPA
@@ -126,7 +126,7 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
   );
 };
 
-// Novo componente para capturar cliques no mapa
+// Componente para capturar cliques no mapa
 const MapClickZoneAdder = ({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) => {
   useMapEvents({
     click(e) {
