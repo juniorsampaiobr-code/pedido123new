@@ -132,11 +132,21 @@ const Settings = () => {
         return;
       }
 
-      const { lat, lon, address } = data[0];
+      const { lat, lon } = data[0];
+      
+      // Busca reversa para obter detalhes mais precisos do endereço, incluindo o número
+      const reverseUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`;
+      const reverseResponse = await fetch(reverseUrl);
+      if (!reverseResponse.ok) throw new Error("Falha ao obter detalhes do endereço.");
+
+      const reverseData = await reverseResponse.json();
       
       form.setValue('latitude', parseFloat(lat), { shouldValidate: true });
       form.setValue('longitude', parseFloat(lon), { shouldValidate: true });
-      updateAddressFields(address);
+      
+      if (reverseData.address) {
+        updateAddressFields(reverseData.address);
+      }
 
       toast.success("Endereço encontrado e campos atualizados!");
 
