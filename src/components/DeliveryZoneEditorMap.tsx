@@ -22,6 +22,7 @@ interface DeliveryZoneEditorMapProps {
   restaurantCenter: [number, number];
   zones: DeliveryZone[];
   onZoneRadiusChange: (index: number, newRadiusKm: number) => void;
+  onMapClick: (lat: number, lng: number) => void; // Novo prop para cliques no mapa
 }
 
 const zoneColors = [
@@ -125,7 +126,17 @@ const ResizableCircle = ({ center, radiusKm, color, name, fee, onRadiusChange }:
   );
 };
 
-export const DeliveryZoneEditorMap = ({ restaurantCenter, zones, onZoneRadiusChange }: DeliveryZoneEditorMapProps) => {
+// Novo componente para capturar cliques no mapa
+const MapClickZoneAdder = ({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) => {
+  useMapEvents({
+    click(e) {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+};
+
+export const DeliveryZoneEditorMap = ({ restaurantCenter, zones, onZoneRadiusChange, onMapClick }: DeliveryZoneEditorMapProps) => {
   const sortedZones = [...zones].sort((a, b) => (a.max_distance_km || 0) - (b.max_distance_km || 0));
   const [mapCenter, setMapCenter] = useState(restaurantCenter);
 
@@ -142,6 +153,8 @@ export const DeliveryZoneEditorMap = ({ restaurantCenter, zones, onZoneRadiusCha
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       
+      <MapClickZoneAdder onMapClick={onMapClick} />
+
       {/* Marcador do Restaurante (Centro das Zonas) */}
       {(restaurantCenter[0] !== 0 || restaurantCenter[1] !== 0) && (
         <Marker position={restaurantCenter}>

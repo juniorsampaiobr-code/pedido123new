@@ -162,6 +162,27 @@ const Delivery = () => {
     });
   };
 
+  // Função para adicionar uma nova zona ao clicar no mapa
+  const handleMapClick = useCallback((lat: number, lng: number) => {
+    // Nota: Como as zonas de entrega são baseadas na distância do centro do restaurante,
+    // o clique no mapa apenas aciona a criação de uma nova zona com um raio padrão.
+    // O centro da zona é sempre o restaurante.
+    
+    // Se o restaurante não tiver coordenadas, não faz sentido adicionar zonas.
+    if (!restaurant?.latitude || !restaurant?.longitude) {
+      toast.warning("Configure as coordenadas do restaurante em Configurações primeiro.");
+      return;
+    }
+
+    appendZone({ 
+      name: `Zona ${zoneFields.length + 1} (Clique)`, 
+      delivery_fee: 5.00, 
+      max_distance_km: 1, // Raio inicial de 1km
+    });
+    toast.info(`Nova zona de entrega adicionada. Ajuste o raio no mapa.`);
+  }, [restaurant, zoneFields.length, appendZone]);
+
+
   const hasCoordinates = restaurant?.latitude && restaurant?.longitude;
   const restaurantCenter: [number, number] = useMemo(() => {
     if (typeof restaurant?.latitude === 'number' && typeof restaurant?.longitude === 'number') {
@@ -180,6 +201,8 @@ const Delivery = () => {
               <CardTitle className="text-2xl font-bold">Mapa de Cobertura</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Visualize as faixas de entrega em tempo real. Arraste a borda do círculo para redimensionar a zona.
+                <br />
+                <span className="font-semibold text-primary">Dica: Clique em qualquer lugar do mapa para adicionar uma nova zona.</span>
               </p>
             </CardHeader>
             <CardContent>
@@ -190,6 +213,7 @@ const Delivery = () => {
                   restaurantCenter={restaurantCenter} 
                   zones={watchedZones as DeliveryZone[]} 
                   onZoneRadiusChange={handleZoneRadiusChange}
+                  onMapClick={handleMapClick} // Passando a nova função
                 />
               ) : (
                 <Alert>
