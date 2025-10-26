@@ -94,11 +94,13 @@ const Settings = () => {
   const lat = form.watch('latitude');
   const lng = form.watch('longitude');
 
-  const currentPosition = useMemo((): [number, number] | null => {
-    if (typeof lat === 'number' && typeof lng === 'number') {
+  const DEFAULT_CENTER: [number, number] = [-23.55052, -46.633308]; // São Paulo
+
+  const markerPosition = useMemo((): [number, number] => {
+    if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
       return [lat, lng];
     }
-    return null;
+    return DEFAULT_CENTER;
   }, [lat, lng]);
 
   const restaurantMutation = useMutation({
@@ -183,16 +185,14 @@ const Settings = () => {
                     Clique no mapa ou arraste o marcador para definir a localização exata.
                   </p>
                   
-                  {currentPosition && (
-                    <LocationPickerMap 
-                      center={currentPosition}
-                      markerPosition={currentPosition}
-                      onLocationChange={(newLat, newLng) => {
-                        form.setValue('latitude', newLat, { shouldValidate: true });
-                        form.setValue('longitude', newLng, { shouldValidate: true });
-                      }}
-                    />
-                  )}
+                  <LocationPickerMap 
+                    center={markerPosition}
+                    markerPosition={markerPosition}
+                    onLocationChange={(newLat, newLng) => {
+                      form.setValue('latitude', newLat, { shouldValidate: true });
+                      form.setValue('longitude', newLng, { shouldValidate: true });
+                    }}
+                  />
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={form.control} name="latitude" render={({ field }) => (<FormItem><FormLabel>Latitude</FormLabel><FormControl><Input {...field} placeholder="-22.7627908" value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
