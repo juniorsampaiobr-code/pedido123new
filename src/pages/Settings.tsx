@@ -298,7 +298,7 @@ const Settings = () => {
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Preencha o CEP e o número e clique em buscar para preencher o endereço.
+                      Coloque o CEP e nº do estabelecimento e para melhor precisão mova o alfinete no mapa e salve as configurações
                     </p>
                   </div>
 
@@ -312,15 +312,13 @@ const Settings = () => {
                   </div>
                   <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP</FormLabel><FormControl><ZipCodeInput {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
 
-                  <p className="text-sm text-muted-foreground pt-4 border-t">
-                    Clique no mapa ou arraste o marcador para ajustar a localização exata.
-                  </p>
-                  
-                  <LocationPickerMap 
-                    center={markerPosition}
-                    markerPosition={markerPosition}
-                    onLocationChange={handleMapLocationChange}
-                  />
+                  <div className="pt-4 border-t">
+                    <LocationPickerMap 
+                      center={markerPosition}
+                      markerPosition={markerPosition}
+                      onLocationChange={handleMapLocationChange}
+                    />
+                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={form.control} name="latitude" render={({ field }) => (<FormItem><FormLabel>Latitude</FormLabel><FormControl><Input {...field} placeholder="-22.7627908" value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
