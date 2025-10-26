@@ -54,7 +54,7 @@ const ResizableCircle = ({ index, center, radiusKm, color, name, fee, onRadiusCh
   const safeRadiusKm = typeof radiusKm === 'number' && !isNaN(radiusKm) ? radiusKm : 0.1;
   const radiusInMeters = safeRadiusKm * 1000;
 
-  // 1. Manipulador de Movimento (Move)
+  // 1. Manipulador de Movimento (Move) - Redimensionamento
   const handleMouseMove = useCallback((e: L.LeafletMouseEvent) => {
     if (!isResizingRef.current || !circleRef.current) return;
 
@@ -79,6 +79,7 @@ const ResizableCircle = ({ index, center, radiusKm, color, name, fee, onRadiusCh
 
   // 3. Manipulador de Clique (Down) - Inicia o redimensionamento
   const handleMouseDown = useCallback((e: L.LeafletMouseEvent) => {
+    // Previne que o evento se propague para o mapa (evita arrastar o mapa)
     L.DomEvent.stop(e); 
     
     isResizingRef.current = true;
