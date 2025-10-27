@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { ProductCard } from '@/components/ProductCard';
 import { useDebounce } from '@/hooks/useDebounce';
+import { Card, CardContent } from '@/components/ui/card';
+import { LazyImage } from '@/components/LazyImage';
 
 type Product = Tables<'products'>;
 type Restaurant = Tables<'restaurants'>;
@@ -20,7 +22,12 @@ type CategoryWithProducts = Tables<'categories'> & {
   products: Product[];
 };
 
-const fetchMenuData = async (): Promise<{ restaurant: Restaurant, menu: CategoryWithProducts[] }> => {
+interface MenuData {
+  restaurant: Restaurant;
+  menu: CategoryWithProducts[];
+}
+
+const fetchMenuData = async (): Promise<MenuData> => {
   const { data: restaurantData, error: restaurantError } = await supabase
     .from('restaurants')
     .select('*')
@@ -59,11 +66,11 @@ const fetchMenuData = async (): Promise<{ restaurant: Restaurant, menu: Category
 };
 
 const Menu = () => {
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error } = useQuery<MenuData>({
     queryKey: ['menuData'],
     queryFn: fetchMenuData,
     staleTime: 1000 * 60 * 5, // 5 minutos
-    cacheTime: 1000 * 60 * 10, // 10 minutos
+    gcTime: 1000 * 60 * 10, // 10 minutos
   });
   
   const { totalItems, subtotal } = useCart();

@@ -3,6 +3,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect, useState, useRef, useCallback, memo, useMemo } from 'react';
 import { Tables } from '@/integrations/supabase/types';
+import { LatLngExpression } from 'leaflet';
 
 // Corrige um problema comum com o ícone do marcador em bundlers como o Vite
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -165,9 +166,9 @@ const DeliveryZoneEditorMapComponent = ({ restaurantCenter, zones, onZoneRadiusC
   const sortedZones = [...zones].sort((a, b) => (a.max_distance_km || 0) - (b.max_distance_km || 0));
   
   // Usar useMemo para calcular o centro do mapa apenas quando necessário
-  const mapCenter = useMemo(() => {
+  const mapCenter: LatLngExpression = useMemo(() => {
     if (sortedZones.length > 0 && sortedZones[0].center_latitude && sortedZones[0].center_longitude) {
-      return [sortedZones[0].center_latitude, sortedZones[0].center_longitude];
+      return [sortedZones[0].center_latitude, sortedZones[0].center_longitude] as [number, number];
     } else if (restaurantCenter[0] !== 0 || restaurantCenter[1] !== 0) {
       return restaurantCenter;
     }
