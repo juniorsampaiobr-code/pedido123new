@@ -53,11 +53,17 @@ const ResizableCircle = ({ index, center, radiusKm, color, name, fee, onRadiusCh
   const safeRadiusKm = typeof radiusKm === 'number' && !isNaN(radiusKm) ? radiusKm : 0.1;
   const radiusInMeters = safeRadiusKm * 1000;
 
-  useEffect(() => {
+  // Usar useCallback para evitar recriação da função
+  const updateRadius = useCallback(() => {
     if (circleRef.current) {
       circleRef.current.setRadius(radiusInMeters);
     }
   }, [radiusInMeters]);
+
+  // Usar useEffect com dependência específica
+  useEffect(() => {
+    updateRadius();
+  }, [updateRadius]);
 
   const handleMouseMove = useCallback((e: L.LeafletMouseEvent) => {
     if (!isResizingRef.current || !circleRef.current) return;
@@ -91,19 +97,25 @@ const ResizableCircle = ({ index, center, radiusKm, color, name, fee, onRadiusCh
     map.getContainer().style.cursor = 'crosshair';
   }, [map, handleMouseMove, handleMouseUp]);
 
+  // Remover event listeners ao desmontar
+  useEffect(() => {
+    return () => {
+      map.off('mousemove', handleMouseMove);
+      map.off('mouseup', handleMouseUp);
+    };
+  }, [map, handleMouseMove, handleMouseUp]);
+
   useEffect(() => {
     const circle = circleRef.current;
     if (circle) {
       circle.on('mousedown', handleMouseDown);
-    }
-    return () => {
-      if (circle) {
+      
+      // Cleanup function
+      return () => {
         circle.off('mousedown', handleMouseDown);
-      }
-      map.off('mousemove', handleMouseMove);
-      map.off('mouseup', handleMouseUp);
-    };
-  }, [map, handleMouseDown, handleMouseMove, handleMouseUp]);
+      };
+    }
+  }, [handleMouseDown]);
 
   return (
     <>
@@ -151,15 +163,19 @@ const MapClickZoneAdder = ({ onMapClick }: { onMapClick: (lat: number, lng: numb
 
 const DeliveryZoneEditorMapComponent = ({ restaurantCenter, zones, onZoneRadiusChange, onZoneCenterChange, onMapClick }: DeliveryZoneEditorMapProps) => {
   const sortedZones = [...zones].sort((a, b) => (a.max_distance_km || 0) - (b.max_distance_km || 0));
-  const [mapCenter, setMapCenter] = useState(restaurantCenter);
-
-  useEffect(() => {
+  
+  // Usar useMemo para calcular o centro do mapa apenas quando necessário
+  const mapCenter = useMemo(() => {
     if (sortedZones.length > 0 && sortedZones[0].center_latitude && sortedZones[0].center_longitude) {
-        setMapCenter([sortedZones[0].center_latitude, sortedZones[0].center_longitude]);
+      return [sortedZones[0].center_latitude, sortedZones[0].center_longitude];
     } else if (restaurantCenter[0] !== 0 || restaurantCenter[1] !== 0) {
-      setMapCenter(restaurantCenter);
+      return restaurantCenter;
     }
+    return [0, 0]; // Default fallback
   }, [restaurantCenter, sortedZones]);
+
+  // Memoizar as zonas para evitar re-renderizações desnecessárias
+  const memoizedZones = useMemo(() => sortedZones, [sortedZones]);
 
   return (
     <MapContainer center={mapCenter} zoom={14} scrollWheelZoom={false} className="h-96 w-full rounded-lg z-0">
@@ -176,7 +192,7 @@ const DeliveryZoneEditorMapComponent = ({ restaurantCenter, zones, onZoneRadiusC
         </Marker>
       )}
 
-      {sortedZones.map((zone, index) => {
+      {memoizedZones.map((zone, index) => {
         if (!zone.max_distance_km || zone.max_distance_km <= 0) return null;
         
         const color = zoneColors[index % zoneColors.length];
@@ -194,8 +210,8 @@ const DeliveryZoneEditorMapComponent = ({ restaurantCenter, zones, onZoneRadiusC
             color={color}
             name={zone.name}
             fee={zone.delivery_fee}
-            onRadiusChange={(newRadiusKm) => onZoneRadiusChange(index, newRadiusKm)}
-            onCenterChange={(lat, lng) => onZoneCenterChange(index, lat, lng)}
+            onRadiusChange={onZoneRadiusChange}
+            onCenterChange={onZoneCenterChange}
           />
         );
       })}
@@ -203,4 +219,14 @@ const DeliveryZoneEditorMapComponent = ({ restaurantCenter, zones, onZoneRadiusC
   );
 };
 
-export const DeliveryZoneEditorMap = memo(DeliveryZoneEditorMapComponent);
+// Adicionar React.memo com função de comparação personalizada
+const areEqual = (prevProps: DeliveryZoneEditorMapProps, nextProps: DeliveryZoneEditorMapProps) => {
+  return (
+    prevProps.restaurantCenter[0] === nextProps.restaurantCenter[0] &&
+    prevProps.restaurantCenter[1] === nextProps.restaurantCenter[1] &&
+    prevProps.zones.length === nextProps.zones.length &&
+    JSON.stringify(prevProps.zones) === JSON.stringify(nextProps.zones)
+  );
+};
+
+export const DeliveryZoneEditorMap = memo(DeliveryZoneEditorMapComponent, areEqual);

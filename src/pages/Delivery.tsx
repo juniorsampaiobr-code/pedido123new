@@ -96,12 +96,13 @@ const Delivery = () => {
     mode: 'onChange',
   });
 
-  const { fields: zoneFields, append: appendZone, remove: removeZone, replace, update } = useFieldArray({
+  const { fields: zoneFields, append: appendZone, remove: removeZone, replace } = useFieldArray({
     control: zonesForm.control,
     name: "zones",
   });
 
-  const watchedZones = zonesForm.watch('zones');
+  // Memoizar os valores observados do formulário
+  const watchedZones = useMemo(() => zonesForm.watch('zones'), [zonesForm]);
   const memoizedWatchedZones = useMemo(() => watchedZones, [watchedZones]);
 
   const DEFAULT_CENTER: [number, number] = useMemo(() => {
@@ -109,21 +110,26 @@ const Delivery = () => {
       return [restaurant.latitude, restaurant.longitude];
     }
     return [-23.55052, -46.633308];
-  }, [restaurant]);
+  }, [restaurant?.latitude, restaurant?.longitude]);
+
+  // Usar useCallback para evitar recriação da função
+  const updateFormWithZones = useCallback((zones: DeliveryZone[]) => {
+    const formattedZones = zones.map(zone => ({
+      id: zone.id,
+      name: zone.name || '',
+      delivery_fee: zone.delivery_fee,
+      max_distance_km: zone.max_distance_km && typeof zone.max_distance_km === 'number' ? zone.max_distance_km : 1,
+      center_latitude: zone.center_latitude,
+      center_longitude: zone.center_longitude,
+    }));
+    replace(formattedZones);
+  }, [replace]);
 
   useEffect(() => {
     if (deliveryZones) {
-      const formattedZones = deliveryZones.map(zone => ({
-        id: zone.id,
-        name: zone.name || '',
-        delivery_fee: zone.delivery_fee,
-        max_distance_km: zone.max_distance_km && typeof zone.max_distance_km === 'number' ? zone.max_distance_km : 1,
-        center_latitude: zone.center_latitude,
-        center_longitude: zone.center_longitude,
-      }));
-      replace(formattedZones);
+      updateFormWithZones(deliveryZones);
     }
-  }, [deliveryZones, replace]);
+  }, [deliveryZones, updateFormWithZones]);
 
   const zonesMutation = useMutation({
     mutationFn: async (data: ZonesFormValues) => {
@@ -163,23 +169,18 @@ const Delivery = () => {
     zonesMutation.mutate(data);
   };
 
+  // Memoizar as funções de callback
   const handleZoneRadiusChange = useCallback((index: number, newRadiusKm: number) => {
-    update(index, {
-      ...watchedZones[index],
-      max_distance_km: parseFloat(newRadiusKm.toFixed(2)),
-    });
-  }, [update, watchedZones]);
+    zonesForm.setValue(`zones.${index}.max_distance_km`, parseFloat(newRadiusKm.toFixed(2)));
+  }, [zonesForm]);
 
   const handleZoneCenterChange = useCallback((index: number, lat: number, lng: number) => {
-    update(index, {
-      ...watchedZones[index],
-      center_latitude: lat,
-      center_longitude: lng,
-    });
+    zonesForm.setValue(`zones.${index}.center_latitude`, lat);
+    zonesForm.setValue(`zones.${index}.center_longitude`, lng);
     toast.info(`Centro da Zona ${index + 1} movido.`);
-  }, [update, watchedZones]);
+  }, [zonesForm]);
 
-  const handleNewZone = () => {
+  const handleNewZone = useCallback(() => {
     appendZone({ 
       name: `Nova Zona ${zoneFields.length + 1}`, 
       delivery_fee: 5.00, 
@@ -187,7 +188,7 @@ const Delivery = () => {
       center_latitude: DEFAULT_CENTER[0],
       center_longitude: DEFAULT_CENTER[1],
     });
-  };
+  }, [appendZone, zoneFields.length, DEFAULT_CENTER]);
 
   const handleMapClick = useCallback((lat: number, lng: number) => {
     if (!restaurant?.latitude || !restaurant?.longitude) {
@@ -203,7 +204,7 @@ const Delivery = () => {
       center_longitude: lng,
     });
     toast.info(`Nova zona de entrega adicionada no local do clique.`);
-  }, [restaurant, zoneFields.length, appendZone]);
+  }, [restaurant?.latitude, restaurant?.longitude, appendZone, zoneFields.length]);
 
   const hasCoordinates = restaurant?.latitude && restaurant?.longitude;
   const restaurantCenter: [number, number] = DEFAULT_CENTER;
