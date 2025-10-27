@@ -93,7 +93,7 @@ const Delivery = () => {
   const zonesForm = useForm<ZonesFormValues>({
     resolver: zodResolver(zonesFormSchema),
     defaultValues: { zones: [] },
-    mode: 'onChange', // Use onChange to update map instantly
+    mode: 'onChange',
   });
 
   const { fields: zoneFields, append: appendZone, remove: removeZone, replace, update } = useFieldArray({
@@ -101,18 +101,14 @@ const Delivery = () => {
     name: "zones",
   });
 
-  // Usamos useMemo para garantir que o array de zonas só mude se o conteúdo mudar,
-  // evitando re-renderizações desnecessárias do componente do mapa.
   const watchedZones = zonesForm.watch('zones');
   const memoizedWatchedZones = useMemo(() => watchedZones, [watchedZones]);
-
 
   const DEFAULT_CENTER: [number, number] = useMemo(() => {
     if (typeof restaurant?.latitude === 'number' && typeof restaurant?.longitude === 'number') {
       return [restaurant.latitude, restaurant.longitude];
     }
-    // Default to São Paulo if coordinates are missing
-    return [-23.55052, -46.633308]; 
+    return [-23.55052, -46.633308];
   }, [restaurant]);
 
   useEffect(() => {
@@ -143,14 +139,12 @@ const Delivery = () => {
         is_active: true,
       }));
 
-      // Delete existing zones
       const { error: deleteError } = await supabase
         .from('delivery_zones')
         .delete()
         .eq('restaurant_id', restaurant.id);
       if (deleteError) throw new Error(`Erro ao limpar zonas antigas: ${deleteError.message}`);
 
-      // Insert new/updated zones
       const { error: insertError } = await supabase
         .from('delivery_zones')
         .insert(updates as TablesInsert<'delivery_zones'>[]);
@@ -195,7 +189,6 @@ const Delivery = () => {
     });
   };
 
-  // Função para adicionar uma nova zona ao clicar no mapa
   const handleMapClick = useCallback((lat: number, lng: number) => {
     if (!restaurant?.latitude || !restaurant?.longitude) {
       toast.warning("Configure as coordenadas do restaurante em Configurações primeiro.");
@@ -206,12 +199,11 @@ const Delivery = () => {
       name: `Zona ${zoneFields.length + 1} (Clique)`, 
       delivery_fee: 5.00, 
       max_distance_km: 1,
-      center_latitude: lat, // Usa a coordenada do clique como centro inicial
+      center_latitude: lat,
       center_longitude: lng,
     });
     toast.info(`Nova zona de entrega adicionada no local do clique.`);
   }, [restaurant, zoneFields.length, appendZone]);
-
 
   const hasCoordinates = restaurant?.latitude && restaurant?.longitude;
   const restaurantCenter: [number, number] = DEFAULT_CENTER;
@@ -315,7 +307,6 @@ const Delivery = () => {
                                     {...distanceField} 
                                     value={distanceField.value === undefined || distanceField.value === null ? '' : String(distanceField.value)}
                                     onChange={(e) => {
-                                      // Atualiza o valor no formulário, garantindo que seja um número (ou string vazia)
                                       const value = e.target.value;
                                       const numericValue = value === '' ? '' : parseFloat(value.replace(',', '.'));
                                       distanceField.onChange(numericValue);

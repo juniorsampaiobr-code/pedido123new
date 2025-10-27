@@ -22,19 +22,18 @@ interface DeliveryZoneEditorMapProps {
   restaurantCenter: [number, number];
   zones: DeliveryZone[];
   onZoneRadiusChange: (index: number, newRadiusKm: number) => void;
-  onZoneCenterChange: (index: number, lat: number, lng: number) => void; // Novo prop para mover o centro
+  onZoneCenterChange: (index: number, lat: number, lng: number) => void;
   onMapClick: (lat: number, lng: number) => void;
 }
 
 const zoneColors = [
-  'rgba(59, 130, 246, 0.4)',  // blue-500
-  'rgba(16, 185, 129, 0.4)', // emerald-500
-  'rgba(239, 68, 68, 0.4)',   // red-500
-  'rgba(249, 115, 22, 0.4)',  // orange-500
-  'rgba(139, 92, 246, 0.4)',  // violet-500
+  'rgba(59, 130, 246, 0.4)',
+  'rgba(16, 185, 129, 0.4)',
+  'rgba(239, 68, 68, 0.4)',
+  'rgba(249, 115, 22, 0.4)',
+  'rgba(139, 92, 246, 0.4)',
 ];
 
-// Componente auxiliar para permitir o redimensionamento e movimento do círculo
 interface ResizableCircleProps {
   index: number;
   center: [number, number];
@@ -54,15 +53,12 @@ const ResizableCircle = ({ index, center, radiusKm, color, name, fee, onRadiusCh
   const safeRadiusKm = typeof radiusKm === 'number' && !isNaN(radiusKm) ? radiusKm : 0.1;
   const radiusInMeters = safeRadiusKm * 1000;
 
-  // Efeito para forçar a atualização do raio quando a prop radiusKm muda (via input do formulário)
   useEffect(() => {
     if (circleRef.current) {
       circleRef.current.setRadius(radiusInMeters);
     }
   }, [radiusInMeters]);
 
-
-  // 1. Manipulador de Movimento (Move) - Redimensionamento
   const handleMouseMove = useCallback((e: L.LeafletMouseEvent) => {
     if (!isResizingRef.current || !circleRef.current) return;
 
@@ -76,7 +72,6 @@ const ResizableCircle = ({ index, center, radiusKm, color, name, fee, onRadiusCh
     onRadiusChange(newRadiusKm);
   }, [onRadiusChange]);
 
-  // 2. Manipulador de Soltura (Up)
   const handleMouseUp = useCallback(() => {
     isResizingRef.current = false;
     map.dragging.enable();
@@ -85,10 +80,8 @@ const ResizableCircle = ({ index, center, radiusKm, color, name, fee, onRadiusCh
     map.getContainer().style.cursor = '';
   }, [map, handleMouseMove]);
 
-  // 3. Manipulador de Clique (Down) - Inicia o redimensionamento
   const handleMouseDown = useCallback((e: L.LeafletMouseEvent) => {
-    // Previne que o evento se propague para o mapa (evita arrastar o mapa)
-    L.DomEvent.stop(e); 
+    L.DomEvent.stop(e);
     
     isResizingRef.current = true;
     map.dragging.disable();
@@ -98,7 +91,6 @@ const ResizableCircle = ({ index, center, radiusKm, color, name, fee, onRadiusCh
     map.getContainer().style.cursor = 'crosshair';
   }, [map, handleMouseMove, handleMouseUp]);
 
-  // 4. Efeito para anexar o listener de mousedown ao círculo
   useEffect(() => {
     const circle = circleRef.current;
     if (circle) {
@@ -130,14 +122,13 @@ const ResizableCircle = ({ index, center, radiusKm, color, name, fee, onRadiusCh
         </Tooltip>
       </Circle>
       
-      {/* Marcador móvel no centro do círculo */}
       <Marker
         position={center}
         draggable={true}
         eventHandlers={{
           dragend: (e) => {
             const { lat, lng } = e.target.getLatLng();
-            onCenterChange(lat, lng); // Atualiza o centro da zona
+            onCenterChange(lat, lng);
           },
         }}
       >
@@ -149,7 +140,6 @@ const ResizableCircle = ({ index, center, radiusKm, color, name, fee, onRadiusCh
   );
 };
 
-// Componente para capturar cliques no mapa
 const MapClickZoneAdder = ({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) => {
   useMapEvents({
     click(e) {
@@ -164,7 +154,6 @@ const DeliveryZoneEditorMapComponent = ({ restaurantCenter, zones, onZoneRadiusC
   const [mapCenter, setMapCenter] = useState(restaurantCenter);
 
   useEffect(() => {
-    // Se houver zonas, centraliza no primeiro centro de zona, caso contrário, usa o restaurante
     if (sortedZones.length > 0 && sortedZones[0].center_latitude && sortedZones[0].center_longitude) {
         setMapCenter([sortedZones[0].center_latitude, sortedZones[0].center_longitude]);
     } else if (restaurantCenter[0] !== 0 || restaurantCenter[1] !== 0) {
@@ -181,14 +170,12 @@ const DeliveryZoneEditorMapComponent = ({ restaurantCenter, zones, onZoneRadiusC
       
       <MapClickZoneAdder onMapClick={onMapClick} />
 
-      {/* Marcador do Restaurante (Apenas para referência, não é o centro da zona) */}
       {(restaurantCenter[0] !== 0 || restaurantCenter[1] !== 0) && (
         <Marker position={restaurantCenter} opacity={0.5}>
           <Tooltip permanent>Local do Restaurante</Tooltip>
         </Marker>
       )}
 
-      {/* Círculos das Zonas de Entrega Existentes */}
       {sortedZones.map((zone, index) => {
         if (!zone.max_distance_km || zone.max_distance_km <= 0) return null;
         
