@@ -230,11 +230,12 @@ const Hours = () => {
                   return (
                     <div key={field.id}>
                       <div className="flex items-center justify-between py-3">
-                        <div className="w-32 font-medium">
+                        <div className="w-32 font-medium flex-shrink-0">
                           {dayInfo?.label}
                         </div>
                         
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-6">
+                          {/* Switch Control Group */}
                           <FormField
                             control={form.control}
                             name={`hours.${index}.is_open`}
@@ -246,14 +247,15 @@ const Hours = () => {
                                     onCheckedChange={switchField.onChange}
                                   />
                                 </FormControl>
-                                <FormLabel className="text-sm font-normal w-16 text-right">
+                                <FormLabel className="text-sm font-normal w-16 text-left">
                                   {switchField.value ? 'Aberto' : 'Fechado'}
                                 </FormLabel>
                               </FormItem>
                             )}
                           />
 
-                          <div className={isClosed ? 'opacity-50 pointer-events-none' : 'flex gap-4'}>
+                          {/* Time Inputs Group */}
+                          <div className={isClosed ? 'opacity-50 pointer-events-none flex gap-4' : 'flex gap-4'}>
                             <FormField
                               control={form.control}
                               name={`hours.${index}.open_time`}
