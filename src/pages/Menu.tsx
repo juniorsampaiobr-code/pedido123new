@@ -14,9 +14,11 @@ import { ProductCard } from '@/components/ProductCard';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Card, CardContent } from '@/components/ui/card';
 import { LazyImage } from '@/components/LazyImage';
+import { BusinessStatus } from '@/components/BusinessStatus';
 
 type Product = Tables<'products'>;
 type Restaurant = Tables<'restaurants'>;
+type BusinessHour = Tables<'business_hours'>;
 
 type CategoryWithProducts = Tables<'categories'> & {
   products: Product[];
@@ -25,6 +27,7 @@ type CategoryWithProducts = Tables<'categories'> & {
 interface MenuData {
   restaurant: Restaurant;
   menu: CategoryWithProducts[];
+  hours: BusinessHour[];
 }
 
 const fetchMenuData = async (): Promise<MenuData> => {
@@ -40,7 +43,7 @@ const fetchMenuData = async (): Promise<MenuData> => {
 
   const restaurantId = restaurantData.id;
 
-  const [categoriesResult, productsResult] = await Promise.all([
+  const [categoriesResult, productsResult, hoursResult] = await Promise.all([
     supabase
       .from('categories')
       .select('*')
@@ -51,18 +54,28 @@ const fetchMenuData = async (): Promise<MenuData> => {
       .from('products')
       .select('*')
       .eq('restaurant_id', restaurantId)
-      .eq('is_available', true)
+      .eq('is_available', true),
+    supabase
+      .from('business_hours')
+      .select('*')
+      .eq('restaurant_id', restaurantId)
   ]);
 
   if (categoriesResult.error) throw new Error(`Erro ao buscar categorias: ${categoriesResult.error.message}`);
   if (productsResult.error) throw new Error(`Erro ao buscar produtos: ${productsResult.error.message}`);
+  if (hoursResult.error) throw new Error(`Erro ao buscar horários: ${hoursResult.error.message}`);
+
 
   const productsByCategory = (categoriesResult.data || []).map(category => ({
     ...category,
     products: (productsResult.data || []).filter(product => product.category_id === category.id)
   })).filter(category => category.products.length > 0);
 
-  return { restaurant: restaurantData, menu: productsByCategory as CategoryWithProducts[] };
+  return { 
+    restaurant: restaurantData, 
+    menu: productsByCategory as CategoryWithProducts[],
+    hours: hoursResult.data as BusinessHour[],
+  };
 };
 
 const Menu = () => {
@@ -141,7 +154,7 @@ const Menu = () => {
     );
   }
 
-  const { restaurant } = data;
+  const { restaurant, hours } = data;
 
   return (
     <>
@@ -168,7 +181,11 @@ const Menu = () => {
             </div>
           )}
           <h1 className="text-3xl font-bold tracking-tight mb-2">{restaurant.name}</h1>
-          <p className="text-muted-foreground">{restaurant.description}</p>
+          <p className="text-muted-foreground mb-4">{restaurant.description}</p>
+          
+          {/* New Business Status Component */}
+          <BusinessStatus restaurant={restaurant} hours={hours} />
+
         </header>
 
         <div className="mb-8">
