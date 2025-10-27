@@ -1,7 +1,7 @@
 import { MapContainer, TileLayer, Marker, Circle, Tooltip, useMapEvents, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { useEffect, useState, useRef, useCallback, memo } from 'react';
+import { useEffect, useState, useRef, useCallback, memo, useMemo } from 'react';
 import { Tables } from '@/integrations/supabase/types';
 
 // Corrige um problema comum com o ícone do marcador em bundlers como o Vite
@@ -210,8 +210,8 @@ const DeliveryZoneEditorMapComponent = ({ restaurantCenter, zones, onZoneRadiusC
             color={color}
             name={zone.name}
             fee={zone.delivery_fee}
-            onRadiusChange={onZoneRadiusChange}
-            onCenterChange={onZoneCenterChange}
+            onRadiusChange={(newRadiusKm) => onZoneRadiusChange(index, newRadiusKm)}
+            onCenterChange={(lat, lng) => onZoneCenterChange(index, lat, lng)}
           />
         );
       })}
