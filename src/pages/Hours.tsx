@@ -35,6 +35,7 @@ const DAYS_OF_WEEK = [
 ];
 
 const hourSchema = z.object({
+  id: z.string().optional(),
   day_of_week: z.number().min(0).max(6),
   is_open: z.boolean().default(true),
   open_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Formato de hora inválido (HH:MM)").optional(),
@@ -54,12 +55,11 @@ const hoursFormSchema = z.object({
 
 type HoursFormValues = z.infer<typeof hoursFormSchema>;
 
-const DEFAULT_HOURS: BusinessHourInsert[] = DAYS_OF_WEEK.map(day => ({
+const DEFAULT_HOURS: Omit<BusinessHourInsert, 'restaurant_id'>[] = DAYS_OF_WEEK.map(day => ({
   day_of_week: day.day_of_week,
   is_open: true,
   open_time: '09:00',
   close_time: '18:00',
-  restaurant_id: '',
 }));
 
 const fetchBusinessHours = async (restaurantId: string): Promise<BusinessHour[]> => {
@@ -77,17 +77,17 @@ const Hours = () => {
   const queryClient = useQueryClient();
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
 
-  useQuery({
+  const { data: restaurantData, isLoading: isRestaurantLoading } = useQuery({
     queryKey: ['restaurantId'],
     queryFn: async () => {
       const { data, error } = await supabase.from('restaurants').select('id').limit(1).single();
       if (error) throw new Error(error.message);
       setRestaurantId(data.id);
-      return data.id;
+      return data;
     },
   });
 
-  const { data: fetchedHours, isLoading } = useQuery<BusinessHour[]>({
+  const { data: fetchedHours, isLoading, isError, error } = useQuery<BusinessHour[]>({
     queryKey: ['businessHours', restaurantId],
     queryFn: () => fetchBusinessHours(restaurantId!),
     enabled: !!restaurantId,
@@ -96,11 +96,7 @@ const Hours = () => {
   const form = useForm<HoursFormValues>({
     resolver: zodResolver(hoursFormSchema),
     defaultValues: {
-      hours: DEFAULT_HOURS.map(h => ({
-        ...h,
-        open_time: h.open_time || '09:00',
-        close_time: h.close_time || '18:00',
-      })),
+      hours: DEFAULT_HOURS,
     },
     mode: 'onBlur',
   });
@@ -112,19 +108,29 @@ const Hours = () => {
 
   useEffect(() => {
     if (fetchedHours && fetchedHours.length > 0) {
+      // Ordenar os horários recebidos pelo dia da semana
       const sortedHours = fetchedHours.sort((a, b) => a.day_of_week - b.day_of_week);
+      
+      // Mapear para o formato esperado pelo formulário
       const formHours = DAYS_OF_WEEK.map(day => {
         const existing = sortedHours.find(h => h.day_of_week === day.day_of_week);
         return {
+          id: existing?.id,
           day_of_week: day.day_of_week,
-          is_open: existing?.is_open ?? false,
+          is_open: existing?.is_open ?? true,
           open_time: existing?.open_time || '09:00',
           close_time: existing?.close_time || '18:00',
         };
       });
+      
       replace(formHours);
     } else if (restaurantId && !isLoading) {
-      replace(DEFAULT_HOURS.map(h => ({ ...h, restaurant_id: restaurantId })));
+      // Se não houver horários cadastrados, usar os valores padrão
+      const defaultHoursWithRestaurantId = DEFAULT_HOURS.map(h => ({
+        ...h,
+        restaurant_id: restaurantId
+      }));
+      replace(DEFAULT_HOURS);
     }
   }, [fetchedHours, restaurantId, isLoading, replace]);
 
@@ -132,7 +138,9 @@ const Hours = () => {
     mutationFn: async (data: HoursFormValues) => {
       if (!restaurantId) throw new Error('ID do restaurante não disponível.');
 
+      // Preparar os dados para atualização/inserção
       const updates: BusinessHourInsert[] = data.hours.map(h => ({
+        ...(h.id && { id: h.id }), // Incluir ID se existir (para atualização)
         restaurant_id: restaurantId,
         day_of_week: h.day_of_week,
         is_open: h.is_open,
@@ -140,16 +148,34 @@ const Hours = () => {
         close_time: h.is_open ? h.close_time : null,
       }));
 
-      const { error: deleteError } = await supabase
-        .from('business_hours')
-        .delete()
-        .eq('restaurant_id', restaurantId);
-      if (deleteError) throw new Error(`Erro ao limpar horários antigos: ${deleteError.message}`);
+      // Se já existem registros, atualizar; caso contrário, inserir
+      if (fetchedHours && fetchedHours.length > 0) {
+        // Atualizar cada registro individualmente
+        const updatePromises = updates.map(async (update) => {
+          if (update.id) {
+            // Atualizar registro existente
+            const { error } = await supabase
+              .from('business_hours')
+              .update(update)
+              .eq('id', update.id);
+            if (error) throw new Error(`Erro ao atualizar horário: ${error.message}`);
+          } else {
+            // Inserir novo registro
+            const { error } = await supabase
+              .from('business_hours')
+              .insert(update);
+            if (error) throw new Error(`Erro ao inserir horário: ${error.message}`);
+          }
+        });
 
-      const { error: insertError } = await supabase
-        .from('business_hours')
-        .insert(updates);
-      if (insertError) throw new Error(`Erro ao inserir novos horários: ${insertError.message}`);
+        await Promise.all(updatePromises);
+      } else {
+        // Inserir todos os registros
+        const { error } = await supabase
+          .from('business_hours')
+          .insert(updates);
+        if (error) throw new Error(`Erro ao inserir horários: ${error.message}`);
+      }
     },
     onSuccess: () => {
       toast.success('Horários de funcionamento salvos com sucesso!');
@@ -164,7 +190,7 @@ const Hours = () => {
     mutation.mutate(data);
   };
 
-  const isDataLoading = isLoading || !restaurantId;
+  const isDataLoading = isLoading || isRestaurantLoading || !restaurantId;
 
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
@@ -189,6 +215,10 @@ const Hours = () => {
                 </div>
               ))}
               <Skeleton className="h-12 w-full mt-6" />
+            </div>
+          ) : isError ? (
+            <div className="text-destructive">
+              Erro ao carregar horários: {error?.message || "Erro desconhecido"}
             </div>
           ) : (
             <Form {...form}>
@@ -231,7 +261,11 @@ const Hours = () => {
                                 <FormItem className="flex items-center gap-2">
                                   <FormLabel className="text-sm">Abre:</FormLabel>
                                   <FormControl>
-                                    <TimeInput {...timeField} />
+                                    <TimeInput 
+                                      {...timeField} 
+                                      value={timeField.value || '09:00'}
+                                      onChange={(e) => timeField.onChange(e.target.value)}
+                                    />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -244,7 +278,11 @@ const Hours = () => {
                                 <FormItem className="flex items-center gap-2">
                                   <FormLabel className="text-sm">Fecha:</FormLabel>
                                   <FormControl>
-                                    <TimeInput {...timeField} />
+                                    <TimeInput 
+                                      {...timeField} 
+                                      value={timeField.value || '18:00'}
+                                      onChange={(e) => timeField.onChange(e.target.value)}
+                                    />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
