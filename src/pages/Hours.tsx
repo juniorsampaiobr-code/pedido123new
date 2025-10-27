@@ -38,8 +38,8 @@ const hourSchema = z.object({
   id: z.string().optional(),
   day_of_week: z.number().min(0).max(6),
   is_open: z.boolean().default(true),
-  open_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Formato de hora inválido (HH:MM)").optional(),
-  close_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Formato de hora inválido (HH:MM)").optional(),
+  open_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Formato de hora inválido (HH:MM)").optional().nullable(),
+  close_time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Formato de hora inválido (HH:MM)").optional().nullable(),
 });
 
 const hoursFormSchema = z.object({
@@ -108,10 +108,8 @@ const Hours = () => {
 
   useEffect(() => {
     if (fetchedHours && fetchedHours.length > 0) {
-      // Ordenar os horários recebidos pelo dia da semana
       const sortedHours = fetchedHours.sort((a, b) => a.day_of_week - b.day_of_week);
       
-      // Mapear para o formato esperado pelo formulário
       const formHours = DAYS_OF_WEEK.map(day => {
         const existing = sortedHours.find(h => h.day_of_week === day.day_of_week);
         return {
@@ -126,10 +124,6 @@ const Hours = () => {
       replace(formHours);
     } else if (restaurantId && !isLoading) {
       // Se não houver horários cadastrados, usar os valores padrão
-      const defaultHoursWithRestaurantId = DEFAULT_HOURS.map(h => ({
-        ...h,
-        restaurant_id: restaurantId
-      }));
       replace(DEFAULT_HOURS);
     }
   }, [fetchedHours, restaurantId, isLoading, replace]);
@@ -138,19 +132,25 @@ const Hours = () => {
     mutationFn: async (data: HoursFormValues) => {
       if (!restaurantId) throw new Error('ID do restaurante não disponível.');
 
-      // Preparar os dados para atualização/inserção
-      const updates: BusinessHourInsert[] = data.hours.map(h => ({
-        ...(h.id && { id: h.id }), // Incluir ID se existir (para atualização)
+      // 1. Preparar os dados para upsert (inserção ou atualização)
+      const updates = data.hours.map(h => ({
+        id: h.id, // Incluir ID se existir
         restaurant_id: restaurantId,
         day_of_week: h.day_of_week,
         is_open: h.is_open,
+        // Se estiver fechado, garantir que os horários sejam NULL no banco de dados
         open_time: h.is_open ? h.open_time : null,
         close_time: h.is_open ? h.close_time : null,
       }));
 
-      // Se já existem registros, atualizar; caso contrário, inserir
+      // 2. Se houver IDs existentes, fazemos um upsert (update ou insert)
+      // Como o Supabase não suporta upsert com IDs gerados automaticamente, 
+      // e o `business_hours` não tem uma chave única natural além do ID, 
+      // vamos usar a estratégia de deletar e inserir se for a primeira vez, 
+      // ou atualizar/inserir individualmente se já houver dados.
+      
       if (fetchedHours && fetchedHours.length > 0) {
-        // Atualizar cada registro individualmente
+        // Atualizar ou inserir individualmente
         const updatePromises = updates.map(async (update) => {
           if (update.id) {
             // Atualizar registro existente
@@ -160,7 +160,7 @@ const Hours = () => {
               .eq('id', update.id);
             if (error) throw new Error(`Erro ao atualizar horário: ${error.message}`);
           } else {
-            // Inserir novo registro
+            // Inserir novo registro (caso algum dia tenha sido perdido ou seja novo)
             const { error } = await supabase
               .from('business_hours')
               .insert(update);
@@ -170,10 +170,10 @@ const Hours = () => {
 
         await Promise.all(updatePromises);
       } else {
-        // Inserir todos os registros
+        // Inserir todos os 7 dias de uma vez (primeira vez)
         const { error } = await supabase
           .from('business_hours')
-          .insert(updates);
+          .insert(updates as TablesInsert<'business_hours'>[]);
         if (error) throw new Error(`Erro ao inserir horários: ${error.message}`);
       }
     },
@@ -263,7 +263,7 @@ const Hours = () => {
                                   <FormControl>
                                     <TimeInput 
                                       {...timeField} 
-                                      value={timeField.value || '09:00'}
+                                      value={timeField.value || ''} // Use '' if null/undefined
                                       onChange={(e) => timeField.onChange(e.target.value)}
                                     />
                                   </FormControl>
@@ -280,7 +280,7 @@ const Hours = () => {
                                   <FormControl>
                                     <TimeInput 
                                       {...timeField} 
-                                      value={timeField.value || '18:00'}
+                                      value={timeField.value || ''} // Use '' if null/undefined
                                       onChange={(e) => timeField.onChange(e.target.value)}
                                     />
                                   </FormControl>
