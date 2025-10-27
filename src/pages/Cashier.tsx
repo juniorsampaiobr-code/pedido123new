@@ -13,7 +13,7 @@ import { DollarSign, TrendingUp, Calendar, Terminal } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 type CashRegister = Tables<'cash_register'>;
 
@@ -37,6 +37,10 @@ const closeCashierSchema = z.object({
 type CloseCashierFormValues = z.infer<typeof closeCashierSchema>;
 
 const fetchCurrentCashier = async (restaurantId: string): Promise<CashRegister | null> => {
+  // Verificar se o usuário está autenticado
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Usuário não autenticado');
+
   const { data, error } = await supabase
     .from('cash_register')
     .select('*')
@@ -105,7 +109,7 @@ const Cashier = () => {
   const { data: currentCashier, isLoading: isLoadingCashier, isError: isErrorCashier, error: errorCashier } = useQuery<CashRegister | null>({
     queryKey: ['currentCashier', restaurantId],
     queryFn: () => fetchCurrentCashier(restaurantId!),
-    enabled: !!restaurantId,
+    enabled: !!restaurantId && !!user,
   });
 
   const { data: salesToday = 0 } = useQuery<number>({
@@ -185,7 +189,7 @@ const Cashier = () => {
     },
   });
 
-  const isDataLoading = isLoadingCashier || !restaurantId;
+  const isDataLoading = isLoadingCashier || !restaurantId || !user;
 
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
