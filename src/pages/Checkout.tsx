@@ -192,6 +192,9 @@ const Checkout = () => {
     deliveryOption 
   });
 
+  // Variável que estava causando o erro de referência
+  const isDeliverySelected = deliveryOption === 'delivery';
+
   const markerPosition = useMemo((): [number, number] => {
     if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
       return [lat, lng];
@@ -324,7 +327,23 @@ const Checkout = () => {
           }
         }
       }
-      // 3. Se estiver no modo de busca, mas sem coordenadas (ex: falha na geocodificação inicial), não faz nada aqui.
+      // 3. Se estiver no modo de busca, mas sem coordenadas (ex: falha na geocodificação inicial), tenta geocodificar o endereço preenchido
+      else if (addressInputMode === 'search') {
+        const [street, number, neighborhood, city, zipCode] = addressFields;
+        const cleanedZip = cleanZipCode(zipCode);
+        const isAddressComplete = street && number && neighborhood && city && cleanedZip.length === 8;
+
+        if (isAddressComplete) {
+          const fullAddressForGeocode = `${street}, ${number}, ${neighborhood}, ${city}, ${zipCode}`;
+          customerCoords = await geocodeAddress(fullAddressForGeocode);
+          
+          if (customerCoords) {
+            form.setValue('latitude', customerCoords[0]);
+            form.setValue('longitude', customerCoords[1]);
+            setShowMap(true);
+          }
+        }
+      }
 
       if (customerCoords) {
         const restaurantCoords: [number, number] = [restaurant.latitude, restaurant.longitude];
@@ -453,7 +472,6 @@ const Checkout = () => {
   if (isError) return <div className="container mx-auto p-4 max-w-6xl"><Alert variant="destructive"><Terminal className="h-4 w-4" /><AlertTitle>Erro de Conexão</AlertTitle><AlertDescription>{error instanceof Error ? error.message : "Não foi possível carregar os dados."}</AlertDescription></Alert></div>;
 
   const isSubmitting = orderMutation.isPending || isProcessingPayment || isCalculatingFee;
-  const isDeliverySelected = deliveryOption === 'delivery';
   const isDeliveryValid = !isDeliverySelected || (!deliveryError && deliveryFee >= 0);
 
   return (
@@ -471,7 +489,7 @@ const Checkout = () => {
               <form onSubmit={form.handleSubmit(onSubmit, onValidationFail)} className="space-y-6">
                 <Card><CardHeader><CardTitle className="text-xl">1. Seus Dados</CardTitle></CardHeader><CardContent className="space-y-4"><FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nome Completo *</FormLabel><Input placeholder="Seu nome" {...field} /><FormMessage /></FormItem>)} /><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>Telefone *</FormLabel><PhoneInput {...field} /><FormMessage /></FormItem>)} /><FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email (Opcional)</FormLabel><Input placeholder="seu@email.com" {...field} /><FormMessage /></FormItem>)} /></div></CardContent></Card>
                 <Card><CardHeader><CardTitle className="text-xl">2. Entrega</CardTitle></CardHeader><CardContent className="space-y-4"><FormField control={form.control} name="delivery_option" render={({ field }) => (<FormItem className="space-y-3"><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-col space-y-1"><FormItem className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value="delivery" /></FormControl><Truck className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">Delivery</FormLabel></FormItem><FormItem className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value="pickup" /></FormControl><Store className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">Retirada no Local</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem>)} />
-                  {deliveryOption === 'delivery' && (
+                  {isDeliverySelected && (
                     <div className="space-y-4 pt-4 border-t">
                       <h3 className="font-semibold flex items-center gap-2"><MapPin className="h-4 w-4" /> Endereço de Entrega *</h3>
                       
