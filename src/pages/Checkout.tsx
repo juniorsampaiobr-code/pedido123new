@@ -336,8 +336,8 @@ const Checkout = () => {
         const isAddressComplete = street && number && neighborhood && city && cleanedZip.length === 8;
         
         if (isAddressComplete) {
-          const fullAddressForGeocode = `${street}, ${number}, ${neighborhood}, ${city}, ${zipCode}`;
-          customerCoords = await geocodeAddress(fullAddressForGeocode);
+          // Tenta geocodificar o endereço completo
+          customerCoords = await geocodeAddress(`${street}, ${number}, ${neighborhood}, ${city}, ${zipCode}`);
           
           if (customerCoords) {
             // Atualiza o formulário com as coordenadas encontradas
