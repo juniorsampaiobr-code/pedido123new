@@ -10,10 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from "sonner";
 import { DollarSign, TrendingUp, Calendar, Terminal } from 'lucide-react';
-import { User } from '@supabase/supabase-js';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { DashboardContextType } from '@/layouts/DashboardLayout';
 
@@ -85,21 +83,11 @@ const StatCard = ({ title, value, icon: Icon }: StatCardProps) => (
 const Cashier = () => {
   const { restaurant } = useOutletContext<DashboardContextType>();
   const queryClient = useQueryClient();
-  const [user, setUser] = useState<User | null>(null);
-
-  useQuery({
-    queryKey: ['userSession'],
-    queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) setUser(session.user);
-      return session;
-    }
-  });
 
   const { data: currentCashier, isLoading: isLoadingCashier, isError: isErrorCashier, error: errorCashier } = useQuery<CashRegister | null>({
     queryKey: ['currentCashier', restaurant.id],
     queryFn: () => fetchCurrentCashier(restaurant.id),
-    enabled: !!restaurant.id && !!user,
+    enabled: !!restaurant.id,
   });
 
   const { data: salesToday = 0 } = useQuery<number>({
@@ -130,6 +118,7 @@ const Cashier = () => {
 
   const openMutation = useMutation({
     mutationFn: async (data: OpenCashierFormValues) => {
+      const { data: { user } } = await supabase.auth.getUser();
       if (!restaurant.id || !user) throw new Error('Dados de usuário ou restaurante indisponíveis.');
       
       const insertData: TablesInsert<'cash_register'> = {
@@ -153,6 +142,7 @@ const Cashier = () => {
 
   const closeMutation = useMutation({
     mutationFn: async (data: CloseCashierFormValues) => {
+      const { data: { user } } = await supabase.auth.getUser();
       if (!currentCashier?.id || !user) throw new Error('Nenhum caixa aberto para fechar.');
       
       const updateData: TablesUpdate<'cash_register'> = {
@@ -179,7 +169,7 @@ const Cashier = () => {
     },
   });
 
-  const isDataLoading = isLoadingCashier || !restaurant.id || !user;
+  const isDataLoading = isLoadingCashier || !restaurant.id;
 
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
