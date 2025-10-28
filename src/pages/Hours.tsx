@@ -99,8 +99,8 @@ const Hours = () => {
           id: existing?.id,
           day_of_week: day.day_of_week,
           is_open: existing?.is_open ?? true,
-          open_time: existing?.open_time || '09:00',
-          close_time: existing?.close_time || '18:00',
+          open_time: existing?.open_time ? existing.open_time.substring(0, 5) : '09:00',
+          close_time: existing?.close_time ? existing.close_time.substring(0, 5) : '18:00',
         };
       });
       
