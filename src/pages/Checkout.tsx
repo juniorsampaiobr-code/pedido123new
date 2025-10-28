@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -15,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, MapPin, Truck, Store, CreditCard, ArrowLeft, DollarSign, Smartphone, Package, Loader2 } from 'lucide-react';
+import { Terminal, MapPin, Truck, Store, CreditCard, ArrowLeft, DollarSign, Smartphone, Package, Loader2, Clock } from 'lucide-react';
 import { Tables, TablesInsert, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,6 +30,7 @@ import {
 import { PhoneInput } from '@/components/PhoneInput';
 import { ZipCodeInput } from '@/components/ZipCodeInput';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
+import { geocodeAddress, calculateDeliveryFee } from '@/utils/location';
 
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
@@ -91,7 +92,7 @@ const fetchInitialData = async () => {
 
   const [methodsResult, zonesResult] = await Promise.all([
     supabase.from('payment_methods').select('*').eq('restaurant_id', restaurantId).eq('is_active', true).order('name', { ascending: true }),
-    supabase.from('delivery_zones').select('*').eq('restaurant_id', restaurantId).eq('is_active', true).order('minimum_order', { ascending: true }),
+    supabase.from('delivery_zones').select('*').eq('restaurant_id', restaurantId).eq('is_active', true).order('max_distance_km', { ascending: true }),
   ]);
 
   if (methodsResult.error) throw new Error(`Erro ao buscar métodos de pagamento: ${methodsResult.error.message}`);
@@ -114,7 +115,7 @@ const getIconComponent = (iconName: string) => {
   }
 };
 
-const OrderSummary = ({ subtotal, deliveryFee, total, items }: ReturnType<typeof useCart>) => (
+const OrderSummary = ({ subtotal, deliveryFee, total, items, minDeliveryTime, maxDeliveryTime }: ReturnType<typeof useCart> & { minDeliveryTime: number, maxDeliveryTime: number }) => (
   <Card className="sticky top-4">
     <CardHeader><CardTitle className="text-xl">Seu Pedido</CardTitle></CardHeader>
     <CardContent className="space-y-3">
@@ -133,6 +134,13 @@ const OrderSummary = ({ subtotal, deliveryFee, total, items }: ReturnType<typeof
       </div>
       <Separator />
       <div className="flex justify-between text-lg font-bold"><span>Total:</span><span className="text-primary">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}</span></div>
+      
+      {(minDeliveryTime > 0 || maxDeliveryTime > 0) && (
+        <div className="flex items-center justify-center text-sm text-muted-foreground pt-2">
+          <Clock className="h-4 w-4 mr-1" />
+          <span>Entrega estimada: {minDeliveryTime} - {maxDeliveryTime} min</span>
+        </div>
+      )}
     </CardContent>
   </Card>
 );
@@ -143,6 +151,9 @@ const Checkout = () => {
   const cart = useCart();
   const { items, subtotal, deliveryFee, total, setDeliveryFee, clearCart } = cart;
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [deliveryTime, setDeliveryTime] = useState({ min: 0, max: 0 });
+  const [isCalculatingFee, setIsCalculatingFee] = useState(false);
+  const [deliveryError, setDeliveryError] = useState<string | null>(null);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['checkoutInitialData'],
@@ -166,6 +177,63 @@ const Checkout = () => {
   const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
   const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online' || selectedPaymentMethod?.name === 'PIX';
   const isCashPayment = selectedPaymentMethod?.name === 'Dinheiro';
+  
+  const addressFields = form.watch(['street', 'number', 'city', 'zip_code']);
+  const fullAddress = `${addressFields[0]}, ${addressFields[1]}, ${addressFields[2]} - ${addressFields[3]}`;
+
+  // Efeito para calcular a taxa de entrega dinamicamente
+  useEffect(() => {
+    if (deliveryOption === 'pickup') {
+      setDeliveryFee(0);
+      setDeliveryTime({ min: 0, max: 0 });
+      setDeliveryError(null);
+      return;
+    }
+
+    const calculateFee = async () => {
+      if (!restaurant?.latitude || !restaurant?.longitude) {
+        setDeliveryError("O restaurante não configurou suas coordenadas para cálculo de entrega.");
+        setDeliveryFee(0);
+        setDeliveryTime({ min: 0, max: 0 });
+        return;
+      }
+
+      const cleanedZip = cleanZipCode(addressFields[3]);
+      if (addressFields[0] && addressFields[1] && addressFields[2] && cleanedZip.length === 8) {
+        setIsCalculatingFee(true);
+        setDeliveryError(null);
+        
+        const customerCoords = await geocodeAddress(fullAddress);
+        
+        if (customerCoords) {
+          const restaurantCoords: [number, number] = [restaurant.latitude, restaurant.longitude];
+          const feeResult = calculateDeliveryFee(customerCoords, restaurantCoords, deliveryZones);
+
+          if (feeResult) {
+            setDeliveryFee(feeResult.fee);
+            setDeliveryTime({ min: feeResult.minTime, max: feeResult.maxTime });
+          } else {
+            setDeliveryFee(0);
+            setDeliveryTime({ min: 0, max: 0 });
+            setDeliveryError("Seu endereço está fora da nossa área de entrega.");
+          }
+        } else {
+          setDeliveryFee(0);
+          setDeliveryTime({ min: 0, max: 0 });
+          setDeliveryError("Não foi possível localizar seu endereço para calcular a taxa de entrega.");
+        }
+        setIsCalculatingFee(false);
+      } else {
+        // Resetar se o endereço estiver incompleto
+        setDeliveryFee(0);
+        setDeliveryTime({ min: 0, max: 0 });
+        setDeliveryError(null);
+      }
+    };
+
+    calculateFee();
+  }, [deliveryOption, restaurant, deliveryZones, fullAddress, addressFields, setDeliveryFee]);
+
 
   useEffect(() => {
     if (items.length === 0 && !isProcessingPayment) {
@@ -183,18 +251,10 @@ const Checkout = () => {
     }
   }, [paymentMethods, selectedPaymentMethodId, form]);
 
-  useEffect(() => {
-    if (deliveryOption === 'delivery') {
-      const lowestFee = deliveryZones.length > 0 ? deliveryZones[0].delivery_fee : 5.00;
-      setDeliveryFee(lowestFee);
-    } else {
-      setDeliveryFee(0);
-    }
-  }, [deliveryOption, deliveryZones, setDeliveryFee]);
-
   const orderMutation = useMutation({
     mutationFn: async (formData: CheckoutFormValues) => {
       if (!restaurant) throw new Error('Dados do restaurante indisponíveis.');
+      if (formData.delivery_option === 'delivery' && deliveryError) throw new Error(deliveryError);
 
       let customerId: string;
       const cleanedPhone = cleanPhoneNumber(formData.phone);
@@ -264,7 +324,9 @@ const Checkout = () => {
   if (isLoading) return <div className="container mx-auto p-4 max-w-6xl"><Skeleton className="h-10 w-48 mb-6" /><div className="grid lg:grid-cols-3 gap-8"><div className="lg:col-span-2 space-y-6"><Skeleton className="h-64 w-full" /><Skeleton className="h-64 w-full" /></div><div className="lg:col-span-1"><Skeleton className="h-96 w-full sticky top-4" /></div></div></div>;
   if (isError) return <div className="container mx-auto p-4 max-w-6xl"><Alert variant="destructive"><Terminal className="h-4 w-4" /><AlertTitle>Erro de Conexão</AlertTitle><AlertDescription>{error instanceof Error ? error.message : "Não foi possível carregar os dados."}</AlertDescription></Alert></div>;
 
-  const isSubmitting = orderMutation.isPending || isProcessingPayment;
+  const isSubmitting = orderMutation.isPending || isProcessingPayment || isCalculatingFee;
+  const isDeliverySelected = deliveryOption === 'delivery';
+  const isDeliveryValid = !isDeliverySelected || (!deliveryError && deliveryFee > 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -280,14 +342,14 @@ const Checkout = () => {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit, onValidationFail)} className="space-y-6">
                 <Card><CardHeader><CardTitle className="text-xl">1. Seus Dados</CardTitle></CardHeader><CardContent className="space-y-4"><FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nome Completo *</FormLabel><Input placeholder="Seu nome" {...field} /><FormMessage /></FormItem>)} /><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>Telefone *</FormLabel><PhoneInput {...field} /><FormMessage /></FormItem>)} /><FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email (Opcional)</FormLabel><Input placeholder="seu@email.com" {...field} /><FormMessage /></FormItem>)} /></div></CardContent></Card>
-                <Card><CardHeader><CardTitle className="text-xl">2. Entrega</CardTitle></CardHeader><CardContent className="space-y-4"><FormField control={form.control} name="delivery_option" render={({ field }) => (<FormItem className="space-y-3"><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-col space-y-1"><FormItem className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value="delivery" /></FormControl><Truck className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">Delivery</FormLabel></FormItem><FormItem className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value="pickup" /></FormControl><Store className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">Retirada no Local</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem>)} />{deliveryOption === 'delivery' && (<div className="space-y-4 pt-4 border-t"><h3 className="font-semibold flex items-center gap-2"><MapPin className="h-4 w-4" /> Endereço de Entrega *</h3><div className="grid grid-cols-3 gap-4"><FormField control={form.control} name="street" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Rua</FormLabel><Input {...field} /><FormMessage /></FormItem>)} /><FormField control={form.control} name="number" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Número</FormLabel><Input {...field} /><FormMessage /></FormItem>)} /></div><div className="grid grid-cols-2 gap-4"><FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro</FormLabel><Input {...field} /><FormMessage /></FormItem>)} /><FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade</FormLabel><Input {...field} /><FormMessage /></FormItem>)} /></div><FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP</FormLabel><ZipCodeInput {...field} /><FormMessage /></FormItem>)} />{deliveryFee > 0 && (<Alert className="mt-4"><Truck className="h-4 w-4" /><AlertTitle>Taxa de Entrega Aplicada</AlertTitle><AlertDescription>Taxa: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}</AlertDescription></Alert>)}</div>)}</CardContent></Card>
+                <Card><CardHeader><CardTitle className="text-xl">2. Entrega</CardTitle></CardHeader><CardContent className="space-y-4"><FormField control={form.control} name="delivery_option" render={({ field }) => (<FormItem className="space-y-3"><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-col space-y-1"><FormItem className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value="delivery" /></FormControl><Truck className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">Delivery</FormLabel></FormItem><FormItem className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value="pickup" /></FormControl><Store className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">Retirada no Local</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem>)} />{deliveryOption === 'delivery' && (<div className="space-y-4 pt-4 border-t"><h3 className="font-semibold flex items-center gap-2"><MapPin className="h-4 w-4" /> Endereço de Entrega *</h3><div className="grid grid-cols-3 gap-4"><FormField control={form.control} name="street" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Rua</FormLabel><Input {...field} /><FormMessage /></FormItem>)} /><FormField control={form.control} name="number" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Número</FormLabel><Input {...field} /><FormMessage /></FormItem>)} /></div><div className="grid grid-cols-2 gap-4"><FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro</FormLabel><Input {...field} /><FormMessage /></FormItem>)} /><FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade</FormLabel><Input {...field} /><FormMessage /></FormItem>)} /></div><FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP</FormLabel><ZipCodeInput {...field} /><FormMessage /></FormItem>)} />{isCalculatingFee && (<Alert><Loader2 className="h-4 w-4 animate-spin" /><AlertTitle>Calculando Taxa...</AlertTitle><AlertDescription>Aguarde enquanto calculamos a taxa de entrega para o seu endereço.</AlertDescription></Alert>)}{deliveryError && (<Alert variant="destructive"><Terminal className="h-4 w-4" /><AlertTitle>Erro de Entrega</AlertTitle><AlertDescription>{deliveryError}</AlertDescription></Alert>)}{deliveryFee > 0 && !isCalculatingFee && (<Alert className="mt-4"><Truck className="h-4 w-4" /><AlertTitle>Taxa de Entrega Aplicada</AlertTitle><AlertDescription>Taxa: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}</AlertDescription></Alert>)}</div>)}</CardContent></Card>
                 <Card><CardHeader><CardTitle className="text-xl">3. Pagamento</CardTitle></CardHeader><CardContent className="space-y-4"><FormField control={form.control} name="payment_method_id" render={({ field }) => (<FormItem className="space-y-3"><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-col space-y-2">{paymentMethods.map(method => { const Icon = getIconComponent(method.icon || 'Store'); return (<FormItem key={method.id} className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value={method.id} /></FormControl><Icon className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">{method.name}<span className="block text-xs text-muted-foreground">{method.description}</span></FormLabel></FormItem>);})}</RadioGroup></FormControl><FormMessage /></FormItem>)} />{isOnlinePayment && (<div className="space-y-4 pt-4 border-t"><h3 className="font-semibold flex items-center gap-2"><CreditCard className="h-4 w-4" /> Detalhes Adicionais</h3><FormField control={form.control} name="cpf_cnpj" render={({ field }) => (<FormItem><FormLabel>CPF/CNPJ (para a nota)</FormLabel><CpfCnpjInput {...field} /><FormMessage /></FormItem>)} /></div>)}{isCashPayment && (<FormField control={form.control} name="change_for" render={({ field }) => (<FormItem><FormLabel>Precisa de troco para quanto? (R$)</FormLabel><Input type="number" step="0.01" placeholder={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(total)} {...field} value={field.value === null || field.value === undefined ? '' : String(field.value)} onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)} /><FormMessage /></FormItem>)} />)}<FormField control={form.control} name="notes" render={({ field }) => (<FormItem><FormLabel>Observações do Pedido (Opcional)</FormLabel><Textarea placeholder="Ex: Tocar a campainha duas vezes..." {...field} rows={2} /><FormMessage /></FormItem>)} /></CardContent></Card>
-                <div className="lg:hidden sticky bottom-0 bg-card p-4 border-t shadow-2xl"><Button type="submit" className="w-full h-12 text-lg" disabled={isSubmitting}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : `Finalizar Pedido - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}`}</Button></div>
-                <div className="hidden lg:block"><Button type="submit" className="w-full h-12 text-lg" disabled={isSubmitting}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : `Finalizar Pedido - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}`}</Button></div>
+                <div className="lg:hidden sticky bottom-0 bg-card p-4 border-t shadow-2xl"><Button type="submit" className="w-full h-12 text-lg" disabled={isSubmitting || !isDeliveryValid}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : `Finalizar Pedido - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}`}</Button></div>
+                <div className="hidden lg:block"><Button type="submit" className="w-full h-12 text-lg" disabled={isSubmitting || !isDeliveryValid}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : `Finalizar Pedido - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}`}</Button></div>
               </form>
             </Form>
           </div>
-          <div className="lg:col-span-1 hidden lg:block"><OrderSummary {...cart} /></div>
+          <div className="lg:col-span-1 hidden lg:block"><OrderSummary {...cart} minDeliveryTime={deliveryTime.min} maxDeliveryTime={deliveryTime.max} /></div>
         </div>
       </main>
     </div>
