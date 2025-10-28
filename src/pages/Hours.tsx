@@ -89,7 +89,7 @@ const Hours = () => {
 
   useEffect(() => {
     if (fetchedHours) {
-      const hoursData = fetchedHours.length > 0 ? fetchedHours : DAYS_OF_WEEK.map(d => ({ day_of_week: d.day_of_week, is_open: true, open_time: '09:00', close_time: '18:00' }));
+      const hoursData = fetchedHours.length > 0 ? fetchedHours : DAYS_OF_WEEK.map(d => ({ id: undefined, day_of_week: d.day_of_week, is_open: true, open_time: '09:00', close_time: '18:00' }));
       
       const sortedHours = [...hoursData].sort((a, b) => a.day_of_week - b.day_of_week);
       
