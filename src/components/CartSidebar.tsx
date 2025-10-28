@@ -49,9 +49,15 @@ export const CartSidebar = ({ isOpen, onOpenChange }: CartSidebarProps) => {
             <Separator className="my-4" />
 
             <SheetFooter className="space-y-4">
-              <div className="w-full space-y-1 text-sm">
-                <div className="flex justify-between"><span>Subtotal:</span><span className="font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span></div>
-                <div className="flex justify-between text-lg font-bold"><span>Total:</span><span className="text-primary">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}</span></div>
+              <div className="w-full space-y-2">
+                <div className="flex justify-between text-base">
+                  <span className="text-muted-foreground">Subtotal:</span>
+                  <span className="font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total:</span>
+                  <span className="text-primary">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}</span>
+                </div>
               </div>
               <div className="flex gap-2 w-full">
                 <Button variant="outline" onClick={clearCart} className="flex-1">Limpar Carrinho</Button>
