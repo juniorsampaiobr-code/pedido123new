@@ -14,7 +14,7 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
+    FormMessage,
 } from '@/components/ui/form';
 import { TimeInput } from '@/components/TimeInput';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -96,7 +96,7 @@ const Hours = () => {
   const form = useForm<HoursFormValues>({
     resolver: zodResolver(hoursFormSchema),
     defaultValues: {
-      hours: DEFAULT_HOURS,
+      hours: DEFAULT_HOURS.map(h => ({ ...h, id: undefined })), // Inicializa com IDs undefined
     },
     mode: 'onBlur',
   });
@@ -107,8 +107,10 @@ const Hours = () => {
   });
 
   useEffect(() => {
-    if (fetchedHours && fetchedHours.length > 0) {
-      const sortedHours = fetchedHours.sort((a, b) => a.day_of_week - b.day_of_week);
+    if (!isLoading && restaurantId) {
+      const hoursData = fetchedHours || [];
+      
+      const sortedHours = hoursData.sort((a, b) => a.day_of_week - b.day_of_week);
       
       const formHours = DAYS_OF_WEEK.map(day => {
         const existing = sortedHours.find(h => h.day_of_week === day.day_of_week);
@@ -122,9 +124,6 @@ const Hours = () => {
       });
       
       replace(formHours);
-    } else if (restaurantId && !isLoading) {
-      // Se não houver horários cadastrados, usar os valores padrão
-      replace(DEFAULT_HOURS);
     }
   }, [fetchedHours, restaurantId, isLoading, replace]);
 
@@ -144,10 +143,7 @@ const Hours = () => {
       }));
 
       // 2. Se houver IDs existentes, fazemos um upsert (update ou insert)
-      // Como o Supabase não suporta upsert com IDs gerados automaticamente, 
-      // e o `business_hours` não tem uma chave única natural além do ID, 
-      // vamos usar a estratégia de deletar e inserir se for a primeira vez, 
-      // ou atualizar/inserir individualmente se já houver dados.
+      // Vamos usar a estratégia de deletar e inserir se não houver dados, ou atualizar/inserir individualmente se já houver dados.
       
       if (fetchedHours && fetchedHours.length > 0) {
         // Atualizar ou inserir individualmente
