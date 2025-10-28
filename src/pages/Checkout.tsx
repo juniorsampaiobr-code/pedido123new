@@ -115,7 +115,7 @@ const getIconComponent = (iconName: string) => {
   }
 };
 
-const OrderSummary = ({ subtotal, deliveryFee, total, items, minDeliveryTime, maxDeliveryTime }: ReturnType<typeof useCart> & { minDeliveryTime: number, maxDeliveryTime: number }) => (
+const OrderSummary = ({ subtotal, deliveryFee, total, items }: ReturnType<typeof useCart>) => (
   <Card className="sticky top-4">
     <CardHeader><CardTitle className="text-xl">Seu Pedido</CardTitle></CardHeader>
     <CardContent className="space-y-3">
@@ -134,13 +134,6 @@ const OrderSummary = ({ subtotal, deliveryFee, total, items, minDeliveryTime, ma
       </div>
       <Separator />
       <div className="flex justify-between text-lg font-bold"><span>Total:</span><span className="text-primary">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}</span></div>
-      
-      {(minDeliveryTime > 0 || maxDeliveryTime > 0) && (
-        <div className="flex items-center justify-center text-sm text-muted-foreground pt-2">
-          <Clock className="h-4 w-4 mr-1" />
-          <span>Entrega estimada: {minDeliveryTime} - {maxDeliveryTime} min</span>
-        </div>
-      )}
     </CardContent>
   </Card>
 );
@@ -151,7 +144,6 @@ const Checkout = () => {
   const cart = useCart();
   const { items, subtotal, deliveryFee, total, setDeliveryFee, clearCart } = cart;
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [deliveryTime, setDeliveryTime] = useState({ min: 0, max: 0 });
   const [isCalculatingFee, setIsCalculatingFee] = useState(false);
   const [deliveryError, setDeliveryError] = useState<string | null>(null);
 
@@ -185,7 +177,6 @@ const Checkout = () => {
   useEffect(() => {
     if (deliveryOption === 'pickup') {
       setDeliveryFee(0);
-      setDeliveryTime({ min: 0, max: 0 });
       setDeliveryError(null);
       return;
     }
@@ -194,7 +185,6 @@ const Checkout = () => {
       if (!restaurant?.latitude || !restaurant?.longitude) {
         setDeliveryError("O restaurante não configurou suas coordenadas para cálculo de entrega.");
         setDeliveryFee(0);
-        setDeliveryTime({ min: 0, max: 0 });
         return;
       }
 
@@ -211,22 +201,18 @@ const Checkout = () => {
 
           if (feeResult) {
             setDeliveryFee(feeResult.fee);
-            setDeliveryTime({ min: feeResult.minTime, max: feeResult.maxTime });
           } else {
             setDeliveryFee(0);
-            setDeliveryTime({ min: 0, max: 0 });
             setDeliveryError("Seu endereço está fora da nossa área de entrega.");
           }
         } else {
           setDeliveryFee(0);
-          setDeliveryTime({ min: 0, max: 0 });
           setDeliveryError("Não foi possível localizar seu endereço para calcular a taxa de entrega.");
         }
         setIsCalculatingFee(false);
       } else {
         // Resetar se o endereço estiver incompleto
         setDeliveryFee(0);
-        setDeliveryTime({ min: 0, max: 0 });
         setDeliveryError(null);
       }
     };
@@ -349,7 +335,7 @@ const Checkout = () => {
               </form>
             </Form>
           </div>
-          <div className="lg:col-span-1 hidden lg:block"><OrderSummary {...cart} minDeliveryTime={deliveryTime.min} maxDeliveryTime={deliveryTime.max} /></div>
+          <div className="lg:col-span-1 hidden lg:block"><OrderSummary {...cart} /></div>
         </div>
       </main>
     </div>
