@@ -188,6 +188,8 @@ export type Database = {
           id: string
           is_active: boolean | null
           max_distance_km: number | null
+          max_delivery_time_minutes: number | null
+          min_delivery_time_minutes: number | null
           name: string
           restaurant_id: string
           updated_at: string | null
@@ -200,6 +202,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           max_distance_km?: number | null
+          max_delivery_time_minutes?: number | null
+          min_delivery_time_minutes?: number | null
           name: string
           restaurant_id: string
           updated_at?: string | null
@@ -212,6 +216,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           max_distance_km?: number | null
+          max_delivery_time_minutes?: number | null
+          min_delivery_time_minutes?: number | null
           name?: string
           restaurant_id?: string
           updated_at?: string | null
