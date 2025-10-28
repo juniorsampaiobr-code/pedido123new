@@ -537,7 +537,7 @@ const Checkout = () => {
                         <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Rua *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                         <FormField control={form.control} name="number" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Número *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                       </div>
-                      <FormField control={form.control} name="complement" render={({ field }) => (<FormItem><FormLabel>Complemento (Opcional)</FormLabel><Input placeholder="Apto, Bloco, Casa, etc." {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
+                      <FormField control={form.control} name="complement" render={({ field }) => (<FormItem><FormLabel>Complemento (Opcional)</FormLabel><Input placeholder="Apto, Bloco, Casa, etc." {...field} disabled={addressInputMode === 'manual' ? false : false} /></FormItem>)} />
                       <div className="grid grid-cols-2 gap-4">
                         <FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                         <FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
