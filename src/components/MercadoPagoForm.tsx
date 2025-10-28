@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMercadoPagoPublicKey } from '@/hooks/use-mercado-pago-settings';
-import * as MercadoPago from '@mercadopago/sdk-react';
-import { Card, CardContent } from '@/components/ui/card';
+import { initMercadoPago, CardPayment } from '@mercadopago/sdk-react';
+import { CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Terminal, Loader2 } from 'lucide-react';
@@ -20,7 +20,7 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
   useEffect(() => {
     if (publicKey) {
       try {
-        MercadoPago.initMercadoPago(publicKey, { locale: 'pt-BR' });
+        initMercadoPago(publicKey, { locale: 'pt-BR' });
         setIsMpReady(true);
       } catch (e) {
         console.error("Erro ao inicializar Mercado Pago:", e);
@@ -81,8 +81,6 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
   };
 
   const onSubmit = async (cardFormData: any) => {
-    // O CardPaymentBrick já lida com a tokenização e submissão para o Mercado Pago.
-    // O resultado aqui é o objeto de pagamento completo.
     onPaymentSuccess(cardFormData);
   };
 
@@ -93,7 +91,7 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
 
   return (
     <div className="mp-form-container">
-      <MercadoPago.CardPaymentBrick
+      <CardPayment
         initialization={initialization}
         customization={customization}
         onSubmit={onSubmit}
