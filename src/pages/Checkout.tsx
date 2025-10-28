@@ -494,6 +494,8 @@ const Checkout = () => {
   const onSubmit = (data: CheckoutFormValues) => orderMutation.mutate(data);
   const onValidationFail = (errors: any) => {
     if (Object.keys(errors).length > 0) {
+      // Log the errors to the console to see which fields are failing validation
+      console.error("Validation Errors:", errors);
       toast.error('Por favor, preencha todos os campos obrigatórios e corrija os erros.');
     }
   };
@@ -537,7 +539,7 @@ const Checkout = () => {
                         <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Rua *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                         <FormField control={form.control} name="number" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Número *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                       </div>
-                      <FormField control={form.control} name="complement" render={({ field }) => (<FormItem><FormLabel>Complemento (Opcional)</FormLabel><Input placeholder="Apto, Bloco, Casa, etc." {...field} disabled={addressInputMode === 'search' && field.value === ''} /></FormItem>)} />
+                      <FormField control={form.control} name="complement" render={({ field }) => (<FormItem><FormLabel>Complemento (Opcional)</FormLabel><Input placeholder="Apto, Bloco, Casa, etc." {...field} disabled={false} /></FormItem>)} />
                       <div className="grid grid-cols-2 gap-4">
                         <FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                         <FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
