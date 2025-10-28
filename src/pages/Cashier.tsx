@@ -13,7 +13,9 @@ import { DollarSign, TrendingUp, Calendar, Terminal } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '@/layouts/DashboardLayout';
 
 type CashRegister = Tables<'cash_register'>;
 
@@ -37,7 +39,6 @@ const closeCashierSchema = z.object({
 type CloseCashierFormValues = z.infer<typeof closeCashierSchema>;
 
 const fetchCurrentCashier = async (restaurantId: string): Promise<CashRegister | null> => {
-  // Verificar se o usuário está autenticado
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Usuário não autenticado');
 
@@ -82,9 +83,9 @@ const StatCard = ({ title, value, icon: Icon }: StatCardProps) => (
 );
 
 const Cashier = () => {
+  const { restaurant } = useOutletContext<DashboardContextType>();
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
-  const [restaurantId, setRestaurantId] = useState<string | null>(null);
 
   useQuery({
     queryKey: ['userSession'],
@@ -95,21 +96,10 @@ const Cashier = () => {
     }
   });
 
-  useQuery({
-    queryKey: ['restaurantId'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('restaurants').select('id').limit(1).single();
-      if (error) throw new Error(error.message);
-      setRestaurantId(data.id);
-      return data.id;
-    },
-    enabled: !!user,
-  });
-
   const { data: currentCashier, isLoading: isLoadingCashier, isError: isErrorCashier, error: errorCashier } = useQuery<CashRegister | null>({
-    queryKey: ['currentCashier', restaurantId],
-    queryFn: () => fetchCurrentCashier(restaurantId!),
-    enabled: !!restaurantId && !!user,
+    queryKey: ['currentCashier', restaurant.id],
+    queryFn: () => fetchCurrentCashier(restaurant.id),
+    enabled: !!restaurant.id && !!user,
   });
 
   const { data: salesToday = 0 } = useQuery<number>({
@@ -140,10 +130,10 @@ const Cashier = () => {
 
   const openMutation = useMutation({
     mutationFn: async (data: OpenCashierFormValues) => {
-      if (!restaurantId || !user) throw new Error('Dados de usuário ou restaurante indisponíveis.');
+      if (!restaurant.id || !user) throw new Error('Dados de usuário ou restaurante indisponíveis.');
       
       const insertData: TablesInsert<'cash_register'> = {
-        restaurant_id: restaurantId,
+        restaurant_id: restaurant.id,
         opening_balance: data.opening_balance,
         opened_by: user.id,
       };
@@ -189,7 +179,7 @@ const Cashier = () => {
     },
   });
 
-  const isDataLoading = isLoadingCashier || !restaurantId || !user;
+  const isDataLoading = isLoadingCashier || !restaurant.id || !user;
 
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
