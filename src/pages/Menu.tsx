@@ -12,9 +12,12 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { ProductCard } from '@/components/ProductCard';
 import { useDebounce } from '@/hooks/useDebounce';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { LazyImage } from '@/components/LazyImage';
 import { BusinessStatus } from '@/components/BusinessStatus';
+import { getBusinessStatus } from '@/utils/time';
+import { StoreClosedWarning } from '@/components/StoreClosedWarning';
+import { cn } from '@/lib/utils';
 
 type Product = Tables<'products'>;
 type Restaurant = Tables<'restaurants'>;
@@ -93,6 +96,11 @@ const Menu = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
+  const { isOpen } = useMemo(() => {
+    if (!data?.hours) return { isOpen: false, todayHours: 'Carregando...' };
+    return getBusinessStatus(data.hours);
+  }, [data?.hours]);
+
   const filteredMenu = useMemo(() => {
     if (!data?.menu) return [];
     
@@ -108,13 +116,19 @@ const Menu = () => {
   }, [data?.menu, debouncedSearchTerm]);
 
   const handleProductClick = useCallback((product: Product) => {
+    if (!isOpen) {
+      toast.error("A loja está fechada.", {
+        description: "Não é possível adicionar itens ao carrinho no momento.",
+      });
+      return;
+    }
     setSelectedProduct(product);
     if (product.is_price_by_weight) {
       setIsWeightModalOpen(true);
     } else {
       setIsDetailsModalOpen(true);
     }
-  }, []);
+  }, [isOpen]);
 
   if (isLoading) {
     return (
@@ -183,10 +197,10 @@ const Menu = () => {
           <h1 className="text-3xl font-bold tracking-tight mb-2">{restaurant.name}</h1>
           <p className="text-muted-foreground mb-4">{restaurant.description}</p>
           
-          {/* New Business Status Component */}
           <BusinessStatus restaurant={restaurant} hours={hours} />
-
         </header>
+
+        {!isOpen && <StoreClosedWarning />}
 
         <div className="mb-8">
           <input
@@ -198,7 +212,7 @@ const Menu = () => {
           />
         </div>
 
-        <main>
+        <main className={cn(!isOpen && "opacity-50 pointer-events-none")}>
           {filteredMenu.length === 0 ? (
             <div className="text-center py-16">
               <p className="text-muted-foreground text-lg">
@@ -233,8 +247,7 @@ const Menu = () => {
         </main>
       </div>
       
-      {/* Floating Cart Button */}
-      {totalItems > 0 && (
+      {totalItems > 0 && isOpen && (
         <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-card shadow-2xl border-t">
           <Link to="/checkout">
             <Button className="w-full h-14 text-lg font-bold flex justify-between items-center">
