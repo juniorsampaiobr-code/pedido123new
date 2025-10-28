@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from "sonner";
-import { Plus, Trash2, Terminal, Settings } from 'lucide-react';
+import { Plus, Trash2, Edit, Terminal, Settings } from 'lucide-react';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
