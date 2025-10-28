@@ -237,16 +237,17 @@ const Delivery = () => {
               <form onSubmit={zonesForm.handleSubmit(handleZonesSubmit)} className="space-y-6">
                 
                 {/* Table Header */}
-                <div className="grid grid-cols-3 gap-4 p-3 rounded-lg bg-muted/50 font-semibold text-sm text-muted-foreground">
+                <div className="grid grid-cols-4 gap-4 p-3 rounded-lg bg-muted/50 font-semibold text-sm text-muted-foreground">
                   <div className="col-span-1">Distância (km)</div>
                   <div className="col-span-1">Valor da taxa (R$)</div>
+                  <div className="col-span-1">Tempo mínimo (min)</div>
                   <div className="col-span-1 text-center">Ações</div>
                 </div>
 
                 {/* Zone List */}
                 {zoneFields.map((field, index) => {
                   return (
-                    <div key={field.id} className="grid grid-cols-3 gap-4 items-center p-4 border rounded-lg relative">
+                    <div key={field.id} className="grid grid-cols-4 gap-4 items-center p-4 border rounded-lg relative">
                       
                       {/* Distância (max_distance_km) */}
                       <div className="col-span-1">
@@ -300,6 +301,29 @@ const Delivery = () => {
                         />
                       </div>
                       
+                      {/* Tempo mínimo (min_delivery_time_minutes) */}
+                      <div className="col-span-1">
+                        <FormField
+                          control={zonesForm.control}
+                          name={`zones.${index}.min_delivery_time_minutes`}
+                          render={({ field: minTimeField }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  placeholder="min" 
+                                  className="text-center"
+                                  {...minTimeField} 
+                                  value={minTimeField.value === undefined || minTimeField.value === null ? '' : String(minTimeField.value)}
+                                  onChange={(e) => minTimeField.onChange(e.target.value)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
                       {/* Ações */}
                       <div className="col-span-1 flex justify-center gap-2">
                         <Button 
@@ -312,9 +336,8 @@ const Delivery = () => {
                         </Button>
                       </div>
                       
-                      {/* Campos de Tempo e Lat/Lng escondidos, mas necessários para o schema/mutação */}
+                      {/* Campos de Latitude/Longitude escondidos, mas necessários para o schema */}
                       <div className="hidden">
-                        <FormField control={zonesForm.control} name={`zones.${index}.min_delivery_time_minutes`} render={({ field }) => (<Input type="hidden" {...field} />)} />
                         <FormField control={zonesForm.control} name={`zones.${index}.center_latitude`} render={({ field }) => (<Input type="hidden" {...field} />)} />
                         <FormField control={zonesForm.control} name={`zones.${index}.center_longitude`} render={({ field }) => (<Input type="hidden" {...field} />)} />
                       </div>
