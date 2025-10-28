@@ -31,6 +31,6 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom', '@supabase/supabase-js'],
-    exclude: ['@mercadopago/sdk-react'],
+    exclude: ['@mercadopago/sdk-react', '@mercadopago/sdk-js'],
   }
 }));
