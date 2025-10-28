@@ -527,7 +527,17 @@ const Checkout = () => {
                       </div>
                       <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP *</FormLabel><ZipCodeInput {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                       
-                      {showMap && <LocationPickerMap center={markerPosition} markerPosition={markerPosition} onLocationChange={handleMapLocationChange} isInteractive={false} />}
+                      {showMap && (
+                        <div className="space-y-2">
+                          <LocationPickerMap center={markerPosition} markerPosition={markerPosition} onLocationChange={handleMapLocationChange} isInteractive={false} />
+                          {(lat !== null && lng !== null) && (
+                            <div className="text-xs text-muted-foreground flex justify-between">
+                              <span>Latitude: {lat?.toFixed(6)}</span>
+                              <span>Longitude: {lng?.toFixed(6)}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {isCalculatingFee && (<Alert><Loader2 className="h-4 w-4 animate-spin" /><AlertTitle>Calculando Taxa...</AlertTitle><AlertDescription>Aguarde enquanto calculamos a taxa de entrega para o seu endereço.</AlertDescription></Alert>)}
                       {deliveryError && (<Alert variant="destructive"><Terminal className="h-4 w-4" /><AlertTitle>Erro de Entrega</AlertTitle><AlertDescription>{deliveryError}</AlertDescription></Alert>)}
                       {deliveryFee > 0 && !isCalculatingFee && (<Alert className="mt-4"><Truck className="h-4 w-4" /><AlertTitle>Taxa de Entrega Aplicada</AlertTitle><AlertDescription>Taxa: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}</AlertDescription></Alert>)}
