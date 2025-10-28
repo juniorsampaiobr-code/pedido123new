@@ -82,10 +82,10 @@ export const WeightProductModal = ({ product, isOpen, onClose }: WeightProductMo
         <DialogHeader className="text-center">
           <DialogTitle className="text-2xl">Quanto você deseja?</DialogTitle>
           <DialogDescription>
-            <p className="text-lg font-semibold mt-2">{product.name}</p>
-            <p className="text-muted-foreground">
+            <span className="block text-lg font-semibold mt-2">{product.name}</span>
+            <span className="block text-muted-foreground">
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(product.price)} por kg
-            </p>
+            </span>
           </DialogDescription>
         </DialogHeader>
         

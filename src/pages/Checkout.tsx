@@ -403,6 +403,7 @@ const Checkout = () => {
   if (isError) return <div className="container mx-auto p-4 max-w-6xl"><Alert variant="destructive"><Terminal className="h-4 w-4" /><AlertTitle>Erro de Conexão</AlertTitle><AlertDescription>{error instanceof Error ? error.message : "Não foi possível carregar os dados."}</AlertDescription></Alert></div>;
 
   const isSubmitting = orderMutation.isPending || isProcessingPayment || isCalculatingFee;
+  const isDeliverySelected = deliveryOption === 'delivery';
   const isDeliveryValid = !isDeliverySelected || (!deliveryError && deliveryFee >= 0);
 
   return (
