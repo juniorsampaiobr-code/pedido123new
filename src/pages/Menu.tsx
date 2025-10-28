@@ -2,14 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, ShoppingCart, ArrowRight } from "lucide-react";
+import { Terminal } from "lucide-react";
 import { Tables } from '@/integrations/supabase/types';
 import { useState, useMemo, useCallback } from 'react';
 import { ProductDetailsModal } from '@/components/ProductDetailsModal';
 import { WeightProductModal } from '@/components/WeightProductModal';
-import { useCart } from '@/hooks/use-cart';
-import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
 import { ProductCard } from '@/components/ProductCard';
 import { useDebounce } from '@/hooks/useDebounce';
 import { Card } from '@/components/ui/card';
@@ -18,6 +15,8 @@ import { BusinessStatus } from '@/components/BusinessStatus';
 import { getBusinessStatus } from '@/utils/time';
 import { StoreClosedWarning } from '@/components/StoreClosedWarning';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { FloatingCartButton } from '@/components/FloatingCartButton';
 
 type Product = Tables<'products'>;
 type Restaurant = Tables<'restaurants'>;
@@ -89,7 +88,6 @@ const Menu = () => {
     gcTime: 1000 * 60 * 10, // 10 minutos
   });
   
-  const { totalItems, subtotal } = useCart();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
@@ -183,7 +181,7 @@ const Menu = () => {
         onClose={() => setIsWeightModalOpen(false)}
       />
 
-      <div className="container mx-auto px-4 py-8 max-w-5xl mb-20">
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
         <header className="text-center mb-8">
           {restaurant.logo_url && (
             <div className="w-24 h-24 mx-auto rounded-full mb-4 overflow-hidden border-4 border-card shadow-lg">
@@ -247,22 +245,7 @@ const Menu = () => {
         </main>
       </div>
       
-      {totalItems > 0 && isOpen && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 bg-card shadow-2xl border-t">
-          <Link to="/checkout">
-            <Button className="w-full h-14 text-lg font-bold flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="h-5 w-5" />
-                {totalItems} {totalItems === 1 ? 'Item' : 'Itens'}
-              </div>
-              <div className="flex items-center gap-2">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}
-                <ArrowRight className="h-5 w-5 ml-2" />
-              </div>
-            </Button>
-          </Link>
-        </div>
-      )}
+      {isOpen && <FloatingCartButton />}
     </>
   );
 };
