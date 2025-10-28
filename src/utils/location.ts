@@ -60,7 +60,7 @@ export const calculateDeliveryFee = (
   customerCoords: [number, number],
   restaurantCoords: [number, number],
   deliveryZones: any[] // Usamos 'any' aqui para evitar dependência circular de types.ts
-): { fee: number } | null => {
+): { fee: number, minTime: number, maxTime: number } | null => {
   
   const distance = haversineDistance(
     restaurantCoords[0], 
@@ -77,8 +77,13 @@ export const calculateDeliveryFee = (
     // A taxa é apenas a taxa fixa da zona (delivery_fee)
     const fixedFee = zone.delivery_fee || 0;
     
+    const minTime = zone.min_delivery_time_minutes || 0;
+    const maxTime = minTime + 15; // Estimativa simples
+
     return { 
       fee: parseFloat(fixedFee.toFixed(2)),
+      minTime: minTime,
+      maxTime: maxTime,
     };
   }
 

@@ -36,6 +36,10 @@ const zoneSchema = z.object({
     (val) => String(val).replace(',', '.'),
     z.coerce.number({ invalid_type_error: 'Taxa deve ser um número.' }).min(0, 'A taxa não pode ser negativa.')
   ),
+  min_delivery_time_minutes: z.preprocess(
+    (val) => String(val).replace(',', '.'),
+    z.coerce.number({ invalid_type_error: 'Tempo deve ser um número.' }).min(0, 'O tempo mínimo não pode ser negativo.')
+  ),
   center_latitude: z.preprocess(
     (val) => String(val).replace(',', '.'),
     z.coerce.number({ invalid_type_error: 'Latitude deve ser um número.' }).optional().nullable(),
@@ -113,6 +117,7 @@ const Delivery = () => {
       id: zone.id,
       delivery_fee: zone.delivery_fee,
       max_distance_km: zone.max_distance_km && typeof zone.max_distance_km === 'number' ? zone.max_distance_km : 1,
+      min_delivery_time_minutes: zone.min_delivery_time_minutes ?? 0,
       center_latitude: zone.center_latitude,
       center_longitude: zone.center_longitude,
     }));
@@ -133,6 +138,7 @@ const Delivery = () => {
         restaurant_id: restaurant.id,
         delivery_fee: zone.delivery_fee,
         max_distance_km: zone.max_distance_km,
+        min_delivery_time_minutes: zone.min_delivery_time_minutes,
         center_latitude: zone.center_latitude,
         center_longitude: zone.center_longitude,
         is_active: true,
@@ -167,6 +173,7 @@ const Delivery = () => {
     appendZone({ 
       delivery_fee: 5.00, 
       max_distance_km: 10,
+      min_delivery_time_minutes: 30,
       center_latitude: DEFAULT_CENTER[0],
       center_longitude: DEFAULT_CENTER[1],
     });
@@ -230,16 +237,17 @@ const Delivery = () => {
               <form onSubmit={zonesForm.handleSubmit(handleZonesSubmit)} className="space-y-6">
                 
                 {/* Table Header */}
-                <div className="grid grid-cols-3 gap-4 p-3 rounded-lg bg-muted/50 font-semibold text-sm text-muted-foreground">
+                <div className="grid grid-cols-4 gap-4 p-3 rounded-lg bg-muted/50 font-semibold text-sm text-muted-foreground">
                   <div className="col-span-1">Distância (km)</div>
                   <div className="col-span-1">Valor da taxa (R$)</div>
+                  <div className="col-span-1">Tempo mínimo (min)</div>
                   <div className="col-span-1 text-center">Ações</div>
                 </div>
 
                 {/* Zone List */}
                 {zoneFields.map((field, index) => {
                   return (
-                    <div key={field.id} className="grid grid-cols-3 gap-4 items-center p-4 border rounded-lg relative">
+                    <div key={field.id} className="grid grid-cols-4 gap-4 items-center p-4 border rounded-lg relative">
                       
                       {/* Distância (max_distance_km) */}
                       <div className="col-span-1">
@@ -293,6 +301,29 @@ const Delivery = () => {
                         />
                       </div>
                       
+                      {/* Tempo mínimo (min_delivery_time_minutes) */}
+                      <div className="col-span-1">
+                        <FormField
+                          control={zonesForm.control}
+                          name={`zones.${index}.min_delivery_time_minutes`}
+                          render={({ field: minTimeField }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  placeholder="min" 
+                                  className="text-center"
+                                  {...minTimeField} 
+                                  value={minTimeField.value === undefined || minTimeField.value === null ? '' : String(minTimeField.value)}
+                                  onChange={(e) => minTimeField.onChange(e.target.value)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
                       {/* Ações */}
                       <div className="col-span-1 flex justify-center gap-2">
                         <Button 
