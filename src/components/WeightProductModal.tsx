@@ -103,6 +103,12 @@ export const WeightProductModal = ({ product, isOpen, onClose }: WeightProductMo
                       placeholder="Ex: 500" 
                       className="h-12 text-lg text-center"
                       {...field} 
+                      // Corrigindo o aviso de input não controlado/controlado
+                      value={field.value === undefined || field.value === null ? '' : String(field.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        field.onChange(value === '' ? undefined : parseFloat(value));
+                      }}
                     />
                   </FormControl>
                   <FormMessage />

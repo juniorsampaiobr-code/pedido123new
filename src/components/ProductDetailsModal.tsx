@@ -97,6 +97,7 @@ export const ProductDetailsModal = ({ product, isOpen, onClose }: ProductDetails
             <DialogTitle className="text-2xl font-bold text-white drop-shadow-md">
               {product.name}
             </DialogTitle>
+            {/* Adicionando DialogDescription para resolver o warning */}
             <DialogDescription className="sr-only">
               Detalhes e opções de personalização para {product.name}.
             </DialogDescription>
