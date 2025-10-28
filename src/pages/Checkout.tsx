@@ -695,7 +695,7 @@ const Checkout = () => {
                     )}
                     
                     {/* Troco (Dinheiro) */}
-                    {isCashPayment && (<FormField control={form.control} name="change_for" render={({ field }) => (<FormItem><FormLabel>Precisa de troco para quanto? (R$)</FormLabel><Input type="number" step="0.01" placeholder={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(total)} {...field} value={field.value === null || field.value === undefined ? '' : String(field.value)} onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)} /><FormMessage /></FormItem>)} />)}
+                    {isCashPayment && (<FormField control={form.control} name="change_for" render={({ field }) => (<FormItem><FormLabel>Precisa de troco para quanto? (R$)</FormLabel><Input type="number" step="0.01" placeholder={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(total)} {...field} value={field.value === null || field.value === undefined ? '' : String(field.value)} onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)} /><FormMessage /></FormItem>)} />
                     
                     {/* Notas do Pedido */}
                     <FormField control={form.control} name="notes" render={({ field }) => (<FormItem><FormLabel>Observações do Pedido (Opcional)</FormLabel><Textarea placeholder="Ex: Tocar a campainha duas vezes..." {...field} rows={2} /><FormMessage /></FormItem>)} />
