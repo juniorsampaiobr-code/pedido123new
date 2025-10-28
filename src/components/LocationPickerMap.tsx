@@ -19,6 +19,8 @@ interface LocationPickerMapProps {
   center: [number, number];
   markerPosition: [number, number];
   onLocationChange: (lat: number, lng: number) => void;
+  // Adicionando uma prop para controlar se o mapa é interativo (para o checkout)
+  isInteractive?: boolean; 
 }
 
 // Componente para atualizar a visão do mapa quando a posição do marcador muda
@@ -30,35 +32,44 @@ const RecenterAutomatically = ({ lat, lng }: { lat: number, lng: number }) => {
   return null;
 };
 
-// Componente para lidar com cliques no mapa
-const MapClickHandler = ({ onLocationChange }: { onLocationChange: (lat: number, lng: number) => void }) => {
+// Componente para lidar com cliques no mapa (opcionalmente)
+const MapClickHandler = ({ onLocationChange, isInteractive }: { onLocationChange: (lat: number, lng: number) => void, isInteractive: boolean }) => {
   useMapEvents({
     click(e) {
-      onLocationChange(e.latlng.lat, e.latlng.lng);
+      if (isInteractive) {
+        onLocationChange(e.latlng.lat, e.latlng.lng);
+      }
     },
   });
   return null;
 };
 
-const LocationPickerMapComponent = ({ center, markerPosition, onLocationChange }: LocationPickerMapProps) => {
+const LocationPickerMapComponent = ({ center, markerPosition, onLocationChange, isInteractive = true }: LocationPickerMapProps) => {
   return (
-    <MapContainer center={center} zoom={15} scrollWheelZoom={false} className="h-96 w-full rounded-lg z-0">
+    <MapContainer 
+      center={center} 
+      zoom={15} 
+      scrollWheelZoom={isInteractive} 
+      dragging={isInteractive}
+      doubleClickZoom={isInteractive}
+      className="h-96 w-full rounded-lg z-0"
+    >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <Marker
         position={markerPosition}
-        draggable={true}
-        eventHandlers={{
+        draggable={isInteractive} // Apenas arrastável se for interativo
+        eventHandlers={isInteractive ? {
           dragend: (e) => {
             const { lat, lng } = e.target.getLatLng();
             onLocationChange(lat, lng);
           },
-        }}
+        } : undefined}
       />
       <RecenterAutomatically lat={markerPosition[0]} lng={markerPosition[1]} />
-      <MapClickHandler onLocationChange={onLocationChange} />
+      <MapClickHandler onLocationChange={onLocationChange} isInteractive={isInteractive} />
     </MapContainer>
   );
 };

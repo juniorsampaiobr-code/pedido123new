@@ -263,6 +263,8 @@ const Checkout = () => {
     }
   };
 
+  // No checkout, o cliente não deve poder mover o pino, então esta função não será usada pelo mapa,
+  // mas é mantida para consistência caso o mapa seja reativado para interação.
   const handleMapLocationChange = useCallback(async (newLat: number, newLng: number) => {
     form.setValue('latitude', newLat, { shouldValidate: true });
     form.setValue('longitude', newLng, { shouldValidate: true });
@@ -516,16 +518,16 @@ const Checkout = () => {
                       )}
 
                       <div className="grid grid-cols-3 gap-4">
-                        <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Rua *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="number" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Número *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Rua *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
+                        <FormField control={form.control} name="number" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Número *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
-                        <FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
+                        <FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                       </div>
-                      <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP *</FormLabel><ZipCodeInput {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} />
+                      <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP *</FormLabel><ZipCodeInput {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                       
-                      {showMap && <LocationPickerMap center={markerPosition} markerPosition={markerPosition} onLocationChange={handleMapLocationChange} />}
+                      {showMap && <LocationPickerMap center={markerPosition} markerPosition={markerPosition} onLocationChange={handleMapLocationChange} isInteractive={false} />}
                       {isCalculatingFee && (<Alert><Loader2 className="h-4 w-4 animate-spin" /><AlertTitle>Calculando Taxa...</AlertTitle><AlertDescription>Aguarde enquanto calculamos a taxa de entrega para o seu endereço.</AlertDescription></Alert>)}
                       {deliveryError && (<Alert variant="destructive"><Terminal className="h-4 w-4" /><AlertTitle>Erro de Entrega</AlertTitle><AlertDescription>{deliveryError}</AlertDescription></Alert>)}
                       {deliveryFee > 0 && !isCalculatingFee && (<Alert className="mt-4"><Truck className="h-4 w-4" /><AlertTitle>Taxa de Entrega Aplicada</AlertTitle><AlertDescription>Taxa: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}</AlertDescription></Alert>)}
