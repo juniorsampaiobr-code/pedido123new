@@ -56,8 +56,7 @@ const fetchMenuData = async (): Promise<MenuData> => {
     supabase
       .from('products')
       .select('*')
-      .eq('restaurant_id', restaurantId)
-      .eq('is_available', true),
+      .eq('restaurant_id', restaurantId),
     supabase
       .from('business_hours')
       .select('*')
@@ -119,6 +118,12 @@ const Menu = () => {
     if (!isOpen) {
       toast.error("A loja está fechada.", {
         description: "Não é possível adicionar itens ao carrinho no momento.",
+      });
+      return;
+    }
+    if (!product.is_available) {
+      toast.info("Produto indisponível", {
+        description: "Este item não está disponível no momento.",
       });
       return;
     }
@@ -237,6 +242,7 @@ const Menu = () => {
                         price={product.price}
                         image_url={product.image_url}
                         is_price_by_weight={product.is_price_by_weight}
+                        is_available={product.is_available}
                         onClick={() => handleProductClick(product)}
                       />
                     ))}
