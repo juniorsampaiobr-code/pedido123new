@@ -182,6 +182,15 @@ const Checkout = () => {
   const lat = form.watch('latitude');
   const lng = form.watch('longitude');
   const addressFields = form.watch(['street', 'number', 'neighborhood', 'city', 'zip_code']);
+  
+  // Variável de controle para o useEffect de cálculo de taxa
+  const addressTrigger = JSON.stringify({ 
+    mode: addressInputMode, 
+    fields: addressFields, 
+    lat, 
+    lng, 
+    deliveryOption 
+  });
 
   const markerPosition = useMemo((): [number, number] => {
     if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
@@ -232,7 +241,10 @@ const Checkout = () => {
         setShowMap(true);
         toast.success("Endereço encontrado e mapa atualizado!");
       } else {
-        toast.warning("Endereço encontrado, mas não foi possível obter as coordenadas. Verifique o endereço ou ajuste no mapa.");
+        // Se não encontrar coordenadas, limpa lat/lng para evitar cálculo incorreto
+        form.setValue('latitude', null, { shouldValidate: true });
+        form.setValue('longitude', null, { shouldValidate: true });
+        toast.warning("Endereço encontrado, mas não foi possível obter as coordenadas. Ajuste o pino no mapa manualmente.");
       }
 
     } catch (err: any) {
@@ -265,6 +277,18 @@ const Checkout = () => {
     }
   }, [form, updateAddressFields]);
 
+  // Efeito para limpar coordenadas ao mudar o modo de entrada
+  useEffect(() => {
+    form.setValue('latitude', null);
+    form.setValue('longitude', null);
+    setShowMap(false);
+    setDeliveryFee(0);
+    setDeliveryError(null);
+    setDeliveryTime(null);
+  }, [addressInputMode, form, setDeliveryFee]);
+
+
+  // Efeito para calcular a taxa de entrega
   useEffect(() => {
     const calculateFee = async () => {
       if (deliveryOption === 'pickup' || !restaurant?.latitude || !restaurant?.longitude) {
@@ -279,27 +303,28 @@ const Checkout = () => {
 
       let customerCoords: [number, number] | null = null;
       
-      // Se temos coordenadas explícitas (do mapa ou da busca por CEP)
+      // 1. Tenta usar coordenadas existentes (do mapa ou busca por CEP)
       if (lat && lng) {
         customerCoords = [lat, lng];
       } 
-      // Se estamos no modo manual, tentamos geocodificar o endereço digitado
+      // 2. Se não houver coordenadas, tenta geocodificar o endereço completo digitado manualmente
       else if (addressInputMode === 'manual') {
         const [street, number, neighborhood, city, zipCode] = addressFields;
-        if (street && number && neighborhood && city) {
+        const isAddressComplete = street && number && neighborhood && city && cleanZipCode(zipCode).length === 8;
+        
+        if (isAddressComplete) {
           const fullAddressForGeocode = `${street}, ${number}, ${neighborhood}, ${city}, ${zipCode}`;
           customerCoords = await geocodeAddress(fullAddressForGeocode);
+          
+          if (customerCoords) {
+            // Atualiza o formulário com as coordenadas encontradas
+            form.setValue('latitude', customerCoords[0]);
+            form.setValue('longitude', customerCoords[1]);
+            setShowMap(true);
+          }
         }
       }
-      // Se estamos no modo de busca e temos CEP, tentamos geocodificar
-      else if (addressInputMode === 'search') {
-        const [street, number, neighborhood, city, zipCode] = addressFields;
-        const cleanedZip = cleanZipCode(zipCode);
-        if (street && number && neighborhood && city && cleanedZip.length === 8) {
-          const fullAddressForGeocode = `${street}, ${number}, ${neighborhood}, ${city}, ${zipCode}`;
-          customerCoords = await geocodeAddress(fullAddressForGeocode);
-        }
-      }
+      // 3. Se estiver no modo de busca, mas sem coordenadas (ex: falha na geocodificação inicial), não faz nada aqui.
 
       if (customerCoords) {
         const restaurantCoords: [number, number] = [restaurant.latitude, restaurant.longitude];
@@ -316,16 +341,26 @@ const Checkout = () => {
       } else {
         setDeliveryFee(0);
         setDeliveryTime(null);
-        // Só mostra erro se os campos de endereço estiverem preenchidos
-        if (addressFields.some(field => field?.trim() !== '')) {
-          setDeliveryError("Não foi possível localizar seu endereço para calcular a taxa.");
+        // Mostra erro se a entrega estiver selecionada e o endereço estiver preenchido, mas sem coordenadas
+        const [street, number, neighborhood, city, zipCode] = addressFields;
+        const isAddressAttempted = street || number || neighborhood || city || cleanZipCode(zipCode).length > 0;
+        
+        if (isDeliverySelected && isAddressAttempted) {
+          setDeliveryError("Não foi possível localizar seu endereço para calcular a taxa. Por favor, verifique o endereço ou ajuste o pino no mapa.");
+        } else {
+          setDeliveryError(null);
         }
       }
       setIsCalculatingFee(false);
     };
 
-    calculateFee();
-  }, [deliveryOption, restaurant, deliveryZones, addressFields, lat, lng, setDeliveryFee, addressInputMode]);
+    // Adicionamos um pequeno debounce para evitar chamadas excessivas da API de geocodificação
+    const timeoutId = setTimeout(() => {
+      calculateFee();
+    }, 500); 
+
+    return () => clearTimeout(timeoutId);
+  }, [addressTrigger, restaurant, deliveryZones, form, setDeliveryFee, isDeliverySelected, lat, lng, addressInputMode, addressFields]);
 
   useEffect(() => {
     if (items.length === 0 && !isProcessingPayment) {
