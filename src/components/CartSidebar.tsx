@@ -46,9 +46,7 @@ export const CartSidebar = ({ isOpen, onOpenChange }: CartSidebarProps) => {
               </div>
             </ScrollArea>
             
-            <Separator className="my-4" />
-
-            <SheetFooter className="space-y-4">
+            <div className="border-t pt-4 mt-4 space-y-4">
               <div className="w-full space-y-2">
                 <div className="flex justify-between text-base">
                   <span className="text-muted-foreground">Subtotal:</span>
@@ -67,7 +65,7 @@ export const CartSidebar = ({ isOpen, onOpenChange }: CartSidebarProps) => {
                   </Link>
                 </SheetClose>
               </div>
-            </SheetFooter>
+            </div>
           </>
         )}
       </SheetContent>
