@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from "sonner";
-import { Plus, Trash2, Edit, Terminal, Settings } from 'lucide-react';
+import { Plus, Trash2, Terminal, Settings } from 'lucide-react';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -28,22 +28,21 @@ type Restaurant = Tables<'restaurants'>;
 
 const zoneSchema = z.object({
   id: z.string().optional(),
-  name: z.string().min(1, 'O nome da zona é obrigatório.'),
-  delivery_fee: z.preprocess(
-    (val) => String(val).replace(',', '.'),
-    z.coerce.number({ invalid_type_error: 'Taxa deve ser um número.' }).min(0, 'A taxa não pode ser negativa.')
-  ),
   max_distance_km: z.preprocess(
     (val) => String(val).replace(',', '.'),
     z.coerce.number({ invalid_type_error: 'Distância deve ser um número.' }).positive('A distância máxima deve ser maior que zero.')
   ),
+  delivery_fee: z.preprocess(
+    (val) => String(val).replace(',', '.'),
+    z.coerce.number({ invalid_type_error: 'Taxa deve ser um número.' }).min(0, 'A taxa não pode ser negativa.')
+  ),
+  price_per_km: z.preprocess(
+    (val) => String(val).replace(',', '.'),
+    z.coerce.number({ invalid_type_error: 'Taxa por km deve ser um número.' }).min(0, 'A taxa por km não pode ser negativa.')
+  ),
   min_delivery_time_minutes: z.preprocess(
     (val) => String(val).replace(',', '.'),
     z.coerce.number({ invalid_type_error: 'Tempo deve ser um número.' }).min(0, 'O tempo mínimo não pode ser negativo.')
-  ),
-  max_delivery_time_minutes: z.preprocess(
-    (val) => String(val).replace(',', '.'),
-    z.coerce.number({ invalid_type_error: 'Tempo deve ser um número.' }).min(0, 'O tempo máximo não pode ser negativo.')
   ),
   center_latitude: z.preprocess(
     (val) => String(val).replace(',', '.'),
@@ -53,9 +52,6 @@ const zoneSchema = z.object({
     (val) => String(val).replace(',', '.'),
     z.coerce.number({ invalid_type_error: 'Longitude deve ser um número.' }).optional().nullable(),
   ),
-}).refine(data => data.min_delivery_time_minutes <= data.max_delivery_time_minutes, {
-  message: "O tempo mínimo não pode ser maior que o tempo máximo.",
-  path: ["min_delivery_time_minutes"],
 });
 
 const zonesFormSchema = z.object({
@@ -123,11 +119,10 @@ const Delivery = () => {
   const updateFormWithZones = useCallback((zones: DeliveryZone[]) => {
     const formattedZones = zones.map(zone => ({
       id: zone.id,
-      name: zone.name || '',
       delivery_fee: zone.delivery_fee,
       max_distance_km: zone.max_distance_km && typeof zone.max_distance_km === 'number' ? zone.max_distance_km : 1,
+      price_per_km: zone.price_per_km ?? 0,
       min_delivery_time_minutes: zone.min_delivery_time_minutes ?? 0,
-      max_delivery_time_minutes: zone.max_delivery_time_minutes ?? 0,
       center_latitude: zone.center_latitude,
       center_longitude: zone.center_longitude,
     }));
@@ -146,11 +141,10 @@ const Delivery = () => {
 
       const updates = data.zones.map(zone => ({
         restaurant_id: restaurant.id,
-        name: zone.name,
         delivery_fee: zone.delivery_fee,
         max_distance_km: zone.max_distance_km,
+        price_per_km: zone.price_per_km,
         min_delivery_time_minutes: zone.min_delivery_time_minutes,
-        max_delivery_time_minutes: zone.max_delivery_time_minutes,
         center_latitude: zone.center_latitude,
         center_longitude: zone.center_longitude,
         is_active: true,
@@ -183,19 +177,16 @@ const Delivery = () => {
 
   const handleNewZone = useCallback(() => {
     appendZone({ 
-      name: `Nova Zona ${zoneFields.length + 1}`, 
       delivery_fee: 5.00, 
       max_distance_km: 10,
-      min_delivery_time_minutes: 0,
-      max_delivery_time_minutes: 0,
+      price_per_km: 0.50,
+      min_delivery_time_minutes: 30,
       center_latitude: DEFAULT_CENTER[0],
       center_longitude: DEFAULT_CENTER[1],
     });
-  }, [appendZone, zoneFields.length, DEFAULT_CENTER]);
+  }, [appendZone, DEFAULT_CENTER]);
 
   const hasCoordinates = restaurant?.latitude && restaurant?.longitude;
-
-  const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
   if (isLoadingZones || isLoadingRestaurant) {
     return (
@@ -253,21 +244,18 @@ const Delivery = () => {
               <form onSubmit={zonesForm.handleSubmit(handleZonesSubmit)} className="space-y-6">
                 
                 {/* Table Header */}
-                <div className="grid grid-cols-6 gap-4 p-3 rounded-lg bg-muted/50 font-semibold text-sm text-muted-foreground">
-                  <div className="col-span-1">Distância</div>
-                  <div className="col-span-1">Valor da taxa</div>
-                  <div className="col-span-1">Taxa</div>
-                  <div className="col-span-1">Tempo mínimo</div>
-                  <div className="col-span-1">Tempo máximo</div>
+                <div className="grid grid-cols-5 gap-4 p-3 rounded-lg bg-muted/50 font-semibold text-sm text-muted-foreground">
+                  <div className="col-span-1">Distância (km)</div>
+                  <div className="col-span-1">Valor da taxa (R$)</div>
+                  <div className="col-span-1">Taxa por km (R$)</div>
+                  <div className="col-span-1">Tempo mínimo (min)</div>
                   <div className="col-span-1 text-center">Ações</div>
                 </div>
 
                 {/* Zone List */}
                 {zoneFields.map((field, index) => {
-                  const zone = zonesForm.watch(`zones.${index}`);
-                  
                   return (
-                    <div key={field.id} className="grid grid-cols-6 gap-4 items-center p-4 border rounded-lg relative">
+                    <div key={field.id} className="grid grid-cols-5 gap-4 items-center p-4 border rounded-lg relative">
                       
                       {/* Distância (max_distance_km) */}
                       <div className="col-span-1">
@@ -321,18 +309,22 @@ const Delivery = () => {
                         />
                       </div>
                       
-                      {/* Taxa (Nome) - Usando um campo de texto simples para o nome */}
-                      <div className="col-span-1 text-center text-sm font-medium">
+                      {/* Taxa por km (price_per_km) */}
+                      <div className="col-span-1">
                         <FormField
                           control={zonesForm.control}
-                          name={`zones.${index}.name`}
-                          render={({ field: nameField }) => (
+                          name={`zones.${index}.price_per_km`}
+                          render={({ field: pricePerKmField }) => (
                             <FormItem>
                               <FormControl>
                                 <Input 
-                                  placeholder="Nome da Taxa" 
+                                  type="number" 
+                                  step="0.01" 
+                                  placeholder="R$/km" 
                                   className="text-center"
-                                  {...nameField} 
+                                  {...pricePerKmField} 
+                                  value={pricePerKmField.value === undefined || pricePerKmField.value === null ? '' : String(pricePerKmField.value)}
+                                  onChange={(e) => pricePerKmField.onChange(e.target.value)}
                                 />
                               </FormControl>
                               <FormMessage />
@@ -364,40 +356,16 @@ const Delivery = () => {
                         />
                       </div>
 
-                      {/* Tempo máximo (max_delivery_time_minutes) */}
-                      <div className="col-span-1">
-                        <FormField
-                          control={zonesForm.control}
-                          name={`zones.${index}.max_delivery_time_minutes`}
-                          render={({ field: maxTimeField }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input 
-                                  type="number" 
-                                  placeholder="min" 
-                                  className="text-center"
-                                  {...maxTimeField} 
-                                  value={maxTimeField.value === undefined || maxTimeField.value === null ? '' : String(maxTimeField.value)}
-                                  onChange={(e) => maxTimeField.onChange(e.target.value)}
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
                       {/* Ações */}
                       <div className="col-span-1 flex justify-center gap-2">
                         <Button 
                           type="button" 
-                          variant="outline" 
+                          variant="destructive" 
                           size="icon" 
                           onClick={() => removeZone(index)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                        {/* O botão de editar não faz nada por enquanto, mas mantém o layout */}
                         <Button 
                           type="button" 
                           className="bg-pink-500 hover:bg-pink-600 text-white" 
