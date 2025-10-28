@@ -55,13 +55,6 @@ const hoursFormSchema = z.object({
 
 type HoursFormValues = z.infer<typeof hoursFormSchema>;
 
-const DEFAULT_HOURS: Omit<BusinessHourInsert, 'restaurant_id'>[] = DAYS_OF_WEEK.map(day => ({
-  day_of_week: day.day_of_week,
-  is_open: true,
-  open_time: '09:00',
-  close_time: '18:00',
-}));
-
 const fetchBusinessHours = async (restaurantId: string): Promise<BusinessHour[]> => {
   const { data, error } = await supabase
     .from('business_hours')
@@ -78,7 +71,7 @@ const Hours = () => {
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
 
   const { data: restaurantData, isLoading: isRestaurantLoading } = useQuery({
-    queryKey: ['restaurantId'],
+    queryKey: ['restaurantIdForHours'], // Using a more specific key
     queryFn: async () => {
       const { data, error } = await supabase.from('restaurants').select('id').limit(1).single();
       if (error) throw new Error(error.message);
@@ -95,22 +88,21 @@ const Hours = () => {
 
   const form = useForm<HoursFormValues>({
     resolver: zodResolver(hoursFormSchema),
-    defaultValues: {
-      hours: DEFAULT_HOURS.map(h => ({ ...h, id: undefined })), // Inicializa com IDs undefined
-    },
     mode: 'onBlur',
   });
 
-  const { fields, replace } = useFieldArray({
+  const { fields } = useFieldArray({
     control: form.control,
     name: "hours",
   });
 
   useEffect(() => {
-    if (!isLoading && restaurantId) {
-      const hoursData = fetchedHours || [];
+    // This effect runs when fetchedHours data arrives or changes.
+    // It populates the form with the fetched data or with defaults if no data exists.
+    if (fetchedHours) {
+      const hoursData = fetchedHours.length > 0 ? fetchedHours : DAYS_OF_WEEK.map(d => ({ day_of_week: d.day_of_week, is_open: true, open_time: '09:00', close_time: '18:00' }));
       
-      const sortedHours = hoursData.sort((a, b) => a.day_of_week - b.day_of_week);
+      const sortedHours = [...hoursData].sort((a, b) => a.day_of_week - b.day_of_week);
       
       const formHours = DAYS_OF_WEEK.map(day => {
         const existing = sortedHours.find(h => h.day_of_week === day.day_of_week);
@@ -123,55 +115,36 @@ const Hours = () => {
         };
       });
       
-      replace(formHours);
+      form.reset({ hours: formHours });
     }
-  }, [fetchedHours, restaurantId, isLoading, replace]);
+  }, [fetchedHours, form.reset]);
 
   const mutation = useMutation({
     mutationFn: async (data: HoursFormValues) => {
       if (!restaurantId) throw new Error('ID do restaurante não disponível.');
 
-      // 1. Preparar os dados para upsert (inserção ou atualização)
-      const updates = data.hours.map(h => ({
-        id: h.id, // Incluir ID se existir
+      // Strategy: Delete all existing hours for this restaurant and insert the new ones.
+      // This is simpler and more robust for a fixed set of 7 rows.
+      const { error: deleteError } = await supabase
+        .from('business_hours')
+        .delete()
+        .eq('restaurant_id', restaurantId);
+      
+      if (deleteError) throw new Error(`Erro ao limpar horários antigos: ${deleteError.message}`);
+
+      const inserts = data.hours.map(h => ({
         restaurant_id: restaurantId,
         day_of_week: h.day_of_week,
         is_open: h.is_open,
-        // Se estiver fechado, garantir que os horários sejam NULL no banco de dados
         open_time: h.is_open ? h.open_time : null,
         close_time: h.is_open ? h.close_time : null,
       }));
 
-      // 2. Se houver IDs existentes, fazemos um upsert (update ou insert)
-      // Vamos usar a estratégia de deletar e inserir se não houver dados, ou atualizar/inserir individualmente se já houver dados.
+      const { error: insertError } = await supabase
+        .from('business_hours')
+        .insert(inserts);
       
-      if (fetchedHours && fetchedHours.length > 0) {
-        // Atualizar ou inserir individualmente
-        const updatePromises = updates.map(async (update) => {
-          if (update.id) {
-            // Atualizar registro existente
-            const { error } = await supabase
-              .from('business_hours')
-              .update(update)
-              .eq('id', update.id);
-            if (error) throw new Error(`Erro ao atualizar horário: ${error.message}`);
-          } else {
-            // Inserir novo registro (caso algum dia tenha sido perdido ou seja novo)
-            const { error } = await supabase
-              .from('business_hours')
-              .insert(update);
-            if (error) throw new Error(`Erro ao inserir horário: ${error.message}`);
-          }
-        });
-
-        await Promise.all(updatePromises);
-      } else {
-        // Inserir todos os 7 dias de uma vez (primeira vez)
-        const { error } = await supabase
-          .from('business_hours')
-          .insert(updates as TablesInsert<'business_hours'>[]);
-        if (error) throw new Error(`Erro ao inserir horários: ${error.message}`);
-      }
+      if (insertError) throw new Error(`Erro ao inserir novos horários: ${insertError.message}`);
     },
     onSuccess: () => {
       toast.success('Horários de funcionamento salvos com sucesso!');
@@ -186,7 +159,8 @@ const Hours = () => {
     mutation.mutate(data);
   };
 
-  const isDataLoading = isLoading || isRestaurantLoading || !restaurantId;
+  // Show skeleton if initial data is loading or if form fields haven't been populated yet.
+  const isDataLoading = isLoading || isRestaurantLoading || fields.length === 0;
 
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
