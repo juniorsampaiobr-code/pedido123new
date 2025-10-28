@@ -69,7 +69,15 @@ const checkoutSchema = z.object({
     z.coerce.number().optional().nullable(),
   ),
 }).superRefine((data, ctx) => {
+  // Validação para Delivery
   if (data.delivery_option === 'delivery') {
+    // Se o modo de entrada for manual, todos os campos são obrigatórios
+    // Se o modo de entrada for 'search', a validação é feita pela busca de CEP, mas os campos finais ainda precisam ser preenchidos.
+    // Como o formulário não tem acesso direto ao estado `addressInputMode`, vamos simplificar a validação aqui.
+    // A validação de CEP e endereço completo já está no schema, vamos garantir que os campos não estejam vazios.
+    
+    // Para garantir que a validação seja acionada, vamos verificar se os campos estão vazios.
+    // O Zod já garante que o zip_code tenha 8 dígitos se não for vazio.
     if (data.street.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Rua é obrigatória.', path: ['street'] });
     if (data.number.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Número é obrigatório.', path: ['number'] });
     if (data.neighborhood.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Bairro é obrigatório.', path: ['neighborhood'] });
@@ -183,6 +191,9 @@ const Checkout = () => {
   const lng = form.watch('longitude');
   const addressFields = form.watch(['street', 'number', 'neighborhood', 'city', 'zip_code']);
   
+  // Variável que estava causando o erro de referência
+  const isDeliverySelected = deliveryOption === 'delivery';
+
   // Variável de controle para o useEffect de cálculo de taxa
   const addressTrigger = JSON.stringify({ 
     mode: addressInputMode, 
@@ -191,9 +202,6 @@ const Checkout = () => {
     lng, 
     deliveryOption 
   });
-
-  // Variável que estava causando o erro de referência
-  const isDeliverySelected = deliveryOption === 'delivery';
 
   const markerPosition = useMemo((): [number, number] => {
     if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
@@ -288,6 +296,17 @@ const Checkout = () => {
     setDeliveryFee(0);
     setDeliveryError(null);
     setDeliveryTime(null);
+    
+    // Limpar campos de endereço ao mudar de modo, exceto se for para 'manual' e já houver dados
+    if (addressInputMode === 'search') {
+      form.setValue('street', '');
+      form.setValue('number', '');
+      form.setValue('neighborhood', '');
+      form.setValue('city', '');
+      form.setValue('zip_code', '');
+      setSearchCep('');
+      setSearchNumber('');
+    }
   }, [addressInputMode, form, setDeliveryFee]);
 
 
@@ -502,9 +521,15 @@ const Checkout = () => {
                         <div className="space-y-2"><Label>Buscar Endereço por CEP e Número</Label><div className="flex gap-2"><ZipCodeInput placeholder="Digite o CEP" value={searchCep} onChange={(e) => setSearchCep(e.target.value)} /><Input placeholder="Número" value={searchNumber} onChange={(e) => setSearchNumber(e.target.value)} /><Button type="button" onClick={handleAddressSearch} disabled={isSearchingCep}>{isSearchingCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button></div></div>
                       )}
 
-                      <div className="grid grid-cols-3 gap-4"><FormField control={form.control} name="street" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Rua</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} /><FormField control={form.control} name="number" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Número</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} /></div>
-                      <div className="grid grid-cols-2 gap-4"><FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} /><FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} /></div>
-                      <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP</FormLabel><ZipCodeInput {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} />
+                      <div className="grid grid-cols-3 gap-4">
+                        <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Rua *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="number" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Número *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} />
+                      </div>
+                      <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP *</FormLabel><ZipCodeInput {...field} disabled={addressInputMode === 'search'} /><FormMessage /></FormItem>)} />
                       
                       {showMap && <LocationPickerMap center={markerPosition} markerPosition={markerPosition} onLocationChange={handleMapLocationChange} />}
                       {isCalculatingFee && (<Alert><Loader2 className="h-4 w-4 animate-spin" /><AlertTitle>Calculando Taxa...</AlertTitle><AlertDescription>Aguarde enquanto calculamos a taxa de entrega para o seu endereço.</AlertDescription></Alert>)}
