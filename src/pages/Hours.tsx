@@ -19,10 +19,11 @@ import {
 import { TimeInput } from '@/components/TimeInput';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '@/layouts/DashboardLayout';
 
 type BusinessHour = Tables<'business_hours'>;
-type BusinessHourInsert = TablesInsert<'business_hours'>;
 
 const DAYS_OF_WEEK = [
   { day_of_week: 0, label: 'Domingo' },
@@ -67,23 +68,13 @@ const fetchBusinessHours = async (restaurantId: string): Promise<BusinessHour[]>
 };
 
 const Hours = () => {
+  const { restaurant } = useOutletContext<DashboardContextType>();
   const queryClient = useQueryClient();
-  const [restaurantId, setRestaurantId] = useState<string | null>(null);
-
-  const { data: restaurantData, isLoading: isRestaurantLoading } = useQuery({
-    queryKey: ['restaurantIdForHours'], // Using a more specific key
-    queryFn: async () => {
-      const { data, error } = await supabase.from('restaurants').select('id').limit(1).single();
-      if (error) throw new Error(error.message);
-      setRestaurantId(data.id);
-      return data;
-    },
-  });
 
   const { data: fetchedHours, isLoading, isError, error } = useQuery<BusinessHour[]>({
-    queryKey: ['businessHours', restaurantId],
-    queryFn: () => fetchBusinessHours(restaurantId!),
-    enabled: !!restaurantId,
+    queryKey: ['businessHours', restaurant.id],
+    queryFn: () => fetchBusinessHours(restaurant.id),
+    enabled: !!restaurant.id,
   });
 
   const form = useForm<HoursFormValues>({
@@ -97,8 +88,6 @@ const Hours = () => {
   });
 
   useEffect(() => {
-    // This effect runs when fetchedHours data arrives or changes.
-    // It populates the form with the fetched data or with defaults if no data exists.
     if (fetchedHours) {
       const hoursData = fetchedHours.length > 0 ? fetchedHours : DAYS_OF_WEEK.map(d => ({ day_of_week: d.day_of_week, is_open: true, open_time: '09:00', close_time: '18:00' }));
       
@@ -121,19 +110,17 @@ const Hours = () => {
 
   const mutation = useMutation({
     mutationFn: async (data: HoursFormValues) => {
-      if (!restaurantId) throw new Error('ID do restaurante não disponível.');
+      if (!restaurant.id) throw new Error('ID do restaurante não disponível.');
 
-      // Strategy: Delete all existing hours for this restaurant and insert the new ones.
-      // This is simpler and more robust for a fixed set of 7 rows.
       const { error: deleteError } = await supabase
         .from('business_hours')
         .delete()
-        .eq('restaurant_id', restaurantId);
+        .eq('restaurant_id', restaurant.id);
       
       if (deleteError) throw new Error(`Erro ao limpar horários antigos: ${deleteError.message}`);
 
       const inserts = data.hours.map(h => ({
-        restaurant_id: restaurantId,
+        restaurant_id: restaurant.id,
         day_of_week: h.day_of_week,
         is_open: h.is_open,
         open_time: h.is_open ? h.open_time : null,
@@ -159,8 +146,7 @@ const Hours = () => {
     mutation.mutate(data);
   };
 
-  // Show skeleton if initial data is loading or if form fields haven't been populated yet.
-  const isDataLoading = isLoading || isRestaurantLoading || fields.length === 0;
+  const isDataLoading = isLoading || fields.length === 0;
 
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
@@ -205,7 +191,6 @@ const Hours = () => {
                         </div>
                         
                         <div className="flex items-center gap-6">
-                          {/* Switch Control Group */}
                           <FormField
                             control={form.control}
                             name={`hours.${index}.is_open`}
@@ -224,7 +209,6 @@ const Hours = () => {
                             )}
                           />
 
-                          {/* Time Inputs Group */}
                           <div className={isClosed ? 'opacity-50 pointer-events-none flex gap-4' : 'flex gap-4'}>
                             <FormField
                               control={form.control}
@@ -235,7 +219,7 @@ const Hours = () => {
                                   <FormControl>
                                     <TimeInput 
                                       {...timeField} 
-                                      value={timeField.value || ''} // Use '' if null/undefined
+                                      value={timeField.value || ''}
                                       onChange={(e) => timeField.onChange(e.target.value)}
                                     />
                                   </FormControl>
@@ -252,7 +236,7 @@ const Hours = () => {
                                   <FormControl>
                                     <TimeInput 
                                       {...timeField} 
-                                      value={timeField.value || ''} // Use '' if null/undefined
+                                      value={timeField.value || ''}
                                       onChange={(e) => timeField.onChange(e.target.value)}
                                     />
                                   </FormControl>

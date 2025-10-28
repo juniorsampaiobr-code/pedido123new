@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, createContext, useContext, useCallback, memo } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate, useOutletContext } from "react-router-dom";
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Sidebar } from '@/components/Sidebar';
@@ -10,11 +10,11 @@ import { Tables } from '@/integrations/supabase/types';
 import { ShoppingCart, Volume2, VolumeX, AlertCircle, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EnableSoundModal } from "@/components/EnableSoundModal";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 type Restaurant = Tables<'restaurants'>;
 type SoundStatus = 'disabled' | 'enabled' | 'error';
 type AudioReadyState = 'loading' | 'ready' | 'error';
-type RestaurantForLayout = Pick<Restaurant, 'id' | 'notification_sound_url'>;
 
 interface SoundContextType {
   playSound: () => void;
@@ -49,6 +49,10 @@ const navItems = [
   { href: "/settings", label: "Configurações" },
 ];
 
+export type DashboardContextType = {
+  restaurant: Restaurant;
+};
+
 const DashboardLayoutComponent = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -68,15 +72,15 @@ const DashboardLayoutComponent = () => {
     localStorage.setItem('soundNotificationStatus', soundStatus);
   }, [soundStatus]);
 
-  const { data: restaurant } = useQuery<RestaurantForLayout>({
-    queryKey: ['restaurantForLayout'],
+  const { data: restaurant, isLoading: isRestaurantLoading } = useQuery<Restaurant>({
+    queryKey: ['dashboardRestaurant'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('restaurants').select('id, notification_sound_url').limit(1).single();
+      const { data, error } = await supabase.from('restaurants').select('*').limit(1).single();
       if (error) throw new Error(error.message);
       return data;
     },
     enabled: !!user,
-    staleTime: 1000 * 60 * 5, // 5 minutos
+    staleTime: Infinity, // Restaurant data is stable, fetch once
   });
 
   useEffect(() => {
@@ -192,8 +196,8 @@ const DashboardLayoutComponent = () => {
 
   const handleSignOut = async () => { await supabase.auth.signOut(); };
 
-  if (!user) {
-    return <div className="flex h-screen items-center justify-center">Carregando...</div>;
+  if (!user || isRestaurantLoading) {
+    return <LoadingSpinner />;
   }
 
   const isSoundControlDisabled = audioReadyState !== 'ready';
@@ -235,7 +239,7 @@ const DashboardLayoutComponent = () => {
               </div>
             </div>
           </header>
-          <Outlet />
+          <Outlet context={{ restaurant }} />
         </div>
         {restaurant?.notification_sound_url && (
           <audio
