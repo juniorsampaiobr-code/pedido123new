@@ -32,6 +32,7 @@ import { ZipCodeInput } from '@/components/ZipCodeInput';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
 import { geocodeAddress, calculateDeliveryFee } from '@/utils/location';
 import { LocationPickerMap } from '@/components/LocationPickerMap';
+import { MercadoPagoForm } from '@/components/MercadoPagoForm'; // Importando o novo componente
 
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
@@ -157,6 +158,7 @@ const Checkout = () => {
   const [isSearchingCep, setIsSearchingCep] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [addressInputMode, setAddressInputMode] = useState<'search' | 'manual'>('search');
+  const [mpPaymentData, setMpPaymentData] = useState<any>(null); // Estado para dados do cartão/pagamento MP
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['checkoutInitialData'],
@@ -178,7 +180,9 @@ const Checkout = () => {
   const deliveryOption = form.watch('delivery_option');
   const selectedPaymentMethodId = form.watch('payment_method_id');
   const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
-  const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online' || selectedPaymentMethod?.name === 'PIX';
+  const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online'; // Apenas cartão/online
+  const isPixPayment = selectedPaymentMethod?.name === 'PIX'; // PIX ainda usa o fluxo de redirecionamento
+  const isCardPayment = isOnlinePayment; // Usaremos o Brick para Pagamento Online
   const isCashPayment = selectedPaymentMethod?.name === 'Dinheiro';
   
   const lat = form.watch('latitude');
@@ -298,6 +302,7 @@ const Checkout = () => {
     setDeliveryFee(0);
     setDeliveryError(null);
     setDeliveryTime(null);
+    setMpPaymentData(null); // Limpa dados de pagamento ao mudar o modo
     
     // Limpar campos de busca de CEP ao mudar para manual
     if (addressInputMode === 'manual') {
@@ -417,6 +422,13 @@ const Checkout = () => {
     }
   }, [paymentMethods, selectedPaymentMethodId, form]);
 
+  // Limpa os dados de pagamento do MP se o método mudar
+  useEffect(() => {
+    if (!isCardPayment) {
+      setMpPaymentData(null);
+    }
+  }, [isCardPayment]);
+
   const orderMutation = useMutation({
     mutationFn: async (formData: CheckoutFormValues) => {
       if (!restaurant) throw new Error('Dados do restaurante indisponíveis.');
@@ -449,7 +461,8 @@ const Checkout = () => {
         customerId = newCustomer.id;
       }
 
-      const orderStatus = isOnlinePayment ? 'pending_payment' : 'pending';
+      // 1. Cria o pedido no Supabase
+      const orderStatus = (isCardPayment || isPixPayment) ? 'pending_payment' : 'pending';
       const { data: newOrder, error: orderError } = await supabase.from('orders').insert({
         restaurant_id: restaurant.id, customer_id: customerId, status: orderStatus as Enums<'order_status'>,
         total_amount: total, delivery_fee: deliveryFee, notes: formData.notes,
@@ -466,9 +479,42 @@ const Checkout = () => {
       const { error: itemsError } = await supabase.from('order_items').insert(itemsInsert);
       if (itemsError) throw new Error(`Erro ao adicionar itens do pedido: ${itemsError.message}`);
 
-      if (isOnlinePayment) {
+      // 2. Processamento de Pagamento Online
+      if (isCardPayment) {
+        if (!mpPaymentData) throw new Error("Dados de pagamento do cartão não fornecidos.");
+        
         setIsProcessingPayment(true);
-        toast.info("Redirecionando para o pagamento...");
+        toast.info("Processando pagamento com cartão...");
+
+        // Chamar a nova Edge Function para processar o pagamento com o token
+        const { data: paymentResult, error: paymentError } = await supabase.functions.invoke('process-mp-payment', {
+          body: { 
+            orderId, 
+            totalAmount: total, 
+            customerEmail: formData.email,
+            paymentData: mpPaymentData,
+          },
+        });
+
+        if (paymentError) throw new Error(paymentError.message);
+        
+        // Se o pagamento for aprovado, atualizamos o status do pedido
+        if (paymentResult.status === 'approved') {
+          const { error: updateError } = await supabase.from('orders').update({ status: 'confirmed' }).eq('id', orderId);
+          if (updateError) throw new Error(`Erro ao confirmar pedido após pagamento: ${updateError.message}`);
+          toast.success("Pagamento aprovado e pedido confirmado!");
+          navigate(`/order-success/${orderId}`);
+        } else {
+          // Se o pagamento for rejeitado ou pendente, redirecionamos para a página de sucesso
+          // mas o status do pedido permanece 'pending_payment' ou é atualizado para 'cancelled'
+          toast.warning(`Pagamento ${paymentResult.status}. Redirecionando para acompanhamento.`);
+          navigate(`/order-success/${orderId}?status=${paymentResult.status}`);
+        }
+        
+      } else if (isPixPayment) {
+        // Fluxo PIX/Redirecionamento (mantido)
+        setIsProcessingPayment(true);
+        toast.info("Redirecionando para o pagamento PIX...");
         const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
           body: { orderId, items, totalAmount: total, restaurantName: restaurant.name },
         });
@@ -479,7 +525,7 @@ const Checkout = () => {
       return orderId;
     },
     onSuccess: (orderId) => {
-      if (!isOnlinePayment) {
+      if (!isCardPayment && !isPixPayment) {
         toast.success(`Pedido #${orderId.slice(-4)} realizado com sucesso!`);
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         navigate(`/order-success/${orderId}`);
@@ -491,11 +537,21 @@ const Checkout = () => {
     },
   });
 
-  const onSubmit = (data: CheckoutFormValues) => orderMutation.mutate(data);
+  const onSubmit = (data: CheckoutFormValues) => {
+    // Se for pagamento com cartão, o Brick já submeteu os dados para o MP e chamou setMpPaymentData.
+    // A submissão final do formulário só deve ocorrer se não for pagamento com cartão,
+    // ou se os dados do cartão já foram coletados (mpPaymentData está preenchido).
+    if (isCardPayment && !mpPaymentData) {
+      // Se for pagamento com cartão, o botão de submissão deve ser desabilitado
+      // e a submissão deve ser feita pelo Brick.
+      toast.warning("Por favor, preencha os dados do cartão.");
+      return;
+    }
+    orderMutation.mutate(data);
+  };
+  
   const onValidationFail = (errors: any) => {
     if (Object.keys(errors).length > 0) {
-      // Log the errors to the console to see which fields are failing validation
-      console.error("Validation Errors:", errors);
       toast.error('Por favor, preencha todos os campos obrigatórios e corrija os erros.');
     }
   };
@@ -506,6 +562,11 @@ const Checkout = () => {
 
   const isSubmitting = orderMutation.isPending || isProcessingPayment || isCalculatingFee;
   const isDeliveryValid = !isDeliverySelected || (!deliveryError && deliveryFee >= 0);
+  
+  // O botão de submissão só deve ser habilitado se:
+  // 1. Não for pagamento com cartão (isCardPayment é false)
+  // 2. OU for pagamento com cartão E os dados do MP já foram coletados (mpPaymentData existe)
+  const isSubmitButtonEnabled = !isSubmitting && isDeliveryValid && (!isCardPayment || mpPaymentData);
 
   return (
     <div className="min-h-screen bg-background">
@@ -564,9 +625,55 @@ const Checkout = () => {
                     </div>
                   )}
                 </CardContent></Card>
-                <Card><CardHeader><CardTitle className="text-xl">3. Pagamento</CardTitle></CardHeader><CardContent className="space-y-4"><FormField control={form.control} name="payment_method_id" render={({ field }) => (<FormItem className="space-y-3"><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-col space-y-2">{paymentMethods.map(method => { const Icon = getIconComponent(method.icon || 'Store'); return (<FormItem key={method.id} className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value={method.id} /></FormControl><Icon className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">{method.name}<span className="block text-xs text-muted-foreground">{method.description}</span></FormLabel></FormItem>);})}</RadioGroup></FormControl><FormMessage /></FormItem>)} />{isOnlinePayment && (<div className="space-y-4 pt-4 border-t"><h3 className="font-semibold flex items-center gap-2"><CreditCard className="h-4 w-4" /> Detalhes Adicionais</h3><FormField control={form.control} name="cpf_cnpj" render={({ field }) => (<FormItem><FormLabel>CPF/CNPJ (para a nota)</FormLabel><CpfCnpjInput {...field} /><FormMessage /></FormItem>)} /></div>)}{isCashPayment && (<FormField control={form.control} name="change_for" render={({ field }) => (<FormItem><FormLabel>Precisa de troco para quanto? (R$)</FormLabel><Input type="number" step="0.01" placeholder={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(total)} {...field} value={field.value === null || field.value === undefined ? '' : String(field.value)} onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)} /><FormMessage /></FormItem>)} />)}<FormField control={form.control} name="notes" render={({ field }) => (<FormItem><FormLabel>Observações do Pedido (Opcional)</FormLabel><Textarea placeholder="Ex: Tocar a campainha duas vezes..." {...field} rows={2} /><FormMessage /></FormItem>)} /></CardContent></Card>
-                <div className="lg:hidden sticky bottom-0 bg-card p-4 border-t shadow-2xl"><Button type="submit" className="w-full h-12 text-lg" disabled={isSubmitting || !isDeliveryValid}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : `Finalizar Pedido - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}`}</Button></div>
-                <div className="hidden lg:block"><Button type="submit" className="w-full h-12 text-lg" disabled={isSubmitting || !isDeliveryValid}>{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : `Finalizar Pedido - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}`}</Button></div>
+                <Card>
+                  <CardHeader><CardTitle className="text-xl">3. Pagamento</CardTitle></CardHeader>
+                  <CardContent className="space-y-4">
+                    <FormField control={form.control} name="payment_method_id" render={({ field }) => (<FormItem className="space-y-3"><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-col space-y-2">{paymentMethods.map(method => { const Icon = getIconComponent(method.icon || 'Store'); return (<FormItem key={method.id} className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value={method.id} /></FormControl><Icon className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">{method.name}<span className="block text-xs text-muted-foreground">{method.description}</span></FormLabel></FormItem>);})}</RadioGroup></FormControl><FormMessage /></FormItem>)} />
+                    
+                    {/* Formulário de Cartão de Crédito Mercado Pago */}
+                    {isCardPayment && (
+                      <div className="space-y-4 pt-4 border-t">
+                        <h3 className="font-semibold flex items-center gap-2"><CreditCard className="h-4 w-4" /> Dados do Cartão</h3>
+                        <MercadoPagoForm 
+                          totalAmount={total}
+                          onPaymentSuccess={(data) => {
+                            setMpPaymentData(data);
+                            toast.success("Dados do cartão validados. Clique em 'Finalizar Pedido' para processar.");
+                          }}
+                          onPaymentError={(error) => {
+                            setMpPaymentData(null);
+                            toast.error("Erro ao validar cartão. Verifique os dados.");
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Detalhes Adicionais (CPF/CNPJ) */}
+                    {(isCardPayment || isPixPayment) && (
+                      <div className="space-y-4 pt-4 border-t">
+                        <h3 className="font-semibold flex items-center gap-2"><CreditCard className="h-4 w-4" /> Detalhes Adicionais</h3>
+                        <FormField control={form.control} name="cpf_cnpj" render={({ field }) => (<FormItem><FormLabel>CPF/CNPJ (para a nota)</FormLabel><CpfCnpjInput {...field} /><FormMessage /></FormItem>)} />
+                      </div>
+                    )}
+                    
+                    {/* Troco (Dinheiro) */}
+                    {isCashPayment && (<FormField control={form.control} name="change_for" render={({ field }) => (<FormItem><FormLabel>Precisa de troco para quanto? (R$)</FormLabel><Input type="number" step="0.01" placeholder={new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(total)} {...field} value={field.value === null || field.value === undefined ? '' : String(field.value)} onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)} /><FormMessage /></FormItem>)} />)}
+                    
+                    {/* Notas do Pedido */}
+                    <FormField control={form.control} name="notes" render={({ field }) => (<FormItem><FormLabel>Observações do Pedido (Opcional)</FormLabel><Textarea placeholder="Ex: Tocar a campainha duas vezes..." {...field} rows={2} /><FormMessage /></FormItem>)} />
+                  </CardContent>
+                </Card>
+                
+                <div className="lg:hidden sticky bottom-0 bg-card p-4 border-t shadow-2xl">
+                  <Button type="submit" className="w-full h-12 text-lg" disabled={!isSubmitButtonEnabled}>
+                    {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : `Finalizar Pedido - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}`}
+                  </Button>
+                </div>
+                <div className="hidden lg:block">
+                  <Button type="submit" className="w-full h-12 text-lg" disabled={!isSubmitButtonEnabled}>
+                    {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : `Finalizar Pedido - ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}`}
+                  </Button>
+                </div>
               </form>
             </Form>
           </div>
