@@ -52,6 +52,7 @@ const checkoutSchema = z.object({
   }),
   street: z.string().optional().default(''),
   number: z.string().optional().default(''),
+  complement: z.string().optional().default(''), // Novo campo
   neighborhood: z.string().optional().default(''),
   city: z.string().optional().default(''),
   zip_code: z.string().optional().default('').transform(cleanZipCode).refine(val => val.length === 8 || val.length === 0, {
@@ -169,7 +170,7 @@ const Checkout = () => {
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
-      name: '', phone: '', email: '', delivery_option: 'delivery', street: '', number: '', neighborhood: '', city: '', zip_code: '', payment_method_id: '', notes: '', cpf_cnpj: '', change_for: null, latitude: null, longitude: null,
+      name: '', phone: '', email: '', delivery_option: 'delivery', street: '', number: '', complement: '', neighborhood: '', city: '', zip_code: '', payment_method_id: '', notes: '', cpf_cnpj: '', change_for: null, latitude: null, longitude: null,
     },
     mode: 'onBlur',
   });
@@ -182,7 +183,7 @@ const Checkout = () => {
   
   const lat = form.watch('latitude');
   const lng = form.watch('longitude');
-  const addressFields = form.watch(['street', 'number', 'neighborhood', 'city', 'zip_code']);
+  const addressFields = form.watch(['street', 'number', 'complement', 'neighborhood', 'city', 'zip_code']);
   
   // Variável que estava causando o erro de referência
   const isDeliverySelected = deliveryOption === 'delivery';
@@ -210,6 +211,7 @@ const Checkout = () => {
   const updateAddressFields = useCallback((address: any) => {
     form.setValue('street', address.road || address.logradouro || '', { shouldValidate: true });
     form.setValue('number', address.house_number || searchNumber || '', { shouldValidate: true });
+    form.setValue('complement', address.suburb || '', { shouldValidate: true }); // Complemento pode vir do bairro em alguns casos, mas vamos deixar vazio por padrão
     form.setValue('neighborhood', address.suburb || address.bairro || '', { shouldValidate: true });
     form.setValue('city', address.city || address.localidade || '', { shouldValidate: true });
     form.setValue('zip_code', address.postcode || address.cep || '', { shouldValidate: true });
@@ -236,6 +238,7 @@ const Checkout = () => {
 
       form.setValue('street', data.logradouro, { shouldValidate: true });
       form.setValue('number', searchNumber, { shouldValidate: true });
+      form.setValue('complement', '', { shouldValidate: true }); // Limpa complemento na busca por CEP
       form.setValue('neighborhood', data.bairro, { shouldValidate: true });
       form.setValue('city', data.localidade, { shouldValidate: true });
       form.setValue('zip_code', data.cep, { shouldValidate: true });
@@ -305,6 +308,7 @@ const Checkout = () => {
     if (addressInputMode === 'search') {
       form.setValue('street', '');
       form.setValue('number', '');
+      form.setValue('complement', ''); // Limpa complemento
       form.setValue('neighborhood', '');
       form.setValue('city', '');
       form.setValue('zip_code', '');
@@ -333,13 +337,14 @@ const Checkout = () => {
       } 
       // 2. Se não houver coordenadas, tenta geocodificar o endereço completo
       else {
-        const [street, number, neighborhood, city, zipCode] = addressFields;
+        const [street, number, complement, neighborhood, city, zipCode] = addressFields;
         const cleanedZip = cleanZipCode(zipCode);
         const isAddressComplete = street && number && neighborhood && city && cleanedZip.length === 8;
         
         if (isAddressComplete) {
           // Tenta geocodificar o endereço completo
-          customerCoords = await geocodeAddress(`${street}, ${number}, ${neighborhood}, ${city}, ${zipCode}`);
+          const fullAddress = `${street}, ${number} ${complement}, ${neighborhood}, ${city}, ${zipCode}`;
+          customerCoords = await geocodeAddress(fullAddress);
           
           if (customerCoords) {
             // Atualiza o formulário com as coordenadas encontradas
@@ -367,7 +372,7 @@ const Checkout = () => {
         setDeliveryFee(0);
         setDeliveryTime(null);
         
-        const [street, number, neighborhood, city, zipCode] = addressFields;
+        const [street, number, complement, neighborhood, city, zipCode] = addressFields;
         const isAddressAttempted = street && number && neighborhood && city && cleanZipCode(zipCode).length === 8;
         
         // Se o endereço estiver completo, mas a geocodificação falhou, mostra o mapa para ajuste manual
@@ -417,6 +422,17 @@ const Checkout = () => {
       if (!restaurant) throw new Error('Dados do restaurante indisponíveis.');
       if (formData.delivery_option === 'delivery' && deliveryError) throw new Error(deliveryError);
 
+      const addressParts = [
+        formData.street,
+        formData.number,
+        formData.complement ? `(${formData.complement})` : null,
+        formData.neighborhood,
+        formData.city,
+        formData.zip_code,
+      ].filter(Boolean).join(', ');
+
+      const deliveryAddress = formData.delivery_option === 'delivery' ? addressParts : 'Retirada no Local';
+
       let customerId: string;
       const cleanedPhone = cleanPhoneNumber(formData.phone);
       const { data: existingCustomer } = await supabase.from('customers').select('id').eq('phone', cleanedPhone).limit(1).single();
@@ -426,7 +442,7 @@ const Checkout = () => {
       } else {
         const { data: newCustomer, error: customerError } = await supabase.from('customers').insert({
           name: formData.name, phone: cleanedPhone, email: formData.email || null,
-          address: formData.delivery_option === 'delivery' ? `${formData.street}, ${formData.number}, ${formData.neighborhood}, ${formData.city} - ${formData.zip_code}` : null,
+          address: deliveryAddress,
           latitude: formData.latitude, longitude: formData.longitude,
         }).select('id').single();
         if (customerError) throw new Error(`Erro ao criar cliente: ${customerError.message}`);
@@ -437,7 +453,7 @@ const Checkout = () => {
       const { data: newOrder, error: orderError } = await supabase.from('orders').insert({
         restaurant_id: restaurant.id, customer_id: customerId, status: orderStatus as Enums<'order_status'>,
         total_amount: total, delivery_fee: deliveryFee, notes: formData.notes,
-        delivery_address: formData.delivery_option === 'delivery' ? `${formData.street}, ${formData.number}, ${formData.neighborhood}, ${formData.city} - ${formData.zip_code}` : 'Retirada no Local',
+        delivery_address: deliveryAddress,
       }).select('id').single();
 
       if (orderError) throw new Error(`Erro ao criar pedido: ${orderError.message}`);
@@ -521,6 +537,7 @@ const Checkout = () => {
                         <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="col-span-2"><FormLabel>Rua *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                         <FormField control={form.control} name="number" render={({ field }) => (<FormItem className="col-span-1"><FormLabel>Número *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                       </div>
+                      <FormField control={form.control} name="complement" render={({ field }) => (<FormItem><FormLabel>Complemento (Opcional)</FormLabel><Input placeholder="Apto, Bloco, Casa, etc." {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                       <div className="grid grid-cols-2 gap-4">
                         <FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
                         <FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade *</FormLabel><Input {...field} disabled={addressInputMode === 'search'} /></FormItem>)} />
