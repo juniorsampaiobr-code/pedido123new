@@ -156,6 +156,8 @@ export type Database = {
           phone: string
           updated_at: string | null
           user_id: string | null
+          latitude: number | null
+          longitude: number | null
         }
         Insert: {
           address?: string | null
@@ -166,6 +168,8 @@ export type Database = {
           phone: string
           updated_at?: string | null
           user_id?: string | null
+          latitude?: number | null
+          longitude?: number | null
         }
         Update: {
           address?: string | null
@@ -176,6 +180,8 @@ export type Database = {
           phone?: string
           updated_at?: string | null
           user_id?: string | null
+          latitude?: number | null
+          longitude?: number | null
         }
         Relationships: []
       }
