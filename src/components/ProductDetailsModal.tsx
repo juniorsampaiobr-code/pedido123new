@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogDescription, // Importado
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   Form,
@@ -93,15 +93,14 @@ export const ProductDetailsModal = ({ product, isOpen, onClose }: ProductDetails
             alt={product.name} 
             className="w-full h-48 object-cover" 
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent p-4 flex items-end">
+          <DialogHeader className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent p-4 flex flex-col justify-end items-start text-left space-y-0">
             <DialogTitle className="text-2xl font-bold text-white drop-shadow-md">
               {product.name}
             </DialogTitle>
-            {/* Adicionando DialogDescription para resolver o warning */}
             <DialogDescription className="sr-only">
               Detalhes e opções de personalização para {product.name}.
             </DialogDescription>
-          </div>
+          </DialogHeader>
         </div>
         
         <div className="p-6 space-y-4">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMercadoPagoPublicKey } from '@/hooks/use-mercado-pago-settings';
-import { initMercadoPago, CardPaymentBrick } from '@mercadopago/sdk-react';
+import * as MercadoPago from '@mercadopago/sdk-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -20,7 +20,7 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
   useEffect(() => {
     if (publicKey) {
       try {
-        initMercadoPago(publicKey, { locale: 'pt-BR' });
+        MercadoPago.initMercadoPago(publicKey, { locale: 'pt-BR' });
         setIsMpReady(true);
       } catch (e) {
         console.error("Erro ao inicializar Mercado Pago:", e);
@@ -93,7 +93,7 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
 
   return (
     <div className="mp-form-container">
-      <CardPaymentBrick
+      <MercadoPago.CardPaymentBrick
         initialization={initialization}
         customization={customization}
         onSubmit={onSubmit}
