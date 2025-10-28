@@ -1,11 +1,14 @@
-import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-export const FloatingCartButton = () => {
+interface FloatingCartButtonProps {
+  onClick: () => void;
+}
+
+export const FloatingCartButton = ({ onClick }: FloatingCartButtonProps) => {
   const { totalItems, subtotal } = useCart();
 
   if (totalItems === 0) {
@@ -15,8 +18,8 @@ export const FloatingCartButton = () => {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Link to="/checkout" className="fixed top-4 right-4 z-50">
-          <Button size="lg" className="relative h-14 w-14 rounded-full shadow-lg">
+        <div className="fixed top-4 right-4 z-50">
+          <Button size="lg" className="relative h-14 w-14 rounded-full shadow-lg" onClick={onClick}>
             <ShoppingCart className="h-6 w-6" />
             <Badge 
               variant="destructive" 
@@ -25,13 +28,13 @@ export const FloatingCartButton = () => {
               {totalItems}
             </Badge>
           </Button>
-        </Link>
+        </div>
       </TooltipTrigger>
       <TooltipContent>
         <p>
           Total: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}
         </p>
-        <p className="text-xs text-muted-foreground">Clique para finalizar o pedido</p>
+        <p className="text-xs text-muted-foreground">Clique para ver seu carrinho</p>
       </TooltipContent>
     </Tooltip>
   );

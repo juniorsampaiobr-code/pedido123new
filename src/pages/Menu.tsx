@@ -17,6 +17,7 @@ import { StoreClosedWarning } from '@/components/StoreClosedWarning';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { FloatingCartButton } from '@/components/FloatingCartButton';
+import { CartSidebar } from '@/components/CartSidebar';
 
 type Product = Tables<'products'>;
 type Restaurant = Tables<'restaurants'>;
@@ -91,6 +92,7 @@ const Menu = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
+  const [isCartSidebarOpen, setIsCartSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
@@ -180,6 +182,7 @@ const Menu = () => {
         isOpen={isWeightModalOpen}
         onClose={() => setIsWeightModalOpen(false)}
       />
+      <CartSidebar isOpen={isCartSidebarOpen} onOpenChange={setIsCartSidebarOpen} />
 
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         <header className="text-center mb-8">
@@ -245,7 +248,7 @@ const Menu = () => {
         </main>
       </div>
       
-      {isOpen && <FloatingCartButton />}
+      {isOpen && <FloatingCartButton onClick={() => setIsCartSidebarOpen(true)} />}
     </>
   );
 };
