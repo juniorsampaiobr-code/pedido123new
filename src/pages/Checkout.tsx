@@ -181,8 +181,7 @@ const Checkout = () => {
   
   const lat = form.watch('latitude');
   const lng = form.watch('longitude');
-  const addressFields = form.watch(['street', 'number', 'city', 'zip_code']);
-  const fullAddress = `${addressFields[0]}, ${addressFields[1]}, ${addressFields[2]} - ${addressFields[3]}`;
+  const addressFields = form.watch(['street', 'number', 'neighborhood', 'city', 'zip_code']);
 
   const markerPosition = useMemo((): [number, number] => {
     if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
@@ -279,12 +278,26 @@ const Checkout = () => {
       setDeliveryError(null);
 
       let customerCoords: [number, number] | null = null;
+      
+      // Se temos coordenadas explícitas (do mapa ou da busca por CEP)
       if (lat && lng) {
         customerCoords = [lat, lng];
-      } else {
-        const cleanedZip = cleanZipCode(addressFields[3]);
-        if (addressFields[0] && addressFields[1] && addressFields[2] && cleanedZip.length === 8) {
-          customerCoords = await geocodeAddress(fullAddress);
+      } 
+      // Se estamos no modo manual, tentamos geocodificar o endereço digitado
+      else if (addressInputMode === 'manual') {
+        const [street, number, neighborhood, city, zipCode] = addressFields;
+        if (street && number && neighborhood && city) {
+          const fullAddressForGeocode = `${street}, ${number}, ${neighborhood}, ${city}, ${zipCode}`;
+          customerCoords = await geocodeAddress(fullAddressForGeocode);
+        }
+      }
+      // Se estamos no modo de busca e temos CEP, tentamos geocodificar
+      else if (addressInputMode === 'search') {
+        const [street, number, neighborhood, city, zipCode] = addressFields;
+        const cleanedZip = cleanZipCode(zipCode);
+        if (street && number && neighborhood && city && cleanedZip.length === 8) {
+          const fullAddressForGeocode = `${street}, ${number}, ${neighborhood}, ${city}, ${zipCode}`;
+          customerCoords = await geocodeAddress(fullAddressForGeocode);
         }
       }
 
@@ -303,7 +316,8 @@ const Checkout = () => {
       } else {
         setDeliveryFee(0);
         setDeliveryTime(null);
-        if (addressFields.some(field => field.trim() !== '')) {
+        // Só mostra erro se os campos de endereço estiverem preenchidos
+        if (addressFields.some(field => field?.trim() !== '')) {
           setDeliveryError("Não foi possível localizar seu endereço para calcular a taxa.");
         }
       }
@@ -311,7 +325,7 @@ const Checkout = () => {
     };
 
     calculateFee();
-  }, [deliveryOption, restaurant, deliveryZones, fullAddress, lat, lng, setDeliveryFee]);
+  }, [deliveryOption, restaurant, deliveryZones, addressFields, lat, lng, setDeliveryFee, addressInputMode]);
 
   useEffect(() => {
     if (items.length === 0 && !isProcessingPayment) {
