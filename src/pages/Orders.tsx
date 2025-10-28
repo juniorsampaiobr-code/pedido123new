@@ -1,5 +1,4 @@
-import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -9,12 +8,13 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ShoppingCart, Terminal, RefreshCw, Clock, CheckCircle, XCircle, Truck, Package, Utensils, Check, X, DollarSign } from 'lucide-react';
-import { User } from '@supabase/supabase-js';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { OrderDetailsModal } from "@/components/OrderDetailsModal";
 import { toast } from "sonner";
 import { useSound } from "@/layouts/DashboardLayout";
+import { useOutletContext } from "react-router-dom";
+import { DashboardContextType } from "@/layouts/DashboardLayout";
 
 type Order = Tables<'orders'> & { customer: Tables<'customers'> | null };
 
@@ -111,19 +111,9 @@ const OrdersList = ({ status, onViewDetails, restaurantId }: { status: Enums<'or
 };
 
 const Orders = () => {
+  const { restaurant } = useOutletContext<DashboardContextType>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [restaurantId, setRestaurantId] = useState<string | null>(null);
-
-  useQuery({
-    queryKey: ['restaurantIdForOrdersPage'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('restaurants').select('id').limit(1).single();
-      if (error) throw new Error(error.message);
-      setRestaurantId(data.id);
-      return data.id;
-    },
-  });
 
   const handleViewDetails = (order: Order) => { setSelectedOrder(order); setIsModalOpen(true); };
   const handleCloseModal = () => { setIsModalOpen(false); setSelectedOrder(null); };
@@ -138,10 +128,10 @@ const Orders = () => {
     <>
       <OrderDetailsModal order={selectedOrder} isOpen={isModalOpen} onClose={handleCloseModal} />
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
-        {restaurantId ? (
+        {restaurant?.id ? (
           <Tabs defaultValue="pending">
             <TabsList className="w-full overflow-x-auto justify-start">{statusTabs.map(tab => <TabsTrigger key={tab.value} value={tab.value} className="whitespace-nowrap">{tab.label}</TabsTrigger>)}</TabsList>
-            {statusTabs.map(tab => <TabsContent key={tab.value} value={tab.value} className="mt-6"><OrdersList status={tab.value} onViewDetails={handleViewDetails} restaurantId={restaurantId} /></TabsContent>)}
+            {statusTabs.map(tab => <TabsContent key={tab.value} value={tab.value} className="mt-6"><OrdersList status={tab.value} onViewDetails={handleViewDetails} restaurantId={restaurant.id} /></TabsContent>)}
           </Tabs>
         ) : (
           <div className="text-center py-12"><Skeleton className="h-12 w-12 mx-auto mb-4" /><p>Carregando dados do restaurante...</p></div>
