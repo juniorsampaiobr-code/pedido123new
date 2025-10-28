@@ -71,13 +71,6 @@ const checkoutSchema = z.object({
 }).superRefine((data, ctx) => {
   // Validação para Delivery
   if (data.delivery_option === 'delivery') {
-    // Se o modo de entrada for manual, todos os campos são obrigatórios
-    // Se o modo de entrada for 'search', a validação é feita pela busca de CEP, mas os campos finais ainda precisam ser preenchidos.
-    // Como o formulário não tem acesso direto ao estado `addressInputMode`, vamos simplificar a validação aqui.
-    // A validação de CEP e endereço completo já está no schema, vamos garantir que os campos não estejam vazios.
-    
-    // Para garantir que a validação seja acionada, vamos verificar se os campos estão vazios.
-    // O Zod já garante que o zip_code tenha 8 dígitos se não for vazio.
     if (data.street.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Rua é obrigatória.', path: ['street'] });
     if (data.number.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Número é obrigatório.', path: ['number'] });
     if (data.neighborhood.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Bairro é obrigatório.', path: ['neighborhood'] });
@@ -207,8 +200,12 @@ const Checkout = () => {
     if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
       return [lat, lng];
     }
-    return [-23.55052, -46.633308]; // Default center
-  }, [lat, lng]);
+    // Se não houver coordenadas, usa as coordenadas do restaurante como fallback para o mapa
+    if (restaurant?.latitude && restaurant?.longitude) {
+      return [restaurant.latitude, restaurant.longitude];
+    }
+    return [-23.55052, -46.633308]; // Default center (São Paulo)
+  }, [lat, lng, restaurant]);
 
   const updateAddressFields = useCallback((address: any) => {
     form.setValue('street', address.road || address.logradouro || '', { shouldValidate: true });
@@ -297,15 +294,18 @@ const Checkout = () => {
     setDeliveryError(null);
     setDeliveryTime(null);
     
-    // Limpar campos de endereço ao mudar de modo, exceto se for para 'manual' e já houver dados
+    // Limpar campos de busca de CEP ao mudar para manual
+    if (addressInputMode === 'manual') {
+      setSearchCep('');
+      setSearchNumber('');
+    }
+    // Limpar campos de endereço ao mudar para busca de CEP
     if (addressInputMode === 'search') {
       form.setValue('street', '');
       form.setValue('number', '');
       form.setValue('neighborhood', '');
       form.setValue('city', '');
       form.setValue('zip_code', '');
-      setSearchCep('');
-      setSearchNumber('');
     }
   }, [addressInputMode, form, setDeliveryFee]);
 
@@ -329,10 +329,11 @@ const Checkout = () => {
       if (lat && lng) {
         customerCoords = [lat, lng];
       } 
-      // 2. Se não houver coordenadas, tenta geocodificar o endereço completo digitado manualmente
-      else if (addressInputMode === 'manual') {
+      // 2. Se não houver coordenadas, tenta geocodificar o endereço completo
+      else {
         const [street, number, neighborhood, city, zipCode] = addressFields;
-        const isAddressComplete = street && number && neighborhood && city && cleanZipCode(zipCode).length === 8;
+        const cleanedZip = cleanZipCode(zipCode);
+        const isAddressComplete = street && number && neighborhood && city && cleanedZip.length === 8;
         
         if (isAddressComplete) {
           const fullAddressForGeocode = `${street}, ${number}, ${neighborhood}, ${city}, ${zipCode}`;
@@ -346,23 +347,6 @@ const Checkout = () => {
           }
         }
       }
-      // 3. Se estiver no modo de busca, mas sem coordenadas (ex: falha na geocodificação inicial), tenta geocodificar o endereço preenchido
-      else if (addressInputMode === 'search') {
-        const [street, number, neighborhood, city, zipCode] = addressFields;
-        const cleanedZip = cleanZipCode(zipCode);
-        const isAddressComplete = street && number && neighborhood && city && cleanedZip.length === 8;
-
-        if (isAddressComplete) {
-          const fullAddressForGeocode = `${street}, ${number}, ${neighborhood}, ${city}, ${zipCode}`;
-          customerCoords = await geocodeAddress(fullAddressForGeocode);
-          
-          if (customerCoords) {
-            form.setValue('latitude', customerCoords[0]);
-            form.setValue('longitude', customerCoords[1]);
-            setShowMap(true);
-          }
-        }
-      }
 
       if (customerCoords) {
         const restaurantCoords: [number, number] = [restaurant.latitude, restaurant.longitude];
@@ -370,6 +354,7 @@ const Checkout = () => {
 
         if (feeResult) {
           setDeliveryFee(feeResult.fee);
+          setDeliveryError(null); // Limpa o erro se a taxa for calculada
           setDeliveryTime({ minTime: feeResult.minTime, maxTime: feeResult.maxTime });
         } else {
           setDeliveryFee(0);
@@ -379,12 +364,21 @@ const Checkout = () => {
       } else {
         setDeliveryFee(0);
         setDeliveryTime(null);
-        // Mostra erro se a entrega estiver selecionada e o endereço estiver preenchido, mas sem coordenadas
-        const [street, number, neighborhood, city, zipCode] = addressFields;
-        const isAddressAttempted = street || number || neighborhood || city || cleanZipCode(zipCode).length > 0;
         
+        const [street, number, neighborhood, city, zipCode] = addressFields;
+        const isAddressAttempted = street && number && neighborhood && city && cleanZipCode(zipCode).length === 8;
+        
+        // Se o endereço estiver completo, mas a geocodificação falhou, mostra o mapa para ajuste manual
         if (isDeliverySelected && isAddressAttempted) {
           setDeliveryError("Não foi possível localizar seu endereço para calcular a taxa. Por favor, verifique o endereço ou ajuste o pino no mapa.");
+          
+          // Se a geocodificação falhou, mas o endereço está completo, mostramos o mapa
+          // usando as coordenadas do restaurante como ponto de partida para o usuário ajustar.
+          if (restaurant?.latitude && restaurant?.longitude) {
+            form.setValue('latitude', restaurant.latitude);
+            form.setValue('longitude', restaurant.longitude);
+            setShowMap(true);
+          }
         } else {
           setDeliveryError(null);
         }
