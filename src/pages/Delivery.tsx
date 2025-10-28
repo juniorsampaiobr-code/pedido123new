@@ -21,7 +21,6 @@ import {
 } from '@/components/ui/form';
 import { useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { DeliveryZoneEditorMap } from '@/components/DeliveryZoneEditorMap';
 
 type DeliveryZone = Tables<'delivery_zones'>;
 type Restaurant = Tables<'restaurants'>;
@@ -101,10 +100,6 @@ const Delivery = () => {
     name: "zones",
   });
 
-  // Memoizar os valores observados do formulário
-  const watchedZones = useMemo(() => zonesForm.watch('zones'), [zonesForm]);
-  const memoizedWatchedZones = useMemo(() => watchedZones, [watchedZones]);
-
   const DEFAULT_CENTER: [number, number] = useMemo(() => {
     if (typeof restaurant?.latitude === 'number' && typeof restaurant?.longitude === 'number') {
       return [restaurant.latitude, restaurant.longitude];
@@ -145,6 +140,8 @@ const Delivery = () => {
         is_active: true,
       }));
 
+      // Estratégia: Deletar todas as zonas existentes e inserir as novas.
+      // Isso garante que as zonas removidas pelo usuário sejam realmente excluídas.
       const { error: deleteError } = await supabase
         .from('delivery_zones')
         .delete()
@@ -169,17 +166,6 @@ const Delivery = () => {
     zonesMutation.mutate(data);
   };
 
-  // Memoizar as funções de callback
-  const handleZoneRadiusChange = useCallback((index: number, newRadiusKm: number) => {
-    zonesForm.setValue(`zones.${index}.max_distance_km`, parseFloat(newRadiusKm.toFixed(2)));
-  }, [zonesForm]);
-
-  const handleZoneCenterChange = useCallback((index: number, lat: number, lng: number) => {
-    zonesForm.setValue(`zones.${index}.center_latitude`, lat);
-    zonesForm.setValue(`zones.${index}.center_longitude`, lng);
-    toast.info(`Centro da Zona ${index + 1} movido.`);
-  }, [zonesForm]);
-
   const handleNewZone = useCallback(() => {
     appendZone({ 
       name: `Nova Zona ${zoneFields.length + 1}`, 
@@ -190,231 +176,186 @@ const Delivery = () => {
     });
   }, [appendZone, zoneFields.length, DEFAULT_CENTER]);
 
-  const handleMapClick = useCallback((lat: number, lng: number) => {
-    if (!restaurant?.latitude || !restaurant?.longitude) {
-      toast.warning("Configure as coordenadas do restaurante em Configurações primeiro.");
-      return;
-    }
-
-    appendZone({ 
-      name: `Zona ${zoneFields.length + 1} (Clique)`, 
-      delivery_fee: 5.00, 
-      max_distance_km: 1,
-      center_latitude: lat,
-      center_longitude: lng,
-    });
-    toast.info(`Nova zona de entrega adicionada no local do clique.`);
-  }, [restaurant?.latitude, restaurant?.longitude, appendZone, zoneFields.length]);
-
   const hasCoordinates = restaurant?.latitude && restaurant?.longitude;
-  const restaurantCenter: [number, number] = DEFAULT_CENTER;
 
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
-        <div className="lg:sticky top-24 h-fit">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold">Mapa de Cobertura</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Visualize as faixas de entrega em tempo real. Arraste o pino central para mover a zona e a borda do círculo para redimensionar o raio.
-                <br />
-                <span className="font-semibold text-primary">Dica: Clique em qualquer lugar do mapa para adicionar uma nova zona.</span>
-              </p>
-            </CardHeader>
-            <CardContent>
-              {isLoadingRestaurant ? (
-                <Skeleton className="h-96 w-full" />
-              ) : hasCoordinates ? (
-                <DeliveryZoneEditorMap 
-                  restaurantCenter={restaurantCenter} 
-                  zones={memoizedWatchedZones as DeliveryZone[]} 
-                  onZoneRadiusChange={handleZoneRadiusChange}
-                  onZoneCenterChange={handleZoneCenterChange}
-                  onMapClick={handleMapClick}
-                />
-              ) : (
-                <Alert>
-                  <Settings className="h-4 w-4" />
-                  <AlertTitle>Endereço Não Configurado</AlertTitle>
-                  <AlertDescription>
-                    Para visualizar o mapa de entrega, primeiro configure o endereço e as coordenadas do seu restaurante na página de Configurações.
-                    <Link to="/settings">
-                      <Button variant="link" className="p-0 h-auto mt-2">Ir para Configurações</Button>
-                    </Link>
-                  </AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold">Zonas de Entrega</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Defina a taxa de entrega com base na distância máxima em quilômetros (km) a partir do centro de cada zona.
-              </p>
-            </CardHeader>
-            <CardContent>
-              {isLoadingZones ? (
-                <div className="space-y-4">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-12 w-full mt-4" />
-                </div>
-              ) : isErrorZones ? (
-                <Alert variant="destructive">
-                  <Terminal className="h-4 w-4" />
-                  <AlertTitle>Erro ao carregar zonas de entrega</AlertTitle>
-                  <AlertDescription>{errorZones instanceof Error ? errorZones.message : "Ocorreu um erro desconhecido."}</AlertDescription>
-                </Alert>
-              ) : (
-                <Form {...zonesForm}>
-                  <form onSubmit={zonesForm.handleSubmit(handleZonesSubmit)} className="space-y-6">
-                    
-                    {zoneFields.map((field, index) => (
-                      <div key={field.id} className="border p-4 rounded-lg space-y-4 relative">
-                        <h4 className="font-semibold text-lg">Zona {index + 1}</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <FormField
-                            control={zonesForm.control}
-                            name={`zones.${index}.name`}
-                            render={({ field: nameField }) => (
-                              <FormItem className="md:col-span-1">
-                                <FormLabel>Nome da Zona *</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    placeholder="Ex: Até 2km" 
-                                    {...nameField} 
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={zonesForm.control}
-                            name={`zones.${index}.max_distance_km`}
-                            render={({ field: distanceField }) => (
-                              <FormItem className="md:col-span-1">
-                                <FormLabel>Distância (km) *</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    type="number" 
-                                    step="0.1" 
-                                    placeholder="2" 
-                                    {...distanceField} 
-                                    value={distanceField.value === undefined || distanceField.value === null ? '' : String(distanceField.value)}
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      const numericValue = value === '' ? '' : parseFloat(value.replace(',', '.'));
-                                      distanceField.onChange(numericValue);
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={zonesForm.control}
-                            name={`zones.${index}.delivery_fee`}
-                            render={({ field: feeField }) => (
-                              <FormItem className="md:col-span-1">
-                                <FormLabel>Taxa (R$) *</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    type="number" 
-                                    step="0.01" 
-                                    placeholder="4,00" 
-                                    {...feeField} 
-                                    value={feeField.value === undefined || feeField.value === null ? '' : String(feeField.value)}
-                                    onChange={(e) => feeField.onChange(e.target.value)}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField
-                                control={zonesForm.control}
-                                name={`zones.${index}.center_latitude`}
-                                render={({ field: latField }) => (
-                                    <FormItem>
-                                        <FormLabel>Latitude Central</FormLabel>
-                                        <FormControl>
-                                            <Input 
-                                                type="number" 
-                                                step="any" 
-                                                placeholder="Latitude" 
-                                                {...latField} 
-                                                value={latField.value === undefined || latField.value === null ? '' : String(latField.value)}
-                                                onChange={(e) => latField.onChange(e.target.value)}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={zonesForm.control}
-                                name={`zones.${index}.center_longitude`}
-                                render={({ field: lngField }) => (
-                                    <FormItem>
-                                        <FormLabel>Longitude Central</FormLabel>
-                                        <FormControl>
-                                            <Input 
-                                                type="number" 
-                                                step="any" 
-                                                placeholder="Longitude" 
-                                                {...lngField} 
-                                                value={lngField.value === undefined || lngField.value === null ? '' : String(lngField.value)}
-                                                onChange={(e) => lngField.onChange(e.target.value)}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-                        <Button 
-                          type="button" 
-                          variant="destructive" 
-                          size="icon" 
-                          className="absolute top-4 right-4"
-                          onClick={() => removeZone(index)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+      <div className="max-w-3xl mx-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold">Zonas de Entrega</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Defina a taxa de entrega com base na distância máxima em quilômetros (km) a partir do centro de cada zona.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {isLoadingZones || isLoadingRestaurant ? (
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-12 w-full mt-4" />
+              </div>
+            ) : isErrorZones ? (
+              <Alert variant="destructive">
+                <Terminal className="h-4 w-4" />
+                <AlertTitle>Erro ao carregar zonas de entrega</AlertTitle>
+                <AlertDescription>{errorZones instanceof Error ? errorZones.message : "Ocorreu um erro desconhecido."}</AlertDescription>
+              </Alert>
+            ) : !hasCoordinates ? (
+              <Alert>
+                <Settings className="h-4 w-4" />
+                <AlertTitle>Endereço Não Configurado</AlertTitle>
+                <AlertDescription>
+                  Para configurar zonas de entrega baseadas em distância, primeiro configure o endereço e as coordenadas do seu restaurante na página de Configurações.
+                  <Link to="/settings">
+                    <Button variant="link" className="p-0 h-auto mt-2">Ir para Configurações</Button>
+                  </Link>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Form {...zonesForm}>
+                <form onSubmit={zonesForm.handleSubmit(handleZonesSubmit)} className="space-y-6">
+                  
+                  {zoneFields.map((field, index) => (
+                    <div key={field.id} className="border p-4 rounded-lg space-y-4 relative">
+                      <h4 className="font-semibold text-lg">Zona {index + 1}</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <FormField
+                          control={zonesForm.control}
+                          name={`zones.${index}.name`}
+                          render={({ field: nameField }) => (
+                            <FormItem className="md:col-span-1">
+                              <FormLabel>Nome da Zona *</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Ex: Até 2km" 
+                                  {...nameField} 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={zonesForm.control}
+                          name={`zones.${index}.max_distance_km`}
+                          render={({ field: distanceField }) => (
+                            <FormItem className="md:col-span-1">
+                              <FormLabel>Distância (km) *</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  step="0.1" 
+                                  placeholder="2" 
+                                  {...distanceField} 
+                                  value={distanceField.value === undefined || distanceField.value === null ? '' : String(distanceField.value)}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    const numericValue = value === '' ? '' : parseFloat(value.replace(',', '.'));
+                                    distanceField.onChange(numericValue);
+                                  }}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={zonesForm.control}
+                          name={`zones.${index}.delivery_fee`}
+                          render={({ field: feeField }) => (
+                            <FormItem className="md:col-span-1">
+                              <FormLabel>Taxa (R$) *</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  type="number" 
+                                  step="0.01" 
+                                  placeholder="4,00" 
+                                  {...feeField} 
+                                  value={feeField.value === undefined || feeField.value === null ? '' : String(feeField.value)}
+                                  onChange={(e) => feeField.onChange(e.target.value)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       </div>
-                    ))}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                              control={zonesForm.control}
+                              name={`zones.${index}.center_latitude`}
+                              render={({ field: latField }) => (
+                                  <FormItem>
+                                      <FormLabel>Latitude Central</FormLabel>
+                                      <FormControl>
+                                          <Input 
+                                              type="number" 
+                                              step="any" 
+                                              placeholder="Latitude" 
+                                              {...latField} 
+                                              value={latField.value === undefined || latField.value === null ? '' : String(latField.value)}
+                                              onChange={(e) => latField.onChange(e.target.value)}
+                                          />
+                                      </FormControl>
+                                      <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                          <FormField
+                              control={zonesForm.control}
+                              name={`zones.${index}.center_longitude`}
+                              render={({ field: lngField }) => (
+                                  <FormItem>
+                                      <FormLabel>Longitude Central</FormLabel>
+                                      <FormControl>
+                                          <Input 
+                                              type="number" 
+                                              step="any" 
+                                              placeholder="Longitude" 
+                                              {...lngField} 
+                                              value={lngField.value === undefined || lngField.value === null ? '' : String(lngField.value)}
+                                              onChange={(e) => lngField.onChange(e.target.value)}
+                                          />
+                                      </FormControl>
+                                      <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                      </div>
+                      <Button 
+                        type="button" 
+                        variant="destructive" 
+                        size="icon" 
+                        className="absolute top-4 right-4"
+                        onClick={() => removeZone(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
 
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={handleNewZone}
-                    >
-                      <Plus className="mr-2 h-4 w-4" /> Adicionar Nova Zona (Centro do Restaurante)
-                    </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={handleNewZone}
+                  >
+                    <Plus className="mr-2 h-4 w-4" /> Adicionar Nova Zona (Centro do Restaurante)
+                  </Button>
 
-                    <Button 
-                      type="submit" 
-                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg mt-6"
-                      disabled={zonesMutation.isPending}
-                    >
-                      {zonesMutation.isPending ? 'Salvando...' : 'Salvar Zonas de Entrega'}
-                    </Button>
-                  </form>
-                </Form>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg mt-6"
+                    disabled={zonesMutation.isPending}
+                  >
+                    {zonesMutation.isPending ? 'Salvando...' : 'Salvar Zonas de Entrega'}
+                  </Button>
+                </form>
+              </Form>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </main>
   );
