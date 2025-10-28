@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, Suspense } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -32,7 +32,17 @@ import { ZipCodeInput } from '@/components/ZipCodeInput';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
 import { geocodeAddress, calculateDeliveryFee } from '@/utils/location';
 import { LocationPickerMap } from '@/components/LocationPickerMap';
-import { MercadoPagoForm } from '@/components/MercadoPagoForm'; // Importando o novo componente
+
+// Componente de fallback para o MercadoPagoForm
+const MercadoPagoFormFallback = () => (
+  <div className="flex items-center justify-center p-8">
+    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+    Carregando formulário de pagamento...
+  </div>
+);
+
+// Componente MercadoPagoForm carregado dinamicamente
+const MercadoPagoForm = React.lazy(() => import('@/components/MercadoPagoForm'));
 
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
@@ -53,7 +63,7 @@ const checkoutSchema = z.object({
   }),
   street: z.string().optional().default(''),
   number: z.string().optional().default(''),
-  complement: z.string().optional().default(''), // Novo campo
+  complement: z.string().optional().default(''),
   neighborhood: z.string().optional().default(''),
   city: z.string().optional().default(''),
   zip_code: z.string().optional().default('').transform(cleanZipCode).refine(val => val.length === 8 || val.length === 0, {
@@ -71,7 +81,6 @@ const checkoutSchema = z.object({
     z.coerce.number().optional().nullable(),
   ),
 }).superRefine((data, ctx) => {
-  // Validação para Delivery
   if (data.delivery_option === 'delivery') {
     if (data.street.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Rua é obrigatória.', path: ['street'] });
     if (data.number.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Número é obrigatório.', path: ['number'] });
@@ -158,7 +167,8 @@ const Checkout = () => {
   const [isSearchingCep, setIsSearchingCep] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [addressInputMode, setAddressInputMode] = useState<'search' | 'manual'>('search');
-  const [mpPaymentData, setMpPaymentData] = useState<any>(null); // Estado para dados do cartão/pagamento MP
+  const [mpPaymentData, setMpPaymentData] = useState<any>(null);
+  const [isMpFormVisible, setIsMpFormVisible] = useState(false); // Controla a visibilidade do formulário MP
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['checkoutInitialData'],
@@ -180,19 +190,17 @@ const Checkout = () => {
   const deliveryOption = form.watch('delivery_option');
   const selectedPaymentMethodId = form.watch('payment_method_id');
   const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
-  const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online'; // Apenas cartão/online
-  const isPixPayment = selectedPaymentMethod?.name === 'PIX'; // PIX ainda usa o fluxo de redirecionamento
-  const isCardPayment = isOnlinePayment; // Usaremos o Brick para Pagamento Online
+  const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online';
+  const isPixPayment = selectedPaymentMethod?.name === 'PIX';
+  const isCardPayment = isOnlinePayment;
   const isCashPayment = selectedPaymentMethod?.name === 'Dinheiro';
   
   const lat = form.watch('latitude');
   const lng = form.watch('longitude');
   const addressFields = form.watch(['street', 'number', 'complement', 'neighborhood', 'city', 'zip_code']);
   
-  // Variável que estava causando o erro de referência
   const isDeliverySelected = deliveryOption === 'delivery';
 
-  // Variável de controle para o useEffect de cálculo de taxa
   const addressTrigger = JSON.stringify({ 
     mode: addressInputMode, 
     fields: addressFields, 
@@ -205,17 +213,16 @@ const Checkout = () => {
     if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
       return [lat, lng];
     }
-    // Se não houver coordenadas, usa as coordenadas do restaurante como fallback para o mapa
     if (restaurant?.latitude && restaurant?.longitude) {
       return [restaurant.latitude, restaurant.longitude];
     }
-    return [-23.55052, -46.633308]; // Default center (São Paulo)
+    return [-23.55052, -46.633308];
   }, [lat, lng, restaurant]);
 
   const updateAddressFields = useCallback((address: any) => {
     form.setValue('street', address.road || address.logradouro || '', { shouldValidate: true });
     form.setValue('number', address.house_number || searchNumber || '', { shouldValidate: true });
-    form.setValue('complement', address.suburb || '', { shouldValidate: true }); // Complemento pode vir do bairro em alguns casos, mas vamos deixar vazio por padrão
+    form.setValue('complement', address.suburb || '', { shouldValidate: true });
     form.setValue('neighborhood', address.suburb || address.bairro || '', { shouldValidate: true });
     form.setValue('city', address.city || address.localidade || '', { shouldValidate: true });
     form.setValue('zip_code', address.postcode || address.cep || '', { shouldValidate: true });
@@ -242,7 +249,7 @@ const Checkout = () => {
 
       form.setValue('street', data.logradouro, { shouldValidate: true });
       form.setValue('number', searchNumber, { shouldValidate: true });
-      form.setValue('complement', '', { shouldValidate: true }); // Limpa complemento na busca por CEP
+      form.setValue('complement', '', { shouldValidate: true });
       form.setValue('neighborhood', data.bairro, { shouldValidate: true });
       form.setValue('city', data.localidade, { shouldValidate: true });
       form.setValue('zip_code', data.cep, { shouldValidate: true });
@@ -256,7 +263,6 @@ const Checkout = () => {
         setShowMap(true);
         toast.success("Endereço encontrado e mapa atualizado!");
       } else {
-        // Se não encontrar coordenadas, limpa lat/lng para evitar cálculo incorreto
         form.setValue('latitude', null, { shouldValidate: true });
         form.setValue('longitude', null, { shouldValidate: true });
         toast.warning("Endereço encontrado, mas não foi possível obter as coordenadas. Ajuste o pino no mapa manualmente.");
@@ -270,8 +276,6 @@ const Checkout = () => {
     }
   };
 
-  // No checkout, o cliente não deve poder mover o pino, então esta função não será usada pelo mapa,
-  // mas é mantida para consistência caso o mapa seja reativado para interação.
   const handleMapLocationChange = useCallback(async (newLat: number, newLng: number) => {
     form.setValue('latitude', newLat, { shouldValidate: true });
     form.setValue('longitude', newLng, { shouldValidate: true });
@@ -294,7 +298,6 @@ const Checkout = () => {
     }
   }, [form, updateAddressFields]);
 
-  // Efeito para limpar coordenadas ao mudar o modo de entrada
   useEffect(() => {
     form.setValue('latitude', null);
     form.setValue('longitude', null);
@@ -302,26 +305,22 @@ const Checkout = () => {
     setDeliveryFee(0);
     setDeliveryError(null);
     setDeliveryTime(null);
-    setMpPaymentData(null); // Limpa dados de pagamento ao mudar o modo
+    setMpPaymentData(null);
     
-    // Limpar campos de busca de CEP ao mudar para manual
     if (addressInputMode === 'manual') {
       setSearchCep('');
       setSearchNumber('');
     }
-    // Limpar campos de endereço ao mudar para busca de CEP
     if (addressInputMode === 'search') {
       form.setValue('street', '');
       form.setValue('number', '');
-      form.setValue('complement', ''); // Limpa complemento
+      form.setValue('complement', '');
       form.setValue('neighborhood', '');
       form.setValue('city', '');
       form.setValue('zip_code', '');
     }
   }, [addressInputMode, form, setDeliveryFee]);
 
-
-  // Efeito para calcular a taxa de entrega
   useEffect(() => {
     const calculateFee = async () => {
       if (deliveryOption === 'pickup' || !restaurant?.latitude || !restaurant?.longitude) {
@@ -336,23 +335,18 @@ const Checkout = () => {
 
       let customerCoords: [number, number] | null = null;
       
-      // 1. Tenta usar coordenadas existentes (do mapa ou busca por CEP)
       if (lat && lng) {
         customerCoords = [lat, lng];
-      } 
-      // 2. Se não houver coordenadas, tenta geocodificar o endereço completo
-      else {
+      } else {
         const [street, number, complement, neighborhood, city, zipCode] = addressFields;
         const cleanedZip = cleanZipCode(zipCode);
         const isAddressComplete = street && number && neighborhood && city && cleanedZip.length === 8;
         
         if (isAddressComplete) {
-          // Tenta geocodificar o endereço completo
           const fullAddress = `${street}, ${number} ${complement}, ${neighborhood}, ${city}, ${zipCode}`;
           customerCoords = await geocodeAddress(fullAddress);
           
           if (customerCoords) {
-            // Atualiza o formulário com as coordenadas encontradas
             form.setValue('latitude', customerCoords[0]);
             form.setValue('longitude', customerCoords[1]);
             setShowMap(true);
@@ -366,7 +360,7 @@ const Checkout = () => {
 
         if (feeResult) {
           setDeliveryFee(feeResult.fee);
-          setDeliveryError(null); // Limpa o erro se a taxa for calculada
+          setDeliveryError(null);
           setDeliveryTime({ minTime: feeResult.minTime, maxTime: feeResult.maxTime });
         } else {
           setDeliveryFee(0);
@@ -380,12 +374,9 @@ const Checkout = () => {
         const [street, number, complement, neighborhood, city, zipCode] = addressFields;
         const isAddressAttempted = street && number && neighborhood && city && cleanZipCode(zipCode).length === 8;
         
-        // Se o endereço estiver completo, mas a geocodificação falhou, mostra o mapa para ajuste manual
         if (isDeliverySelected && isAddressAttempted) {
           setDeliveryError("Não foi possível localizar seu endereço para calcular a taxa. Por favor, verifique o endereço ou ajuste o pino no mapa.");
           
-          // Se a geocodificação falhou, mas o endereço está completo, mostramos o mapa
-          // usando as coordenadas do restaurante como ponto de partida para o usuário ajustar.
           if (restaurant?.latitude && restaurant?.longitude) {
             form.setValue('latitude', restaurant.latitude);
             form.setValue('longitude', restaurant.longitude);
@@ -398,7 +389,6 @@ const Checkout = () => {
       setIsCalculatingFee(false);
     };
 
-    // Adicionamos um pequeno debounce para evitar chamadas excessivas da API de geocodificação
     const timeoutId = setTimeout(() => {
       calculateFee();
     }, 500); 
@@ -422,10 +412,19 @@ const Checkout = () => {
     }
   }, [paymentMethods, selectedPaymentMethodId, form]);
 
-  // Limpa os dados de pagamento do MP se o método mudar
   useEffect(() => {
     if (!isCardPayment) {
       setMpPaymentData(null);
+      setIsMpFormVisible(false);
+    }
+  }, [isCardPayment]);
+
+  // Efeito para controlar a visibilidade do formulário MP
+  useEffect(() => {
+    if (isCardPayment) {
+      setIsMpFormVisible(true);
+    } else {
+      setIsMpFormVisible(false);
     }
   }, [isCardPayment]);
 
@@ -461,7 +460,6 @@ const Checkout = () => {
         customerId = newCustomer.id;
       }
 
-      // 1. Cria o pedido no Supabase
       const orderStatus = (isCardPayment || isPixPayment) ? 'pending_payment' : 'pending';
       const { data: newOrder, error: orderError } = await supabase.from('orders').insert({
         restaurant_id: restaurant.id, customer_id: customerId, status: orderStatus as Enums<'order_status'>,
@@ -479,14 +477,12 @@ const Checkout = () => {
       const { error: itemsError } = await supabase.from('order_items').insert(itemsInsert);
       if (itemsError) throw new Error(`Erro ao adicionar itens do pedido: ${itemsError.message}`);
 
-      // 2. Processamento de Pagamento Online
       if (isCardPayment) {
         if (!mpPaymentData) throw new Error("Dados de pagamento do cartão não fornecidos.");
         
         setIsProcessingPayment(true);
         toast.info("Processando pagamento com cartão...");
 
-        // Chamar a nova Edge Function para processar o pagamento com o token
         const { data: paymentResult, error: paymentError } = await supabase.functions.invoke('process-mp-payment', {
           body: { 
             orderId, 
@@ -498,21 +494,17 @@ const Checkout = () => {
 
         if (paymentError) throw new Error(paymentError.message);
         
-        // Se o pagamento for aprovado, atualizamos o status do pedido
         if (paymentResult.status === 'approved') {
           const { error: updateError } = await supabase.from('orders').update({ status: 'confirmed' }).eq('id', orderId);
           if (updateError) throw new Error(`Erro ao confirmar pedido após pagamento: ${updateError.message}`);
           toast.success("Pagamento aprovado e pedido confirmado!");
           navigate(`/order-success/${orderId}`);
         } else {
-          // Se o pagamento for rejeitado ou pendente, redirecionamos para a página de sucesso
-          // mas o status do pedido permanece 'pending_payment' ou é atualizado para 'cancelled'
           toast.warning(`Pagamento ${paymentResult.status}. Redirecionando para acompanhamento.`);
           navigate(`/order-success/${orderId}?status=${paymentResult.status}`);
         }
         
       } else if (isPixPayment) {
-        // Fluxo PIX/Redirecionamento (mantido)
         setIsProcessingPayment(true);
         toast.info("Redirecionando para o pagamento PIX...");
         const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
@@ -538,12 +530,7 @@ const Checkout = () => {
   });
 
   const onSubmit = (data: CheckoutFormValues) => {
-    // Se for pagamento com cartão, o Brick já submeteu os dados para o MP e chamou setMpPaymentData.
-    // A submissão final do formulário só deve ocorrer se não for pagamento com cartão,
-    // ou se os dados do cartão já foram coletados (mpPaymentData está preenchido).
     if (isCardPayment && !mpPaymentData) {
-      // Se for pagamento com cartão, o botão de submissão deve ser desabilitado
-      // e a submissão deve ser feita pelo Brick.
       toast.warning("Por favor, preencha os dados do cartão.");
       return;
     }
@@ -562,10 +549,6 @@ const Checkout = () => {
 
   const isSubmitting = orderMutation.isPending || isProcessingPayment || isCalculatingFee;
   const isDeliveryValid = !isDeliverySelected || (!deliveryError && deliveryFee >= 0);
-  
-  // O botão de submissão só deve ser habilitado se:
-  // 1. Não for pagamento com cartão (isCardPayment é false)
-  // 2. OU for pagamento com cartão E os dados do MP já foram coletados (mpPaymentData existe)
   const isSubmitButtonEnabled = !isSubmitting && isDeliveryValid && (!isCardPayment || mpPaymentData);
 
   return (
@@ -630,21 +613,24 @@ const Checkout = () => {
                   <CardContent className="space-y-4">
                     <FormField control={form.control} name="payment_method_id" render={({ field }) => (<FormItem className="space-y-3"><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-col space-y-2">{paymentMethods.map(method => { const Icon = getIconComponent(method.icon || 'Store'); return (<FormItem key={method.id} className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value={method.id} /></FormControl><Icon className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">{method.name}<span className="block text-xs text-muted-foreground">{method.description}</span></FormLabel></FormItem>);})}</RadioGroup></FormControl><FormMessage /></FormItem>)} />
                     
-                    {/* Formulário de Cartão de Crédito Mercado Pago */}
-                    {isCardPayment && (
+                    {/* Formulário de Cartão de Crédito Mercado Pago - Carregado dinamicamente */}
+                    {isMpFormVisible && (
                       <div className="space-y-4 pt-4 border-t">
                         <h3 className="font-semibold flex items-center gap-2"><CreditCard className="h-4 w-4" /> Dados do Cartão</h3>
-                        <MercadoPagoForm 
-                          totalAmount={total}
-                          onPaymentSuccess={(data) => {
-                            setMpPaymentData(data);
-                            toast.success("Dados do cartão validados. Clique em 'Finalizar Pedido' para processar.");
-                          }}
-                          onPaymentError={(error) => {
-                            setMpPaymentData(null);
-                            toast.error("Erro ao validar cartão. Verifique os dados.");
-                          }}
-                        />
+                        <Suspense fallback={<MercadoPagoFormFallback />}>
+                          <MercadoPagoForm 
+                            totalAmount={total}
+                            onPaymentSuccess={(data) => {
+                              setMpPaymentData(data);
+                              toast.success("Dados do cartão validados. Clique em 'Finalizar Pedido' para processar.");
+                            }}
+                            onPaymentError={(error) => {
+                              setMpPaymentData(null);
+                              toast.error("Erro ao validar cartão. Verifique os dados.");
+                              console.error("Erro no MercadoPagoForm:", error);
+                            }}
+                          />
+                        </Suspense>
                       </div>
                     )}
 
