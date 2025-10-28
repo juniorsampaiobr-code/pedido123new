@@ -74,16 +74,17 @@ export const calculateDeliveryFee = (
   const zone = deliveryZones.find(z => distance <= z.max_distance_km);
 
   if (zone) {
-    // Calcular a taxa total: Taxa Fixa + (Distância * Taxa por km)
+    // A taxa é apenas a taxa fixa da zona (delivery_fee)
     const fixedFee = zone.delivery_fee || 0;
-    const pricePerKm = zone.price_per_km || 0;
     
-    const calculatedFee = fixedFee + (distance * pricePerKm);
+    // Como removemos max_delivery_time_minutes, vamos usar um valor fixo ou o min_delivery_time_minutes + 15
+    const minTime = zone.min_delivery_time_minutes || 0;
+    const maxTime = minTime + 15; // Estimativa simples
 
     return { 
-      fee: parseFloat(calculatedFee.toFixed(2)),
-      minTime: zone.min_delivery_time_minutes || 0,
-      maxTime: zone.max_delivery_time_minutes || 0,
+      fee: parseFloat(fixedFee.toFixed(2)),
+      minTime: minTime,
+      maxTime: maxTime,
     };
   }
 

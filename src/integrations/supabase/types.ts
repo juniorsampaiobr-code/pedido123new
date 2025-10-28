@@ -188,9 +188,8 @@ export type Database = {
           id: string
           is_active: boolean | null
           max_distance_km: number | null
-          price_per_km: number | null
-          restaurant_id: string
           updated_at: string | null
+          restaurant_id: string
         }
         Insert: {
           center_latitude?: number | null
@@ -200,9 +199,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           max_distance_km?: number | null
-          price_per_km?: number | null
-          restaurant_id: string
           updated_at?: string | null
+          restaurant_id: string
         }
         Update: {
           center_latitude?: number | null
@@ -212,9 +210,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           max_distance_km?: number | null
-          price_per_km?: number | null
-          restaurant_id?: string
           updated_at?: string | null
+          restaurant_id?: string
         }
         Relationships: [
           {
