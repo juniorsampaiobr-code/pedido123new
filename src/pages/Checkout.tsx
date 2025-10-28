@@ -234,7 +234,7 @@ const Checkout = () => {
         toast.info('Seu carrinho está vazio. Adicione itens para continuar.');
         navigate('/menu');
       }, 0);
-      return () => clearTimeout(timer;
+      return () => clearTimeout(timer);
     }
   }, [items.length, navigate, isProcessingPayment]);
 
