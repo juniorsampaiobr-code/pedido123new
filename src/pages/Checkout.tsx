@@ -32,7 +32,7 @@ import { ZipCodeInput } from '@/components/ZipCodeInput';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
 import { geocodeAddress, calculateDeliveryFee } from '@/utils/location';
 import { LocationPickerMap } from '@/components/LocationPickerMap';
-import { MercadoPagoForm } from '@/components/MercadoPagoForm';
+// import { MercadoPagoForm } from '@/components/MercadoPagoForm'; // REMOVIDO
 
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
@@ -133,9 +133,12 @@ const fetchInitialData = async () => {
   if (methodsResult.error) throw new Error(`Erro ao buscar métodos de pagamento: ${methodsResult.error.message}`);
   if (zonesResult.error) throw new Error(`Erro ao buscar zonas de entrega: ${zonesResult.error.message}`);
 
+  // Filtra métodos de pagamento para remover 'Pagamento Online'
+  const filteredMethods = methodsResult.data.filter(method => method.name !== 'Pagamento Online');
+
   return {
     restaurant: restaurantData,
-    paymentMethods: methodsResult.data as PaymentMethod[],
+    paymentMethods: filteredMethods as PaymentMethod[],
     deliveryZones: zonesResult.data as DeliveryZone[],
     deliveryEnabled, // Adicionando o status das taxas de entrega
   };
@@ -188,8 +191,8 @@ const Checkout = () => {
   const [isSearchingCep, setIsSearchingCep] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [addressInputMode, setAddressInputMode] = useState<'search' | 'manual'>('search');
-  const [mpPaymentData, setMpPaymentData] = useState<any>(null);
-  const [mpFormKey, setMpFormKey] = useState(0); // Key para forçar recriação do componente
+  // const [mpPaymentData, setMpPaymentData] = useState<any>(null); // REMOVIDO
+  // const [mpFormKey, setMpFormKey] = useState(0); // REMOVIDO
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['checkoutInitialData'],
@@ -212,9 +215,9 @@ const Checkout = () => {
   const deliveryOption = form.watch('delivery_option');
   const selectedPaymentMethodId = form.watch('payment_method_id');
   const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
-  const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online';
+  // const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online'; // REMOVIDO
   const isPixPayment = selectedPaymentMethod?.name === 'PIX';
-  const isCardPayment = isOnlinePayment; // Pagamento Online é o cartão de crédito
+  // const isCardPayment = isOnlinePayment; // REMOVIDO
   const isCashPayment = selectedPaymentMethod?.name === 'Dinheiro';
   
   const lat = form.watch('latitude');
@@ -327,7 +330,7 @@ const Checkout = () => {
     setDeliveryFee(0);
     setDeliveryError(null);
     setDeliveryTime(null);
-    setMpPaymentData(null);
+    // setMpPaymentData(null); // REMOVIDO
     
     // Limpar campo de troco ao mudar de método de pagamento
     if (!isCashPayment) {
@@ -447,19 +450,18 @@ const Checkout = () => {
     }
   }, [paymentMethods, selectedPaymentMethodId, form]);
 
-  useEffect(() => {
-    if (!isCardPayment) {
-      setMpPaymentData(null);
-    }
-  }, [isCardPayment]);
+  // useEffect(() => { // REMOVIDO: Lógica de Pagamento Online
+  //   if (!isCardPayment) {
+  //     setMpPaymentData(null);
+  //   }
+  // }, [isCardPayment]);
 
-  // Resetar o formulário do Mercado Pago quando o método de pagamento muda
-  useEffect(() => {
-    if (isCardPayment) {
-      setMpFormKey(prev => prev + 1);
-      setMpPaymentData(null);
-    }
-  }, [selectedPaymentMethodId, isCardPayment]);
+  // useEffect(() => { // REMOVIDO: Lógica de Pagamento Online
+  //   if (isCardPayment) {
+  //     setMpFormKey(prev => prev + 1);
+  //     setMpPaymentData(null);
+  //   }
+  // }, [selectedPaymentMethodId, isCardPayment]);
 
   const orderMutation = useMutation({
     mutationFn: async (formData: CheckoutFormValues) => {
@@ -493,7 +495,9 @@ const Checkout = () => {
         customerId = newCustomer.id;
       }
 
-      const orderStatus = (isCardPayment || isPixPayment) ? 'pending_payment' : 'pending';
+      // O status agora é sempre 'pending' (ou 'confirmed' se for PIX, mas vamos simplificar para 'pending' para todos os pagamentos na entrega/retirada)
+      const orderStatus = isPixPayment ? 'pending_payment' : 'pending';
+      
       const { data: newOrder, error: orderError } = await supabase.from('orders').insert({
         restaurant_id: restaurant.id, customer_id: customerId, status: orderStatus as Enums<'order_status'>,
         total_amount: total, delivery_fee: deliveryFee, notes: formData.notes,
@@ -510,34 +514,8 @@ const Checkout = () => {
       const { error: itemsError } = await supabase.from('order_items').insert(itemsInsert);
       if (itemsError) throw new Error(`Erro ao adicionar itens do pedido: ${itemsError.message}`);
 
-      if (isCardPayment) {
-        if (!mpPaymentData) throw new Error("Dados de pagamento do cartão não fornecidos.");
-        
-        setIsProcessingPayment(true);
-        toast.info("Processando pagamento com cartão...");
-
-        const { data: paymentResult, error: paymentError } = await supabase.functions.invoke('process-mp-payment', {
-          body: { 
-            orderId, 
-            totalAmount: total, 
-            customerEmail: formData.email,
-            paymentData: mpPaymentData,
-          },
-        });
-
-        if (paymentError) throw new Error(paymentError.message);
-        
-        if (paymentResult.status === 'approved') {
-          const { error: updateError } = await supabase.from('orders').update({ status: 'confirmed' }).eq('id', orderId);
-          if (updateError) throw new Error(`Erro ao confirmar pedido após pagamento: ${updateError.message}`);
-          toast.success("Pagamento aprovado e pedido confirmado!");
-          navigate(`/order-success/${orderId}`);
-        } else {
-          toast.warning(`Pagamento ${paymentResult.status}. Redirecionando para acompanhamento.`);
-          navigate(`/order-success/${orderId}?status=${paymentResult.status}`);
-        }
-        
-      } else if (isPixPayment) {
+      // REMOVIDA TODA A LÓGICA DE PAGAMENTO ONLINE (CARTÃO E PIX)
+      if (isPixPayment) {
         setIsProcessingPayment(true);
         toast.info("Redirecionando para o pagamento PIX...");
         const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
@@ -545,14 +523,14 @@ const Checkout = () => {
         });
         if (preferenceError) throw new Error(preferenceError.message);
         window.location.href = preferenceData.init_point;
-        // Não navegamos para order-success aqui, pois o Mercado Pago fará o redirecionamento
         return; 
       }
 
       return orderId;
     },
     onSuccess: (orderId) => {
-      if (!isCardPayment && !isPixPayment) {
+      // Se não for PIX, navega diretamente para o sucesso
+      if (!isPixPayment) {
         toast.success(`Pedido #${orderId.slice(-4)} realizado com sucesso!`);
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         navigate(`/order-success/${orderId}`);
@@ -577,11 +555,11 @@ const Checkout = () => {
       }
     }
     
-    // 2. Validação de Pagamento Online
-    if (isCardPayment && !mpPaymentData) {
-      toast.warning("Por favor, preencha os dados do cartão.");
-      return;
-    }
+    // 2. Validação de Pagamento Online (REMOVIDA)
+    // if (isCardPayment && !mpPaymentData) {
+    //   toast.warning("Por favor, preencha os dados do cartão.");
+    //   return;
+    // }
     
     // 3. Mutação
     orderMutation.mutate(data);
@@ -599,7 +577,8 @@ const Checkout = () => {
 
   const isSubmitting = orderMutation.isPending || isProcessingPayment || isCalculatingFee;
   const isDeliveryValid = !isDeliverySelected || (!deliveryError && deliveryFee >= 0);
-  const isSubmitButtonEnabled = !isSubmitting && isDeliveryValid && (!isCardPayment || mpPaymentData);
+  // A validação do botão de submit agora é mais simples
+  const isSubmitButtonEnabled = !isSubmitting && isDeliveryValid;
 
   return (
     <div className="min-h-screen bg-background">
@@ -842,15 +821,8 @@ const Checkout = () => {
                         {deliveryFee > 0 && !isCalculatingFee && (
                           <Alert className="mt-4">
                             <Truck className="h-4 w-4" />
-                            <AlertTitle>Taxa de Entrega Aplicada</AlertTitle>
+                            <AlertTitle>Taxa de Entrega Aplicada</CardTitle>
                             <AlertDescription>Taxa: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}</AlertDescription>
-                          </Alert>
-                        )}
-                        {deliveryTime && !isCalculatingFee && !deliveryError && (
-                          <Alert className="mt-4">
-                            <Clock className="h-4 w-4" />
-                            <AlertTitle>Tempo Estimado de Entrega</AlertTitle>
-                            <AlertDescription>{deliveryTime.minTime} - {deliveryTime.maxTime} minutos</AlertDescription>
                           </Alert>
                         )}
                         {!deliveryEnabled && (
@@ -910,8 +882,8 @@ const Checkout = () => {
                       )} 
                     />
                     
-                    {/* Formulário de Cartão de Crédito Mercado Pago */}
-                    {isCardPayment && (
+                    {/* Formulário de Cartão de Crédito Mercado Pago (REMOVIDO) */}
+                    {/* {isCardPayment && (
                       <div className="space-y-4 pt-4 border-t">
                         <h3 className="font-semibold flex items-center gap-2">
                           <CreditCard className="h-4 w-4" /> Dados do Cartão
@@ -930,10 +902,10 @@ const Checkout = () => {
                           }}
                         />
                       </div>
-                    )}
+                    )} */}
 
                     {/* Detalhes Adicionais (CPF/CNPJ) */}
-                    {(isCardPayment || isPixPayment) && (
+                    {(isPixPayment) && ( // Apenas PIX agora
                       <div className="space-y-4 pt-4 border-t">
                         <h3 className="font-semibold flex items-center gap-2">
                           <CreditCard className="h-4 w-4" /> Detalhes Adicionais

@@ -73,7 +73,7 @@ const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[
 const DEFAULT_METHODS = [
   { name: 'Dinheiro', description: 'Pagamento em dinheiro na entrega', icon: DollarSign },
   { name: 'PIX', description: 'Pagamento via PIX', icon: Smartphone },
-  { name: 'Pagamento Online', description: 'Pagamento online via cartão de crédito ou PIX', icon: CreditCard },
+  // { name: 'Pagamento Online', description: 'Pagamento online via cartão de crédito ou PIX', icon: CreditCard }, // REMOVIDO
   { name: 'Pagamento com cartão na entrega', description: 'Aceita pagamento com cartão de débito ou crédito na entrega', icon: Package },
 ];
 
