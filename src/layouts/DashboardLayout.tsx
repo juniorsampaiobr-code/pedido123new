@@ -6,7 +6,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { Button } from '@/components/ui/button';
 import { toast } from "sonner";
 import { User } from '@supabase/supabase-js';
-import { Tables } from '@/integrations/supabase/types';
+import { Tables, Enums } from '@/integrations/supabase/types';
 import { ShoppingCart, Volume2, VolumeX, AlertCircle, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EnableSoundModal } from "@/components/EnableSoundModal";
@@ -15,6 +15,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 type Restaurant = Tables<'restaurants'>;
 type SoundStatus = 'disabled' | 'enabled' | 'error';
 type AudioReadyState = 'loading' | 'ready' | 'error';
+type OrderStatus = Enums<'order_status'>;
 
 interface SoundContextType {
   playSound: () => void;
@@ -126,17 +127,35 @@ const DashboardLayoutComponent = () => {
   }, [soundStatus, audioReadyState, loopingOrderId]);
 
   useEffect(() => {
-    const channel = supabase.channel('new-orders-toast').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      const newOrder = payload.new as Tables<'orders'>;
-      toast.info("🔔 Novo pedido recebido!", { 
-        description: `Pedido #${newOrder.id.slice(-4)} está aguardando confirmação.`,
-        duration: 15000,
-      });
-      if (newOrder.id) {
-        startSoundLoop(newOrder.id);
-      }
-    }).subscribe();
+    const channel = supabase.channel('new-orders-toast')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        const newOrder = payload.new as Tables<'orders'>;
+        
+        // Toca o som apenas se o status for 'pending' (pagamento na entrega)
+        if (newOrder.status === 'pending' && newOrder.id) {
+          toast.info("🔔 Novo pedido recebido!", { 
+            description: `Pedido #${newOrder.id.slice(-4)} está aguardando confirmação.`,
+            duration: 15000,
+          });
+          startSoundLoop(newOrder.id);
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        const updatedOrder = payload.new as Tables<'orders'>;
+        
+        // Toca o som se o status mudar para 'confirmed' (pagamento online aprovado)
+        if (updatedOrder.status === 'confirmed' && updatedOrder.id) {
+          toast.success("✅ Pagamento Confirmado!", { 
+            description: `Pedido #${updatedOrder.id.slice(-4)} foi pago e está pronto para preparo.`,
+            duration: 15000,
+          });
+          startSoundLoop(updatedOrder.id);
+        }
+      })
+      .subscribe();
+      
     return () => { supabase.removeChannel(channel); };
   }, [queryClient, startSoundLoop]);
 
