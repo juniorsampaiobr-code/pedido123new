@@ -821,7 +821,7 @@ const Checkout = () => {
                         {deliveryFee > 0 && !isCalculatingFee && (
                           <Alert className="mt-4">
                             <Truck className="h-4 w-4" />
-                            <AlertTitle>Taxa de Entrega Aplicada</CardTitle>
+                            <AlertTitle>Taxa de Entrega Aplicada</AlertTitle>
                             <AlertDescription>Taxa: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}</AlertDescription>
                           </Alert>
                         )}
@@ -882,28 +882,6 @@ const Checkout = () => {
                       )} 
                     />
                     
-                    {/* Formulário de Cartão de Crédito Mercado Pago (REMOVIDO) */}
-                    {/* {isCardPayment && (
-                      <div className="space-y-4 pt-4 border-t">
-                        <h3 className="font-semibold flex items-center gap-2">
-                          <CreditCard className="h-4 w-4" /> Dados do Cartão
-                        </h3>
-                        <MercadoPagoForm
-                          key={mpFormKey}
-                          totalAmount={total}
-                          onPaymentSuccess={(data: any) => {
-                            setMpPaymentData(data);
-                            toast.success("Dados do cartão validados. Clique em 'Finalizar Pedido' para processar.");
-                          }}
-                          onPaymentError={(error: any) => {
-                            console.log("Erro no MercadoPagoForm:", error);
-                            // Não mostrar toast de erro aqui para evitar loops
-                            setMpPaymentData(null);
-                          }}
-                        />
-                      </div>
-                    )} */}
-
                     {/* Detalhes Adicionais (CPF/CNPJ) */}
                     {(isPixPayment) && ( // Apenas PIX agora
                       <div className="space-y-4 pt-4 border-t">
