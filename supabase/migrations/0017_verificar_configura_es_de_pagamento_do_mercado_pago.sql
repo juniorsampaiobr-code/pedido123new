@@ -1,0 +1,1 @@
+SELECT * FROM payment_settings LIMIT 1;
