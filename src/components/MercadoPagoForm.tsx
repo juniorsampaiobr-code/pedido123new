@@ -212,8 +212,8 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
                 onFormMounted: (error: any) => {
                   if (error) {
                     console.error('Erro ao montar o formulário:', error);
-                    toast.error("Erro ao carregar o formulário de pagamento.");
-                    onPaymentError(error);
+                    // Não mostrar toast de erro imediato aqui para evitar confusão
+                    console.log('Erro ao montar formulário (não será exibido para o usuário):', error);
                   } else {
                     console.log('Formulário do Mercado Pago montado com sucesso');
                     setIsCardPaymentReady(true);
@@ -258,6 +258,7 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
                     }
                   } catch (error) {
                     console.error('Erro ao processar dados do formulário:', error);
+                    toast.error("Erro ao processar os dados do cartão. Verifique os dados informados.");
                     onPaymentError(error);
                   }
                 },
@@ -269,8 +270,8 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
           }
         } catch (initError: any) {
           console.error("Erro ao inicializar CardPayment:", initError);
-          toast.error("Erro ao carregar o sistema de pagamento.");
-          onPaymentError(initError);
+          // Não mostrar toast de erro imediato aqui para evitar confusão
+          console.log('Erro ao inicializar CardPayment (não será exibido para o usuário):', initError);
         }
       }, 100);
 
@@ -281,8 +282,8 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
     } catch (e: any) {
       console.error("Erro ao inicializar Mercado Pago:", e);
       setScriptError(true);
-      toast.error("Erro ao carregar o sistema de pagamento.");
-      onPaymentError(e);
+      // Não mostrar toast de erro imediato aqui para evitar confusão
+      console.log('Erro ao inicializar Mercado Pago (não será exibido para o usuário):', e);
     }
 
     // Cleanup do CardPayment
@@ -353,6 +354,11 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
           </div>
         )}
       </div>
+      {isCardPaymentReady && (
+        <p className="text-sm text-muted-foreground">
+          Preencha os dados do cartão para finalizar o pagamento.
+        </p>
+      )}
     </div>
   );
 };
