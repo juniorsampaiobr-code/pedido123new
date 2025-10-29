@@ -200,7 +200,7 @@ const Checkout = () => {
   const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
   const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online';
   const isPixPayment = selectedPaymentMethod?.name === 'PIX';
-  const isCardPayment = isOnlinePayment;
+  const isCardPayment = isOnlinePayment; // Pagamento Online é o cartão de crédito
   const isCashPayment = selectedPaymentMethod?.name === 'Dinheiro';
   
   const lat = form.watch('latitude');
@@ -526,6 +526,8 @@ const Checkout = () => {
         });
         if (preferenceError) throw new Error(preferenceError.message);
         window.location.href = preferenceData.init_point;
+        // Não navegamos para order-success aqui, pois o Mercado Pago fará o redirecionamento
+        return; 
       }
 
       return orderId;
