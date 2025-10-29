@@ -129,11 +129,6 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
                 </div>
                 
                 <div>
-                  <label for="form-checkout__issuer" class="block text-sm font-medium mb-1">Banco emissor</label>
-                  <select id="form-checkout__issuer" class="w-full p-2 border rounded"></select>
-                </div>
-                
-                <div>
                   <label for="form-checkout__installments" class="block text-sm font-medium mb-1">Parcelas</label>
                   <select id="form-checkout__installments" class="w-full p-2 border rounded"></select>
                 </div>
@@ -193,10 +188,6 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
                   identificationNumber: {
                     id: "form-checkout__identificationNumber",
                     placeholder: "Número do documento",
-                  },
-                  issuer: {
-                    id: "form-checkout__issuer",
-                    placeholder: "Banco emissor",
                   },
                 },
                 callbacks: {
