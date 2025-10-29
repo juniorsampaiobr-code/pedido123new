@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { useState, useEffect } from 'react';
+import { Printer } from 'lucide-react';
 
 type Order = Tables<'orders'> & { customer: Tables<'customers'> | null };
 type OrderItem = Tables<'order_items'> & { products: Pick<Tables<'products'>, 'name'> | null };
@@ -72,6 +73,11 @@ export const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalP
       toast.error(`Erro ao atualizar status: ${err.message}`);
     },
   });
+
+  const handlePrint = () => {
+    // Implementação básica de impressão
+    window.print();
+  };
 
   if (!order) return null;
 
@@ -143,14 +149,19 @@ export const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalP
             </Select>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button 
-            onClick={() => updateStatusMutation.mutate(currentStatus)}
-            disabled={updateStatusMutation.isPending || currentStatus === order.status}
-          >
-            {updateStatusMutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
+        <DialogFooter className="flex-col sm:flex-row sm:justify-between sm:space-x-2">
+          <Button variant="outline" onClick={handlePrint} className="w-full sm:w-auto mb-2 sm:mb-0">
+            <Printer className="h-4 w-4 mr-2" /> Imprimir Pedido
           </Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button 
+              onClick={() => updateStatusMutation.mutate(currentStatus)}
+              disabled={updateStatusMutation.isPending || currentStatus === order.status}
+            >
+              {updateStatusMutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
