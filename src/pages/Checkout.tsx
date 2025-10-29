@@ -37,6 +37,7 @@ import { MercadoPagoForm } from '@/components/MercadoPagoForm';
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
 type DeliveryZone = Tables<'delivery_zones'>;
+type Restaurant = Tables<'restaurants'>;
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const cleanZipCode = (zipCode: string) => zipCode.replace(/\D/g, '');
@@ -82,6 +83,18 @@ const checkoutSchema = z.object({
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
+// Função para buscar o status das taxas de entrega
+const fetchDeliveryStatus = async (restaurantId: string): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('restaurants')
+    .select('delivery_enabled')
+    .eq('id', restaurantId)
+    .single();
+
+  if (error) throw new Error(`Erro ao buscar status de entrega: ${error.message}`);
+  return data.delivery_enabled ?? true;
+};
+
 const fetchInitialData = async () => {
   const { data: restaurantData, error: restaurantError } = await supabase
     .from('restaurants')
@@ -95,6 +108,9 @@ const fetchInitialData = async () => {
 
   const restaurantId = restaurantData.id;
 
+  // Buscar o status das taxas de entrega
+  const deliveryEnabled = await fetchDeliveryStatus(restaurantId);
+
   const [methodsResult, zonesResult] = await Promise.all([
     supabase.from('payment_methods').select('*').eq('restaurant_id', restaurantId).eq('is_active', true).order('name', { ascending: true }),
     supabase.from('delivery_zones').select('*').eq('restaurant_id', restaurantId).eq('is_active', true).order('max_distance_km', { ascending: true }),
@@ -107,6 +123,7 @@ const fetchInitialData = async () => {
     restaurant: restaurantData,
     paymentMethods: methodsResult.data as PaymentMethod[],
     deliveryZones: zonesResult.data as DeliveryZone[],
+    deliveryEnabled, // Adicionando o status das taxas de entrega
   };
 };
 
@@ -168,6 +185,7 @@ const Checkout = () => {
   const restaurant = data?.restaurant;
   const paymentMethods = data?.paymentMethods || [];
   const deliveryZones = data?.deliveryZones || [];
+  const deliveryEnabled = data?.deliveryEnabled ?? true; // Status das taxas de entrega
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -313,6 +331,14 @@ const Checkout = () => {
 
   useEffect(() => {
     const calculateFee = async () => {
+      // Se as taxas de entrega estiverem desativadas, não calcular taxa
+      if (!deliveryEnabled) {
+        setDeliveryFee(0);
+        setDeliveryError(null);
+        setDeliveryTime(null);
+        return;
+      }
+
       if (deliveryOption === 'pickup' || !restaurant?.latitude || !restaurant?.longitude) {
         setDeliveryFee(0);
         setDeliveryError(null);
@@ -384,7 +410,7 @@ const Checkout = () => {
     }, 500); 
 
     return () => clearTimeout(timeoutId);
-  }, [addressTrigger, restaurant, deliveryZones, form, setDeliveryFee, isDeliverySelected, lat, lng, addressInputMode, addressFields]);
+  }, [addressTrigger, restaurant, deliveryZones, form, setDeliveryFee, isDeliverySelected, lat, lng, addressInputMode, addressFields, deliveryEnabled]);
 
   useEffect(() => {
     if (items.length === 0 && !isProcessingPayment) {
@@ -789,6 +815,13 @@ const Checkout = () => {
                             <Clock className="h-4 w-4" />
                             <AlertTitle>Tempo Estimado de Entrega</AlertTitle>
                             <AlertDescription>{deliveryTime.minTime} - {deliveryTime.maxTime} minutos</AlertDescription>
+                          </Alert>
+                        )}
+                        {!deliveryEnabled && (
+                          <Alert className="mt-4">
+                            <Truck className="h-4 w-4" />
+                            <AlertTitle>Taxas de Entrega Desativadas</AlertTitle>
+                            <AlertDescription>No momento, as taxas de entrega estão desativadas. A entrega será gratuita.</AlertDescription>
                           </Alert>
                         )}
                       </div>

@@ -80,10 +80,31 @@ const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]>
   return data;
 };
 
+// Função para buscar o status das taxas de entrega
+const fetchDeliveryStatus = async (restaurantId: string): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('restaurants')
+    .select('delivery_enabled')
+    .eq('id', restaurantId)
+    .single();
+
+  if (error) throw new Error(`Erro ao buscar status de entrega: ${error.message}`);
+  return data.delivery_enabled ?? true;
+};
+
+// Função para atualizar o status das taxas de entrega
+const updateDeliveryStatus = async (restaurantId: string, enabled: boolean) => {
+  const { error } = await supabase
+    .from('restaurants')
+    .update({ delivery_enabled: enabled })
+    .eq('id', restaurantId);
+
+  if (error) throw new Error(`Erro ao atualizar status de entrega: ${error.message}`);
+};
+
 const Delivery = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [deliveryEnabled, setDeliveryEnabled] = useState(true);
 
   const { data: restaurant, isLoading: isLoadingRestaurant } = useQuery<Restaurant>({
     queryKey: ['restaurantDataForDelivery'],
@@ -94,6 +115,14 @@ const Delivery = () => {
     queryKey: ['deliveryZones', restaurant?.id],
     queryFn: () => fetchDeliveryZones(restaurant!.id),
     enabled: !!restaurant?.id,
+  });
+
+  // Query para buscar o status atual das taxas de entrega
+  const { data: deliveryEnabled, isLoading: isLoadingDeliveryStatus } = useQuery<boolean>({
+    queryKey: ['deliveryStatus', restaurant?.id],
+    queryFn: () => fetchDeliveryStatus(restaurant!.id),
+    enabled: !!restaurant?.id,
+    initialData: true,
   });
 
   const zonesForm = useForm<ZonesFormValues>({
@@ -131,6 +160,19 @@ const Delivery = () => {
       updateFormWithZones(deliveryZones);
     }
   }, [deliveryZones, updateFormWithZones]);
+
+  // Mutação para atualizar o status das taxas de entrega
+  const deliveryStatusMutation = useMutation({
+    mutationFn: ({ restaurantId, enabled }: { restaurantId: string; enabled: boolean }) => 
+      updateDeliveryStatus(restaurantId, enabled),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['deliveryStatus'] });
+      toast.success(`Taxas de entrega ${variables.enabled ? 'ativadas' : 'desativadas'} com sucesso!`);
+    },
+    onError: (err) => {
+      toast.error(`Erro ao atualizar status: ${err.message}`);
+    },
+  });
 
   const zonesMutation = useMutation({
     mutationFn: async (data: ZonesFormValues) => {
@@ -185,11 +227,15 @@ const Delivery = () => {
 
   // Função para alternar o status de entrega
   const toggleDeliveryStatus = () => {
-    setDeliveryEnabled(!deliveryEnabled);
-    toast.success(`Taxas de entrega ${!deliveryEnabled ? 'ativadas' : 'desativadas'} com sucesso!`);
+    if (restaurant?.id) {
+      deliveryStatusMutation.mutate({ 
+        restaurantId: restaurant.id, 
+        enabled: !deliveryEnabled 
+      });
+    }
   };
 
-  if (isLoadingZones || isLoadingRestaurant) {
+  if (isLoadingZones || isLoadingRestaurant || isLoadingDeliveryStatus) {
     return (
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
         <div className="max-w-3xl mx-auto"><Skeleton className="h-96 w-full" /></div>
