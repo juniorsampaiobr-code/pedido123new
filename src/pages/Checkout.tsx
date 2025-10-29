@@ -158,6 +158,7 @@ const Checkout = () => {
   const [showMap, setShowMap] = useState(false);
   const [addressInputMode, setAddressInputMode] = useState<'search' | 'manual'>('search');
   const [mpPaymentData, setMpPaymentData] = useState<any>(null);
+  const [mpFormKey, setMpFormKey] = useState(0); // Key para forçar recriação do componente
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['checkoutInitialData'],
@@ -406,6 +407,14 @@ const Checkout = () => {
       setMpPaymentData(null);
     }
   }, [isCardPayment]);
+
+  // Resetar o formulário do Mercado Pago quando o método de pagamento muda
+  useEffect(() => {
+    if (isCardPayment) {
+      setMpFormKey(prev => prev + 1);
+      setMpPaymentData(null);
+    }
+  }, [selectedPaymentMethodId, isCardPayment]);
 
   const orderMutation = useMutation({
     mutationFn: async (formData: CheckoutFormValues) => {
@@ -832,15 +841,16 @@ const Checkout = () => {
                           <CreditCard className="h-4 w-4" /> Dados do Cartão
                         </h3>
                         <MercadoPagoForm
+                          key={mpFormKey}
                           totalAmount={total}
                           onPaymentSuccess={(data: any) => {
                             setMpPaymentData(data);
                             toast.success("Dados do cartão validados. Clique em 'Finalizar Pedido' para processar.");
                           }}
                           onPaymentError={(error: any) => {
+                            console.log("Erro no MercadoPagoForm:", error);
+                            // Não mostrar toast de erro aqui para evitar loops
                             setMpPaymentData(null);
-                            toast.error("Erro ao validar cartão. Verifique os dados.");
-                            console.error("Erro no MercadoPagoForm:", error);
                           }}
                         />
                       </div>
