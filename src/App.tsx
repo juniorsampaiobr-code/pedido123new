@@ -42,7 +42,14 @@ const App = () => {
     <QueryClientProvider client={queryClientMemo}>
       <TooltipProvider>
         <Toaster />
-        <Sonner />
+        <Sonner 
+          position="bottom-center" 
+          toastOptions={{
+            style: {
+              marginBottom: '100px', // Adiciona 100px de margem inferior (aproximadamente 10cm)
+            }
+          }}
+        />
         <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <CartProvider>
             <Suspense fallback={<LoadingSpinner />}>
