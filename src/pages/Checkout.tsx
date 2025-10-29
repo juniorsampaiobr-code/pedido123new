@@ -32,6 +32,7 @@ import { ZipCodeInput } from '@/components/ZipCodeInput';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
 import { geocodeAddress, calculateDeliveryFee } from '@/utils/location';
 import { LocationPickerMap } from '@/components/LocationPickerMap';
+import { MercadoPagoForm } from '@/components/MercadoPagoForm';
 
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
@@ -157,8 +158,6 @@ const Checkout = () => {
   const [showMap, setShowMap] = useState(false);
   const [addressInputMode, setAddressInputMode] = useState<'search' | 'manual'>('search');
   const [mpPaymentData, setMpPaymentData] = useState<any>(null);
-  const [isMpFormVisible, setIsMpFormVisible] = useState(false);
-  const [mpFormError, setMpFormError] = useState<string | null>(null);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['checkoutInitialData'],
@@ -296,7 +295,6 @@ const Checkout = () => {
     setDeliveryError(null);
     setDeliveryTime(null);
     setMpPaymentData(null);
-    setMpFormError(null);
     
     if (addressInputMode === 'manual') {
       setSearchCep('');
@@ -406,17 +404,6 @@ const Checkout = () => {
   useEffect(() => {
     if (!isCardPayment) {
       setMpPaymentData(null);
-      setIsMpFormVisible(false);
-      setMpFormError(null);
-    }
-  }, [isCardPayment]);
-
-  useEffect(() => {
-    if (isCardPayment) {
-      setIsMpFormVisible(true);
-      setMpFormError(null);
-    } else {
-      setIsMpFormVisible(false);
     }
   }, [isCardPayment]);
 
@@ -543,79 +530,6 @@ const Checkout = () => {
   const isDeliveryValid = !isDeliverySelected || (!deliveryError && deliveryFee >= 0);
   const isSubmitButtonEnabled = !isSubmitting && isDeliveryValid && (!isCardPayment || mpPaymentData);
 
-  // Componente de fallback para o MercadoPagoForm
-  const MercadoPagoFormFallback = () => (
-    <div className="flex items-center justify-center p-8">
-      <Loader2 className="h-6 w-6 animate-spin mr-2" />
-      Carregando formulário de pagamento...
-    </div>
-  );
-
-  // Componente MercadoPagoForm carregado dinamicamente com tratamento de erro
-  const MercadoPagoFormWrapper = () => {
-    const [Component, setComponent] = useState<React.ComponentType<any> | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-      let isMounted = true;
-      
-      const loadComponent = async () => {
-        try {
-          const module = await import('@/components/MercadoPagoForm');
-          if (isMounted) {
-            setComponent(() => module.MercadoPagoForm);
-            setLoading(false);
-          }
-        } catch (err) {
-          console.error("Erro ao carregar MercadoPagoForm:", err);
-          if (isMounted) {
-            setMpFormError("Não foi possível carregar o formulário de pagamento. Por favor, tente novamente ou escolha outra forma de pagamento.");
-            setLoading(false);
-          }
-        }
-      };
-
-      loadComponent();
-
-      return () => {
-        isMounted = false;
-      };
-    }, []);
-
-    if (loading) {
-      return <MercadoPagoFormFallback />;
-    }
-
-    if (mpFormError) {
-      return (
-        <Alert variant="destructive">
-          <Terminal className="h-4 w-4" />
-          <AlertTitle>Erro ao carregar formulário</AlertTitle>
-          <AlertDescription>{mpFormError}</AlertDescription>
-        </Alert>
-      );
-    }
-
-    if (Component) {
-      return (
-        <Component
-          totalAmount={total}
-          onPaymentSuccess={(data: any) => {
-            setMpPaymentData(data);
-            toast.success("Dados do cartão validados. Clique em 'Finalizar Pedido' para processar.");
-          }}
-          onPaymentError={(error: any) => {
-            setMpPaymentData(null);
-            toast.error("Erro ao validar cartão. Verifique os dados.");
-            console.error("Erro no MercadoPagoForm:", error);
-          }}
-        />
-      );
-    }
-
-    return null;
-  };
-
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-50">
@@ -678,11 +592,22 @@ const Checkout = () => {
                   <CardContent className="space-y-4">
                     <FormField control={form.control} name="payment_method_id" render={({ field }) => (<FormItem className="space-y-3"><FormControl><RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex flex-col space-y-2">{paymentMethods.map(method => { const Icon = getIconComponent(method.icon || 'Store'); return (<FormItem key={method.id} className="flex items-center space-x-3 space-y-0 border p-4 rounded-lg cursor-pointer"><FormControl><RadioGroupItem value={method.id} /></FormControl><Icon className="h-5 w-5 text-primary" /><FormLabel className="font-normal flex-1 cursor-pointer">{method.name}<span className="block text-xs text-muted-foreground">{method.description}</span></FormLabel></FormItem>);})}</RadioGroup></FormControl><FormMessage /></FormItem>)} />
                     
-                    {/* Formulário de Cartão de Crédito Mercado Pago - Carregado dinamicamente com fallback */}
-                    {isMpFormVisible && (
+                    {/* Formulário de Cartão de Crédito Mercado Pago */}
+                    {isCardPayment && (
                       <div className="space-y-4 pt-4 border-t">
                         <h3 className="font-semibold flex items-center gap-2"><CreditCard className="h-4 w-4" /> Dados do Cartão</h3>
-                        <MercadoPagoFormWrapper />
+                        <MercadoPagoForm
+                          totalAmount={total}
+                          onPaymentSuccess={(data: any) => {
+                            setMpPaymentData(data);
+                            toast.success("Dados do cartão validados. Clique em 'Finalizar Pedido' para processar.");
+                          }}
+                          onPaymentError={(error: any) => {
+                            setMpPaymentData(null);
+                            toast.error("Erro ao validar cartão. Verifique os dados.");
+                            console.error("Erro no MercadoPagoForm:", error);
+                          }}
+                        />
                       </div>
                     )}
 

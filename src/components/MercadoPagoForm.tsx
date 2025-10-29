@@ -21,7 +21,7 @@ interface MercadoPagoFormProps {
 
 export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError }: MercadoPagoFormProps) => {
   const { data: publicKey, isLoading: isKeyLoading, isError } = useMercadoPagoPublicKey();
-  const [isScriptLoading, setIsScriptLoading] = useState(true);
+  const [isScriptLoading, setIsScriptLoading] = useState(false);
   const [scriptError, setScriptError] = useState(false);
   const [isCardPaymentReady, setIsCardPaymentReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -32,12 +32,14 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
     if (!publicKey) return;
 
     const scriptId = 'mp-sdk-script';
+    
     // Verifica se o script já foi adicionado
     if (document.getElementById(scriptId)) {
       setIsScriptLoading(false);
       return;
     }
 
+    setIsScriptLoading(true);
     const script = document.createElement('script');
     script.id = scriptId;
     script.src = "https://sdk.mercadopago.com/js/v2";
@@ -45,6 +47,7 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
     script.onload = () => {
       setIsScriptLoading(false);
       setScriptError(false);
+      console.log('Script do Mercado Pago carregado com sucesso');
     };
     script.onerror = () => {
       setIsScriptLoading(false);
@@ -76,16 +79,19 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
         throw new Error('SDK do Mercado Pago não carregado.');
       }
 
+      console.log('Inicializando Mercado Pago com a chave:', publicKey.substring(0, 10) + '...');
+
       // Inicializa o Mercado Pago
       const mp = new window.MercadoPago(publicKey, {
         locale: 'pt-BR'
       });
 
-      // Cria o CardPayment
+      // Limpa o container antes de montar
       if (containerRef.current) {
-        containerRef.current.innerHTML = ''; // Limpa o container
+        containerRef.current.innerHTML = '';
       }
       
+      // Cria o CardPayment
       cardPaymentRef.current = mp.cardForm({
         amount: totalAmount.toString(),
         autoMount: true,
@@ -139,42 +145,51 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
               toast.error("Erro ao carregar o formulário de pagamento.");
               onPaymentError(error);
             } else {
+              console.log('Formulário do Mercado Pago montado com sucesso');
               setIsCardPaymentReady(true);
             }
           },
           onSubmit: (event: any) => {
             event.preventDefault();
+            console.log('Enviando formulário de pagamento...');
 
-            const {
-              paymentMethodId: payment_method_id,
-              issuerId: issuer_id,
-              cardholderEmail: email,
-              amount,
-              token,
-              installments,
-              identificationNumber,
-              identificationType,
-            } = cardPaymentRef.current.getCardFormData();
+            try {
+              const formData = cardPaymentRef.current.getCardFormData();
+              console.log('Dados do formulário:', formData);
 
-            // Chama o callback de sucesso com os dados do formulário
-            onPaymentSuccess({
-              token,
-              issuer_id,
-              payment_method_id,
-              transaction_amount: Number(amount),
-              installments: Number(installments),
-              payer: {
-                email,
-                identification: {
-                  type: identificationType,
-                  number: identificationNumber,
+              const {
+                paymentMethodId: payment_method_id,
+                issuerId: issuer_id,
+                cardholderEmail: email,
+                amount,
+                token,
+                installments,
+                identificationNumber,
+                identificationType,
+              } = formData;
+
+              // Chama o callback de sucesso com os dados do formulário
+              onPaymentSuccess({
+                token,
+                issuer_id,
+                payment_method_id,
+                transaction_amount: Number(amount),
+                installments: Number(installments),
+                payer: {
+                  email,
+                  identification: {
+                    type: identificationType,
+                    number: identificationNumber,
+                  },
                 },
-              },
-            });
+              });
+            } catch (error) {
+              console.error('Erro ao processar dados do formulário:', error);
+              onPaymentError(error);
+            }
           },
           onFetching: (resource: any) => {
             console.log('Fetching resource: ', resource);
-            // Mostrar feedback de carregamento
           }
         },
       });
