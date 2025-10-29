@@ -872,7 +872,7 @@ const Checkout = () => {
                         {deliveryTime && !isCalculatingFee && !deliveryError && (
                           <Alert className="mt-4">
                             <Clock className="h-4 w-4" />
-                            <AlertTitle>Tempo Estimado de Entrega</CardTitle>
+                            <AlertTitle>Tempo Estimado de Entrega</AlertTitle>
                             <AlertDescription>{deliveryTime.minTime} - {deliveryTime.maxTime} minutos</AlertDescription>
                           </Alert>
                         )}
