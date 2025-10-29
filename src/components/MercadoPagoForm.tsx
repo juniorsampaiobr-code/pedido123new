@@ -27,6 +27,7 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
   const containerRef = useRef<HTMLDivElement>(null);
   const cardPaymentRef = useRef<any>(null);
   const mercadoPagoInstance = useRef<any>(null);
+  const formInitialized = useRef(false);
 
   // Carrega o script do Mercado Pago dinamicamente
   useEffect(() => {
@@ -68,7 +69,7 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
 
   // Inicializa o Mercado Pago e o CardPayment após o script carregar
   useEffect(() => {
-    if (isScriptLoading || scriptError || !publicKey || !window.MercadoPago) return;
+    if (isScriptLoading || scriptError || !publicKey || !window.MercadoPago || !containerRef.current) return;
 
     try {
       console.log('Inicializando Mercado Pago com a chave:', publicKey.substring(0, 10) + '...');
@@ -80,7 +81,12 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
         });
       }
 
-      // Limpa o container antes de montar
+      // Verifica se o formulário já foi inicializado
+      if (formInitialized.current) {
+        return;
+      }
+
+      // Cria o HTML do formulário
       if (containerRef.current) {
         containerRef.current.innerHTML = `
           <form id="form-checkout">
@@ -136,117 +142,138 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
                 <label for="form-checkout__installments" class="block text-sm font-medium mb-1">Parcelas</label>
                 <select id="form-checkout__installments" class="w-full p-2 border rounded"></select>
               </div>
+              
+              <button type="submit" class="w-full bg-primary text-white py-2 rounded-md mt-4">Pagar</button>
             </div>
           </form>
         `;
       }
-      
-      // Cria o CardPayment
-      if (mercadoPagoInstance.current && !cardPaymentRef.current) {
-        cardPaymentRef.current = mercadoPagoInstance.current.cardForm({
-          amount: totalAmount.toString(),
-          autoMount: true,
-          form: {
-            id: "form-checkout",
-            cardholderName: {
-              id: "form-checkout__cardholderName",
-              placeholder: "Titular do cartão",
-            },
-            cardholderEmail: {
-              id: "form-checkout__cardholderEmail",
-              placeholder: "E-mail",
-            },
-            cardNumber: {
-              id: "form-checkout__cardNumber",
-              placeholder: "Número do cartão",
-            },
-            cardExpirationMonth: {
-              id: "form-checkout__cardExpirationMonth",
-              placeholder: "MM",
-            },
-            cardExpirationYear: {
-              id: "form-checkout__cardExpirationYear",
-              placeholder: "YY",
-            },
-            securityCode: {
-              id: "form-checkout__securityCode",
-              placeholder: "Código de segurança",
-            },
-            installments: {
-              id: "form-checkout__installments",
-              placeholder: "Parcelas",
-            },
-            identificationType: {
-              id: "form-checkout__identificationType",
-              placeholder: "Tipo de documento",
-            },
-            identificationNumber: {
-              id: "form-checkout__identificationNumber",
-              placeholder: "Número do documento",
-            },
-            issuer: {
-              id: "form-checkout__issuer",
-              placeholder: "Banco emissor",
-            },
-          },
-          callbacks: {
-            onFormMounted: (error: any) => {
-              if (error) {
-                console.error('Erro ao montar o formulário:', error);
-                toast.error("Erro ao carregar o formulário de pagamento.");
-                onPaymentError(error);
-              } else {
-                console.log('Formulário do Mercado Pago montado com sucesso');
-                setIsCardPaymentReady(true);
-              }
-            },
-            onSubmit: (event: any) => {
-              event.preventDefault();
-              console.log('Enviando formulário de pagamento...');
 
-              try {
-                if (cardPaymentRef.current) {
-                  const formData = cardPaymentRef.current.getCardFormData();
-                  console.log('Dados do formulário:', formData);
+      // Aguarda um momento para garantir que o DOM foi atualizado
+      setTimeout(() => {
+        // Verifica se o elemento do formulário existe
+        const formElement = document.getElementById('form-checkout');
+        if (!formElement) {
+          console.error('Formulário não encontrado no DOM');
+          toast.error("Erro ao carregar o formulário de pagamento.");
+          onPaymentError(new Error("Formulário não encontrado no DOM."));
+          return;
+        }
 
-                  const {
-                    paymentMethodId: payment_method_id,
-                    issuerId: issuer_id,
-                    cardholderEmail: email,
-                    amount,
-                    token,
-                    installments,
-                    identificationNumber,
-                    identificationType,
-                  } = formData;
+        // Cria o CardPayment
+        try {
+          if (mercadoPagoInstance.current) {
+            cardPaymentRef.current = mercadoPagoInstance.current.cardForm({
+              amount: totalAmount.toString(),
+              autoMount: true,
+              form: {
+                id: "form-checkout",
+                cardholderName: {
+                  id: "form-checkout__cardholderName",
+                  placeholder: "Titular do cartão",
+                },
+                cardholderEmail: {
+                  id: "form-checkout__cardholderEmail",
+                  placeholder: "E-mail",
+                },
+                cardNumber: {
+                  id: "form-checkout__cardNumber",
+                  placeholder: "Número do cartão",
+                },
+                cardExpirationMonth: {
+                  id: "form-checkout__cardExpirationMonth",
+                  placeholder: "MM",
+                },
+                cardExpirationYear: {
+                  id: "form-checkout__cardExpirationYear",
+                  placeholder: "YY",
+                },
+                securityCode: {
+                  id: "form-checkout__securityCode",
+                  placeholder: "Código de segurança",
+                },
+                installments: {
+                  id: "form-checkout__installments",
+                  placeholder: "Parcelas",
+                },
+                identificationType: {
+                  id: "form-checkout__identificationType",
+                  placeholder: "Tipo de documento",
+                },
+                identificationNumber: {
+                  id: "form-checkout__identificationNumber",
+                  placeholder: "Número do documento",
+                },
+                issuer: {
+                  id: "form-checkout__issuer",
+                  placeholder: "Banco emissor",
+                },
+              },
+              callbacks: {
+                onFormMounted: (error: any) => {
+                  if (error) {
+                    console.error('Erro ao montar o formulário:', error);
+                    toast.error("Erro ao carregar o formulário de pagamento.");
+                    onPaymentError(error);
+                  } else {
+                    console.log('Formulário do Mercado Pago montado com sucesso');
+                    setIsCardPaymentReady(true);
+                    formInitialized.current = true;
+                  }
+                },
+                onSubmit: (event: any) => {
+                  event.preventDefault();
+                  console.log('Enviando formulário de pagamento...');
 
-                  // Chama o callback de sucesso com os dados do formulário
-                  onPaymentSuccess({
-                    token,
-                    issuer_id,
-                    payment_method_id,
-                    transaction_amount: Number(amount),
-                    installments: Number(installments),
-                    payer: {
-                      email,
-                      identification: {
-                        type: identificationType,
-                        number: identificationNumber,
-                      },
-                    },
-                  });
+                  try {
+                    if (cardPaymentRef.current) {
+                      const formData = cardPaymentRef.current.getCardFormData();
+                      console.log('Dados do formulário:', formData);
+
+                      const {
+                        paymentMethodId: payment_method_id,
+                        issuerId: issuer_id,
+                        cardholderEmail: email,
+                        amount,
+                        token,
+                        installments,
+                        identificationNumber,
+                        identificationType,
+                      } = formData;
+
+                      // Chama o callback de sucesso com os dados do formulário
+                      onPaymentSuccess({
+                        token,
+                        issuer_id,
+                        payment_method_id,
+                        transaction_amount: Number(amount),
+                        installments: Number(installments),
+                        payer: {
+                          email,
+                          identification: {
+                            type: identificationType,
+                            number: identificationNumber,
+                          },
+                        },
+                      });
+                    }
+                  } catch (error) {
+                    console.error('Erro ao processar dados do formulário:', error);
+                    onPaymentError(error);
+                  }
+                },
+                onFetching: (resource: any) => {
+                  console.log('Fetching resource: ', resource);
                 }
-              } catch (error) {
-                console.error('Erro ao processar dados do formulário:', error);
-                onPaymentError(error);
-              }
-            },
-            onFetching: (resource: any) => {
-              console.log('Fetching resource: ', resource);
-            }
-          },
-        });
-      }
+              },
+            });
+          }
+        } catch (initError: any) {
+          console.error("Erro ao inicializar CardPayment:", initError);
+          toast.error("Erro ao carregar o sistema de pagamento.");
+          onPaymentError(initError);
+        }
+      }, 100);
 
     } catch (e: any) {
       console.error("Erro ao inicializar Mercado Pago:", e);
@@ -258,9 +285,14 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
     // Cleanup do CardPayment
     return () => {
       if (cardPaymentRef.current && cardPaymentRef.current.unmount) {
-        cardPaymentRef.current.unmount();
+        try {
+          cardPaymentRef.current.unmount();
+        } catch (e) {
+          console.warn("Erro ao desmontar CardPayment:", e);
+        }
         cardPaymentRef.current = null;
       }
+      formInitialized.current = false;
     };
   }, [isScriptLoading, scriptError, publicKey, totalAmount, onPaymentSuccess, onPaymentError]);
 
@@ -299,7 +331,7 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
     );
   }
 
-  if (isScriptLoading || !isCardPaymentReady) {
+  if (isScriptLoading) {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="h-6 w-6 animate-spin mr-2" />
@@ -310,7 +342,12 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
 
   return (
     <div ref={containerRef} className="mp-form-container">
-      {/* O formulário será injetado aqui pelo Mercado Pago SDK */}
+      {!isCardPaymentReady && (
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="h-6 w-6 animate-spin mr-2" />
+          Preparando formulário de pagamento...
+        </div>
+      )}
     </div>
   );
 };
