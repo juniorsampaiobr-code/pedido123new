@@ -69,11 +69,12 @@ const checkoutSchema = z.object({
   }),
   change_for: z.preprocess(
     (val) => {
-      // Se o valor for string vazia, retorna null para evitar erro de coerce.number
-      if (val === '') return null;
+      // Se o valor for null, undefined, ou string vazia, retorna null
+      if (val === null || val === undefined || val === '') return null;
+      // Caso contrário, tenta converter a string (substituindo vírgula por ponto)
       return String(val).replace(',', '.');
     },
-    z.coerce.number({ invalid_type_error: 'O troco deve ser um número.' }).optional().nullable(),
+    z.number({ invalid_type_error: 'O troco deve ser um número.' }).optional().nullable(),
   ),
 }).superRefine((data, ctx) => {
   if (data.delivery_option === 'delivery') {
@@ -567,9 +568,12 @@ const Checkout = () => {
     // 1. Validação de Troco (Runtime)
     if (isCashPayment) {
       const changeFor = data.change_for;
-      if (changeFor !== null && changeFor !== undefined && changeFor < total) {
-        toast.error(`O valor do troco (R$ ${changeFor.toFixed(2).replace('.', ',')}) deve ser maior ou igual ao total do pedido (R$ ${total.toFixed(2).replace('.', ',')}).`);
-        return;
+      // Se o usuário preencheu o campo, validamos se é suficiente
+      if (changeFor !== null && changeFor !== undefined) {
+        if (changeFor < total) {
+          toast.error(`O valor do troco (R$ ${changeFor.toFixed(2).replace('.', ',')}) deve ser maior ou igual ao total do pedido (R$ ${total.toFixed(2).replace('.', ',')}).`);
+          return;
+        }
       }
     }
     
@@ -845,7 +849,7 @@ const Checkout = () => {
                         {deliveryTime && !isCalculatingFee && !deliveryError && (
                           <Alert className="mt-4">
                             <Clock className="h-4 w-4" />
-                            <AlertTitle>Tempo Estimado de Entrega</AlertTitle>
+                            <AlertTitle>Tempo Estimado de Entrega</CardTitle>
                             <AlertDescription>{deliveryTime.minTime} - {deliveryTime.maxTime} minutos</AlertDescription>
                           </Alert>
                         )}
