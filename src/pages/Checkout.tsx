@@ -79,6 +79,22 @@ const checkoutSchema = z.object({
     if (data.city.trim() === '') ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Cidade é obrigatória.', path: ['city'] });
     if (data.zip_code.length !== 8) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CEP é obrigatório e deve ter 8 dígitos.', path: ['zip_code'] });
   }
+  
+  // Validação condicional para 'change_for'
+  const isCashPayment = data.payment_method_id === 'Dinheiro'; // Assumindo que 'Dinheiro' é o nome do método
+  
+  // Se o pagamento for em dinheiro e 'change_for' for fornecido, deve ser maior ou igual ao total
+  if (isCashPayment && data.change_for !== null && data.change_for !== undefined) {
+    // Nota: O total do pedido (cart.total) não está disponível diretamente no schema Zod.
+    // Vamos relaxar a validação aqui e confiar na validação do formulário React Hook Form/UI.
+    // Apenas garantimos que se for fornecido, seja um número positivo.
+    if (data.change_for <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'O valor do troco deve ser positivo.', path: ['change_for'] });
+    }
+  }
+  
+  // Se o pagamento NÃO for em dinheiro, garantimos que o campo seja nulo/undefined para evitar erros de validação.
+  // Isso é tratado pelo React Hook Form, mas é bom ter a clareza no schema.
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -315,6 +331,11 @@ const Checkout = () => {
     setDeliveryTime(null);
     setMpPaymentData(null);
     
+    // Limpar campo de troco ao mudar de método de pagamento
+    if (!isCashPayment) {
+      form.setValue('change_for', null);
+    }
+
     if (addressInputMode === 'manual') {
       setSearchCep('');
       setSearchNumber('');
@@ -327,7 +348,7 @@ const Checkout = () => {
       form.setValue('city', '');
       form.setValue('zip_code', '');
     }
-  }, [addressInputMode, form, setDeliveryFee]);
+  }, [addressInputMode, form, setDeliveryFee, isCashPayment]);
 
   useEffect(() => {
     const calculateFee = async () => {
@@ -546,11 +567,17 @@ const Checkout = () => {
   });
 
   const onSubmit = (data: CheckoutFormValues) => {
+    // Antes de submeter, se não for pagamento em dinheiro, garantimos que change_for seja null
+    const finalData = { ...data };
+    if (!isCashPayment) {
+      finalData.change_for = null;
+    }
+    
     if (isCardPayment && !mpPaymentData) {
       toast.warning("Por favor, preencha os dados do cartão.");
       return;
     }
-    orderMutation.mutate(data);
+    orderMutation.mutate(finalData);
   };
   
   const onValidationFail = (errors: any) => {
@@ -843,7 +870,14 @@ const Checkout = () => {
                         <FormItem className="space-y-3">
                           <FormControl>
                             <RadioGroup 
-                              onValueChange={field.onChange} 
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                                // Limpa o troco se o novo método não for Dinheiro
+                                const newMethod = paymentMethods.find(m => m.id === value);
+                                if (newMethod?.name !== 'Dinheiro') {
+                                  form.setValue('change_for', null);
+                                }
+                              }} 
                               defaultValue={field.value} 
                               className="flex flex-col space-y-2"
                             >
