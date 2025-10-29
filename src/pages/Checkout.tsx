@@ -84,10 +84,9 @@ const checkoutSchema = z.object({
     if (data.zip_code.length !== 8) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CEP é obrigatório e deve ter 8 dígitos.', path: ['zip_code'] });
   }
   
-  // Validação condicional para 'change_for'
-  const isCashPayment = data.payment_method_id === 'Dinheiro'; // Assumindo que 'Dinheiro' é o nome do método
+  // Validação condicional para 'change_for' (apenas verifica se é positivo, se fornecido)
+  const isCashPayment = data.payment_method_id === 'Dinheiro'; 
   
-  // Se o pagamento for em dinheiro e 'change_for' for fornecido, deve ser maior ou igual ao total
   if (isCashPayment && data.change_for !== null && data.change_for !== undefined) {
     if (data.change_for <= 0) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'O valor do troco deve ser positivo.', path: ['change_for'] });
@@ -331,7 +330,7 @@ const Checkout = () => {
     
     // Limpar campo de troco ao mudar de método de pagamento
     if (!isCashPayment) {
-      form.setValue('change_for', null, { shouldValidate: true }); // Adicionado shouldValidate: true
+      form.setValue('change_for', null, { shouldValidate: true }); 
     }
 
     if (addressInputMode === 'manual') {
@@ -346,7 +345,90 @@ const Checkout = () => {
       form.setValue('city', '');
       form.setValue('zip_code', '');
     }
-  }, [addressInputMode, form, setDeliveryFee, isCashPayment, selectedPaymentMethodId]); // Adicionado selectedPaymentMethodId como dependência
+  }, [addressInputMode, form, setDeliveryFee, isCashPayment, selectedPaymentMethodId]); 
+
+  useEffect(() => {
+    const calculateFee = async () => {
+      // Se as taxas de entrega estiverem desativadas, não calcular taxa
+      if (!deliveryEnabled) {
+        setDeliveryFee(0);
+        setDeliveryError(null);
+        setDeliveryTime(null);
+        return;
+      }
+
+      if (deliveryOption === 'pickup' || !restaurant?.latitude || !restaurant?.longitude) {
+        setDeliveryFee(0);
+        setDeliveryError(null);
+        setDeliveryTime(null);
+        return;
+      }
+
+      setIsCalculatingFee(true);
+      setDeliveryError(null);
+
+      let customerCoords: [number, number] | null = null;
+      
+      if (lat && lng) {
+        customerCoords = [lat, lng];
+      } else {
+        const [street, number, complement, neighborhood, city, zipCode] = addressFields;
+        const cleanedZip = cleanZipCode(zipCode);
+        const isAddressComplete = street && number && neighborhood && city && cleanedZip.length === 8;
+        
+        if (isAddressComplete) {
+          const fullAddress = `${street}, ${number} ${complement}, ${neighborhood}, ${city}, ${zipCode}`;
+          customerCoords = await geocodeAddress(fullAddress);
+          
+          if (customerCoords) {
+            form.setValue('latitude', customerCoords[0]);
+            form.setValue('longitude', customerCoords[1]);
+            setShowMap(true);
+          }
+        }
+      }
+
+      if (customerCoords) {
+        const restaurantCoords: [number, number] = [restaurant.latitude, restaurant.longitude];
+        const feeResult = calculateDeliveryFee(customerCoords, restaurantCoords, deliveryZones);
+
+        if (feeResult) {
+          setDeliveryFee(feeResult.fee);
+          setDeliveryError(null);
+          setDeliveryTime({ minTime: feeResult.minTime, maxTime: feeResult.maxTime });
+        } else {
+          setDeliveryFee(0);
+          setDeliveryError("Seu endereço está fora da nossa área de entrega.");
+          setDeliveryTime(null);
+        }
+      } else {
+        setDeliveryFee(0);
+        setDeliveryTime(null);
+        
+        const [street, number, complement, neighborhood, city, zipCode] = addressFields;
+        const isAddressAttempted = street && number && neighborhood && city && cleanZipCode(zipCode).length === 8;
+        
+        if (isDeliverySelected && isAddressAttempted) {
+          setDeliveryError("Não foi possível localizar seu endereço para calcular a taxa. Por favor, verifique o endereço ou ajuste o pino no mapa.");
+          
+          if (restaurant?.latitude && restaurant?.longitude) {
+            form.setValue('latitude', restaurant.latitude);
+            form.setValue('longitude', restaurant.longitude);
+            setShowMap(true);
+          }
+        } else {
+          setDeliveryError(null);
+        }
+      }
+      setIsCalculatingFee(false);
+    };
+
+    const timeoutId = setTimeout(() => {
+      calculateFee();
+    }, 500); 
+
+    return () => clearTimeout(timeoutId);
+  }, [addressTrigger, restaurant, deliveryZones, form, setDeliveryFee, isDeliverySelected, lat, lng, addressInputMode, addressFields, deliveryEnabled]);
 
   useEffect(() => {
     if (items.length === 0 && !isProcessingPayment) {
@@ -482,17 +564,23 @@ const Checkout = () => {
   });
 
   const onSubmit = (data: CheckoutFormValues) => {
-    // Antes de submeter, se não for pagamento em dinheiro, garantimos que change_for seja null
-    const finalData = { ...data };
-    if (!isCashPayment) {
-      finalData.change_for = null;
+    // 1. Validação de Troco (Runtime)
+    if (isCashPayment) {
+      const changeFor = data.change_for;
+      if (changeFor !== null && changeFor !== undefined && changeFor < total) {
+        toast.error(`O valor do troco (R$ ${changeFor.toFixed(2).replace('.', ',')}) deve ser maior ou igual ao total do pedido (R$ ${total.toFixed(2).replace('.', ',')}).`);
+        return;
+      }
     }
     
+    // 2. Validação de Pagamento Online
     if (isCardPayment && !mpPaymentData) {
       toast.warning("Por favor, preencha os dados do cartão.");
       return;
     }
-    orderMutation.mutate(finalData);
+    
+    // 3. Mutação
+    orderMutation.mutate(data);
   };
   
   const onValidationFail = (errors: any) => {
@@ -787,7 +875,11 @@ const Checkout = () => {
                             <RadioGroup 
                               onValueChange={(value) => {
                                 field.onChange(value);
-                                // A lógica de limpeza do troco foi movida para o useEffect para garantir que o Zod a veja.
+                                // Limpa o troco se o novo método não for Dinheiro
+                                const newMethod = paymentMethods.find(m => m.id === value);
+                                if (newMethod?.name !== 'Dinheiro') {
+                                  form.setValue('change_for', null, { shouldValidate: true });
+                                }
                               }} 
                               defaultValue={field.value} 
                               className="flex flex-col space-y-2"
