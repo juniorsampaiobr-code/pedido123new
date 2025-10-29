@@ -6,7 +6,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Terminal, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// Definindo os tipos para o SDK do Mercado Pago
 declare global {
   interface Window {
     MercadoPago: any;
@@ -71,6 +70,11 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
   useEffect(() => {
     if (isScriptLoading || scriptError || !publicKey || !window.MercadoPago || !containerRef.current) return;
 
+    // Verifica se já foi inicializado
+    if (formInitialized.current) {
+      return;
+    }
+
     try {
       console.log('Inicializando Mercado Pago com a chave:', publicKey.substring(0, 10) + '...');
       
@@ -79,11 +83,6 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
         mercadoPagoInstance.current = new window.MercadoPago(publicKey, {
           locale: 'pt-BR'
         });
-      }
-
-      // Verifica se o formulário já foi inicializado
-      if (formInitialized.current) {
-        return;
       }
 
       // Cria o HTML do formulário
@@ -150,7 +149,7 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
       }
 
       // Aguarda um momento para garantir que o DOM foi atualizado
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         // Verifica se o elemento do formulário existe
         const formElement = document.getElementById('form-checkout');
         if (!formElement) {
@@ -162,7 +161,7 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
 
         // Cria o CardPayment
         try {
-          if (mercadoPagoInstance.current) {
+          if (mercadoPagoInstance.current && !cardPaymentRef.current) {
             cardPaymentRef.current = mercadoPagoInstance.current.cardForm({
               amount: totalAmount.toString(),
               autoMount: true,
@@ -275,6 +274,10 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
         }
       }, 100);
 
+      return () => {
+        clearTimeout(timer);
+      };
+
     } catch (e: any) {
       console.error("Erro ao inicializar Mercado Pago:", e);
       setScriptError(true);
@@ -341,13 +344,15 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
   }
 
   return (
-    <div ref={containerRef} className="mp-form-container">
-      {!isCardPaymentReady && (
-        <div className="flex items-center justify-center p-8">
-          <Loader2 className="h-6 w-6 animate-spin mr-2" />
-          Preparando formulário de pagamento...
-        </div>
-      )}
+    <div className="space-y-4">
+      <div ref={containerRef} className="mp-form-container">
+        {!isCardPaymentReady && (
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            Preparando formulário de pagamento...
+          </div>
+        )}
+      </div>
     </div>
   );
 };
