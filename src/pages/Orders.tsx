@@ -119,15 +119,15 @@ const Orders = () => {
   const handleCloseModal = () => { setIsModalOpen(false); setSelectedOrder(null); };
 
   const statusTabs: { value: Enums<'order_status'> | 'all', label: string }[] = [
-    { value: 'all', label: 'Todos' }, 
+    { value: 'pending_payment', label: 'Aguardando Pag.' }, // Primeiro
     { value: 'pending', label: 'Pendentes' }, 
-    { value: 'pending_payment', label: 'Aguardando Pag.' }, // Adicionado
     { value: 'confirmed', label: 'Confirmados' },
     { value: 'preparing', label: 'Em Preparação' }, 
     { value: 'ready', label: 'Prontos' }, 
     { value: 'delivering', label: 'Em Entrega' },
     { value: 'delivered', label: 'Entregues' }, 
     { value: 'cancelled', label: 'Cancelados' },
+    { value: 'all', label: 'Todos' }, 
   ];
 
   return (
@@ -135,7 +135,7 @@ const Orders = () => {
       <OrderDetailsModal order={selectedOrder} isOpen={isModalOpen} onClose={handleCloseModal} />
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
         {restaurant?.id ? (
-          <Tabs defaultValue="pending">
+          <Tabs defaultValue="pending_payment">
             <TabsList className="w-full overflow-x-auto justify-start">{statusTabs.map(tab => <TabsTrigger key={tab.value} value={tab.value} className="whitespace-nowrap">{tab.label}</TabsTrigger>)}</TabsList>
             {statusTabs.map(tab => <TabsContent key={tab.value} value={tab.value} className="mt-6"><OrdersList status={tab.value} onViewDetails={handleViewDetails} restaurantId={restaurant.id} /></TabsContent>)}
           </Tabs>
