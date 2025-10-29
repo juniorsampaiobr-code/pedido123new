@@ -119,9 +119,15 @@ const Orders = () => {
   const handleCloseModal = () => { setIsModalOpen(false); setSelectedOrder(null); };
 
   const statusTabs: { value: Enums<'order_status'> | 'all', label: string }[] = [
-    { value: 'all', label: 'Todos' }, { value: 'pending', label: 'Pendentes' }, { value: 'confirmed', label: 'Confirmados' },
-    { value: 'preparing', label: 'Em Preparação' }, { value: 'ready', label: 'Prontos' }, { value: 'delivering', label: 'Em Entrega' },
-    { value: 'delivered', label: 'Entregues' }, { value: 'cancelled', label: 'Cancelados' },
+    { value: 'all', label: 'Todos' }, 
+    { value: 'pending', label: 'Pendentes' }, 
+    { value: 'pending_payment', label: 'Aguardando Pag.' }, // Adicionado
+    { value: 'confirmed', label: 'Confirmados' },
+    { value: 'preparing', label: 'Em Preparação' }, 
+    { value: 'ready', label: 'Prontos' }, 
+    { value: 'delivering', label: 'Em Entrega' },
+    { value: 'delivered', label: 'Entregues' }, 
+    { value: 'cancelled', label: 'Cancelados' },
   ];
 
   return (
