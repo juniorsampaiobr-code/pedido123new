@@ -212,8 +212,9 @@ const Checkout = () => {
   const deliveryOption = form.watch('delivery_option');
   const selectedPaymentMethodId = form.watch('payment_method_id');
   const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
-  
   const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online';
+  const isPixPayment = selectedPaymentMethod?.name === 'PIX';
+  const isCardPayment = isOnlinePayment; // Pagamento Online é o cartão de crédito
   const isCashPayment = selectedPaymentMethod?.name === 'Dinheiro';
   
   const lat = form.watch('latitude');
@@ -279,13 +280,13 @@ const Checkout = () => {
       const coords = await geocodeAddress(fullAddressForGeocode);
       
       if (coords) {
-        form.setValue('latitude', coords[0]);
-        form.setValue('longitude', coords[1]);
+        form.setValue('latitude', coords[0], { shouldValidate: true });
+        form.setValue('longitude', coords[1], { shouldValidate: true });
         setShowMap(true);
         toast.success("Endereço encontrado e mapa atualizado!");
       } else {
-        form.setValue('latitude', null);
-        form.setValue('longitude', null);
+        form.setValue('latitude', null, { shouldValidate: true });
+        form.setValue('longitude', null, { shouldValidate: true });
         toast.warning("Endereço encontrado, mas não foi possível obter as coordenadas. Ajuste o pino no mapa manualmente.");
       }
 
@@ -447,18 +448,18 @@ const Checkout = () => {
   }, [paymentMethods, selectedPaymentMethodId, form]);
 
   useEffect(() => {
-    if (!isOnlinePayment) {
+    if (!isCardPayment) {
       setMpPaymentData(null);
     }
-  }, [isOnlinePayment]);
+  }, [isCardPayment]);
 
   // Resetar o formulário do Mercado Pago quando o método de pagamento muda
   useEffect(() => {
-    if (isOnlinePayment) {
+    if (isCardPayment) {
       setMpFormKey(prev => prev + 1);
       setMpPaymentData(null);
     }
-  }, [selectedPaymentMethodId, isOnlinePayment]);
+  }, [selectedPaymentMethodId, isCardPayment]);
 
   const orderMutation = useMutation({
     mutationFn: async (formData: CheckoutFormValues) => {
@@ -492,7 +493,7 @@ const Checkout = () => {
         customerId = newCustomer.id;
       }
 
-      const orderStatus = isOnlinePayment ? 'pending_payment' : 'pending';
+      const orderStatus = (isCardPayment || isPixPayment) ? 'pending_payment' : 'pending';
       const { data: newOrder, error: orderError } = await supabase.from('orders').insert({
         restaurant_id: restaurant.id, customer_id: customerId, status: orderStatus as Enums<'order_status'>,
         total_amount: total, delivery_fee: deliveryFee, notes: formData.notes,
@@ -509,61 +510,49 @@ const Checkout = () => {
       const { error: itemsError } = await supabase.from('order_items').insert(itemsInsert);
       if (itemsError) throw new Error(`Erro ao adicionar itens do pedido: ${itemsError.message}`);
 
-      // --- Lógica de Pagamento Online ---
-      if (isOnlinePayment) {
-        // Se houver dados de cartão, processa o pagamento diretamente (Cartão de Crédito)
-        if (mpPaymentData) {
-          setIsProcessingPayment(true);
-          toast.info("Processando pagamento com cartão...");
+      if (isCardPayment) {
+        if (!mpPaymentData) throw new Error("Dados de pagamento do cartão não fornecidos.");
+        
+        setIsProcessingPayment(true);
+        toast.info("Processando pagamento com cartão...");
 
-          const { data: paymentResult, error: paymentError } = await supabase.functions.invoke('process-mp-payment', {
-            body: { 
-              orderId, 
-              totalAmount: total, 
-              customerEmail: formData.email,
-              paymentData: {
-                ...mpPaymentData,
-                payer: {
-                  identification: {
-                    type: mpPaymentData.identificationType,
-                    number: formData.cpf_cnpj, // Usando CPF/CNPJ do formulário principal
-                  }
-                }
-              },
-            },
-          });
+        const { data: paymentResult, error: paymentError } = await supabase.functions.invoke('process-mp-payment', {
+          body: { 
+            orderId, 
+            totalAmount: total, 
+            customerEmail: formData.email,
+            paymentData: mpPaymentData,
+          },
+        });
 
-          if (paymentError) throw new Error(paymentError.message);
-          
-          if (paymentResult.status === 'approved') {
-            const { error: updateError } = await supabase.from('orders').update({ status: 'confirmed' }).eq('id', orderId);
-            if (updateError) throw new Error(`Erro ao confirmar pedido após pagamento: ${updateError.message}`);
-            toast.success("Pagamento aprovado e pedido confirmado!");
-            navigate(`/order-success/${orderId}`);
-          } else {
-            toast.warning(`Pagamento ${paymentResult.status}. Redirecionando para acompanhamento.`);
-            navigate(`/order-success/${orderId}?status=${paymentResult.status}`);
-          }
-          
+        if (paymentError) throw new Error(paymentError.message);
+        
+        if (paymentResult.status === 'approved') {
+          const { error: updateError } = await supabase.from('orders').update({ status: 'confirmed' }).eq('id', orderId);
+          if (updateError) throw new Error(`Erro ao confirmar pedido após pagamento: ${updateError.message}`);
+          toast.success("Pagamento aprovado e pedido confirmado!");
+          navigate(`/order-success/${orderId}`);
         } else {
-          // Se não houver dados de cartão, redireciona para a preferência (PIX/Boleto)
-          setIsProcessingPayment(true);
-          toast.info("Redirecionando para o pagamento online...");
-          const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
-            body: { orderId, items, totalAmount: total, restaurantName: restaurant.name },
-          });
-          if (preferenceError) throw new Error(preferenceError.message);
-          window.location.href = preferenceData.init_point;
-          // Retorna para evitar a navegação padrão de sucesso
-          return; 
+          toast.warning(`Pagamento ${paymentResult.status}. Redirecionando para acompanhamento.`);
+          navigate(`/order-success/${orderId}?status=${paymentResult.status}`);
         }
+        
+      } else if (isPixPayment) {
+        setIsProcessingPayment(true);
+        toast.info("Redirecionando para o pagamento PIX...");
+        const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
+          body: { orderId, items, totalAmount: total, restaurantName: restaurant.name },
+        });
+        if (preferenceError) throw new Error(preferenceError.message);
+        window.location.href = preferenceData.init_point;
+        // Não navegamos para order-success aqui, pois o Mercado Pago fará o redirecionamento
+        return; 
       }
 
       return orderId;
     },
     onSuccess: (orderId) => {
-      // Só navega para o sucesso se não for pagamento online (que já navega ou redireciona)
-      if (!isOnlinePayment) {
+      if (!isCardPayment && !isPixPayment) {
         toast.success(`Pedido #${orderId.slice(-4)} realizado com sucesso!`);
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         navigate(`/order-success/${orderId}`);
@@ -588,11 +577,8 @@ const Checkout = () => {
       }
     }
     
-    // 2. Validação de Pagamento Online (Apenas se for Cartão)
-    // Se for Pagamento Online, e o usuário não preencheu o cartão (mpPaymentData é null),
-    // assumimos que ele quer PIX/Boleto e o fluxo de redirecionamento será iniciado.
-    // Se for Pagamento Online E mpPaymentData existe, ele está tentando pagar com cartão.
-    if (isOnlinePayment && !mpPaymentData) {
+    // 2. Validação de Pagamento Online
+    if (isCardPayment && !mpPaymentData) {
       toast.warning("Por favor, preencha os dados do cartão.");
       return;
     }
@@ -613,18 +599,12 @@ const Checkout = () => {
 
   const isSubmitting = orderMutation.isPending || isProcessingPayment || isCalculatingFee;
   const isDeliveryValid = !isDeliverySelected || (!deliveryError && deliveryFee >= 0);
-  
-  // O botão de submissão deve estar habilitado se:
-  // 1. Não estiver processando/calculando.
-  // 2. A entrega for válida.
-  // 3. Se for Pagamento Online, ele deve estar habilitado, pois o fluxo de PIX/Boleto não exige mpPaymentData.
-  //    A única exceção é se o usuário preencheu o cartão, mas a validação falhou (o que é tratado pelo MercadoPagoForm).
-  const isSubmitButtonEnabled = !isSubmitting && isDeliveryValid;
+  const isSubmitButtonEnabled = !isSubmitting && isDeliveryValid && (!isCardPayment || mpPaymentData);
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-50">
-        <div className="container max-w-6xl mx-auto px-4 py-4 flex items-center">
+        <div className="container mx-auto px-4 py-4 max-w-6xl flex items-center">
           <Link to="/menu"><Button variant="ghost" size="icon" className="mr-4"><ArrowLeft className="h-5 w-5" /></Button></Link>
           <h1 className="text-2xl font-bold">Finalizar Pedido</h1>
         </div>
@@ -931,10 +911,10 @@ const Checkout = () => {
                     />
                     
                     {/* Formulário de Cartão de Crédito Mercado Pago */}
-                    {isOnlinePayment && (
+                    {isCardPayment && (
                       <div className="space-y-4 pt-4 border-t">
                         <h3 className="font-semibold flex items-center gap-2">
-                          <CreditCard className="h-4 w-4" /> Dados do Cartão (Opcional para PIX/Boleto)
+                          <CreditCard className="h-4 w-4" /> Dados do Cartão
                         </h3>
                         <MercadoPagoForm
                           key={mpFormKey}
@@ -953,7 +933,7 @@ const Checkout = () => {
                     )}
 
                     {/* Detalhes Adicionais (CPF/CNPJ) */}
-                    {isOnlinePayment && (
+                    {(isCardPayment || isPixPayment) && (
                       <div className="space-y-4 pt-4 border-t">
                         <h3 className="font-semibold flex items-center gap-2">
                           <CreditCard className="h-4 w-4" /> Detalhes Adicionais
