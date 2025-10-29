@@ -97,11 +97,6 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
                 </div>
                 
                 <div>
-                  <label for="form-checkout__cardholderEmail" class="block text-sm font-medium mb-1">E-mail</label>
-                  <input type="email" id="form-checkout__cardholderEmail" class="w-full p-2 border rounded" />
-                </div>
-                
-                <div>
                   <label for="form-checkout__cardNumber" class="block text-sm font-medium mb-1">Número do cartão</label>
                   <input type="text" id="form-checkout__cardNumber" class="w-full p-2 border rounded" />
                 </div>
@@ -171,10 +166,6 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
                     id: "form-checkout__cardholderName",
                     placeholder: "Titular do cartão",
                   },
-                  cardholderEmail: {
-                    id: "form-checkout__cardholderEmail",
-                    placeholder: "E-mail",
-                  },
                   cardNumber: {
                     id: "form-checkout__cardNumber",
                     placeholder: "Número do cartão",
@@ -230,7 +221,6 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
                         const {
                           paymentMethodId: payment_method_id,
                           issuerId: issuer_id,
-                          cardholderEmail: email,
                           amount,
                           token,
                           installments,
@@ -245,13 +235,8 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
                           payment_method_id,
                           transaction_amount: Number(amount),
                           installments: Number(installments),
-                          payer: {
-                            email,
-                            identification: {
-                              type: identificationType,
-                              number: identificationNumber,
-                            },
-                          },
+                          identificationNumber,
+                          identificationType,
                         });
                       }
                     } catch (error) {
