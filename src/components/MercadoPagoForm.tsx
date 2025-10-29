@@ -26,6 +26,7 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
   const [isCardPaymentReady, setIsCardPaymentReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const cardPaymentRef = useRef<any>(null);
+  const mercadoPagoInstance = useRef<any>(null);
 
   // Carrega o script do Mercado Pago dinamicamente
   useEffect(() => {
@@ -62,137 +63,190 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
       if (document.getElementById(scriptId)) {
         document.body.removeChild(script);
       }
-      // Limpa o container ao desmontar
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
-      }
     };
   }, [publicKey, onPaymentError]);
 
   // Inicializa o Mercado Pago e o CardPayment após o script carregar
   useEffect(() => {
-    if (isScriptLoading || scriptError || !publicKey || !containerRef.current) return;
+    if (isScriptLoading || scriptError || !publicKey || !window.MercadoPago) return;
 
     try {
-      // Verifica se o objeto MercadoPago está disponível
-      if (!window.MercadoPago) {
-        throw new Error('SDK do Mercado Pago não carregado.');
-      }
-
       console.log('Inicializando Mercado Pago com a chave:', publicKey.substring(0, 10) + '...');
-
-      // Inicializa o Mercado Pago
-      const mp = new window.MercadoPago(publicKey, {
-        locale: 'pt-BR'
-      });
+      
+      // Inicializa o Mercado Pago apenas uma vez
+      if (!mercadoPagoInstance.current) {
+        mercadoPagoInstance.current = new window.MercadoPago(publicKey, {
+          locale: 'pt-BR'
+        });
+      }
 
       // Limpa o container antes de montar
       if (containerRef.current) {
-        containerRef.current.innerHTML = '';
+        containerRef.current.innerHTML = `
+          <form id="form-checkout">
+            <div class="space-y-4">
+              <div>
+                <label for="form-checkout__cardholderName" class="block text-sm font-medium mb-1">Titular do cartão</label>
+                <input type="text" id="form-checkout__cardholderName" class="w-full p-2 border rounded" />
+              </div>
+              
+              <div>
+                <label for="form-checkout__cardholderEmail" class="block text-sm font-medium mb-1">E-mail</label>
+                <input type="email" id="form-checkout__cardholderEmail" class="w-full p-2 border rounded" />
+              </div>
+              
+              <div>
+                <label for="form-checkout__cardNumber" class="block text-sm font-medium mb-1">Número do cartão</label>
+                <input type="text" id="form-checkout__cardNumber" class="w-full p-2 border rounded" />
+              </div>
+              
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label for="form-checkout__cardExpirationMonth" class="block text-sm font-medium mb-1">Mês de vencimento</label>
+                  <input type="text" id="form-checkout__cardExpirationMonth" class="w-full p-2 border rounded" placeholder="MM" />
+                </div>
+                <div>
+                  <label for="form-checkout__cardExpirationYear" class="block text-sm font-medium mb-1">Ano de vencimento</label>
+                  <input type="text" id="form-checkout__cardExpirationYear" class="w-full p-2 border rounded" placeholder="YY" />
+                </div>
+              </div>
+              
+              <div>
+                <label for="form-checkout__securityCode" class="block text-sm font-medium mb-1">Código de segurança</label>
+                <input type="text" id="form-checkout__securityCode" class="w-full p-2 border rounded" />
+              </div>
+              
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label for="form-checkout__identificationType" class="block text-sm font-medium mb-1">Tipo de documento</label>
+                  <select id="form-checkout__identificationType" class="w-full p-2 border rounded"></select>
+                </div>
+                <div>
+                  <label for="form-checkout__identificationNumber" class="block text-sm font-medium mb-1">Número do documento</label>
+                  <input type="text" id="form-checkout__identificationNumber" class="w-full p-2 border rounded" />
+                </div>
+              </div>
+              
+              <div>
+                <label for="form-checkout__issuer" class="block text-sm font-medium mb-1">Banco emissor</label>
+                <select id="form-checkout__issuer" class="w-full p-2 border rounded"></select>
+              </div>
+              
+              <div>
+                <label for="form-checkout__installments" class="block text-sm font-medium mb-1">Parcelas</label>
+                <select id="form-checkout__installments" class="w-full p-2 border rounded"></select>
+              </div>
+            </div>
+          </form>
+        `;
       }
       
       // Cria o CardPayment
-      cardPaymentRef.current = mp.cardForm({
-        amount: totalAmount.toString(),
-        autoMount: true,
-        form: {
-          id: "form-checkout",
-          cardholderName: {
-            id: "form-checkout__cardholderName",
-            placeholder: "Titular do cartão",
+      if (mercadoPagoInstance.current && !cardPaymentRef.current) {
+        cardPaymentRef.current = mercadoPagoInstance.current.cardForm({
+          amount: totalAmount.toString(),
+          autoMount: true,
+          form: {
+            id: "form-checkout",
+            cardholderName: {
+              id: "form-checkout__cardholderName",
+              placeholder: "Titular do cartão",
+            },
+            cardholderEmail: {
+              id: "form-checkout__cardholderEmail",
+              placeholder: "E-mail",
+            },
+            cardNumber: {
+              id: "form-checkout__cardNumber",
+              placeholder: "Número do cartão",
+            },
+            cardExpirationMonth: {
+              id: "form-checkout__cardExpirationMonth",
+              placeholder: "MM",
+            },
+            cardExpirationYear: {
+              id: "form-checkout__cardExpirationYear",
+              placeholder: "YY",
+            },
+            securityCode: {
+              id: "form-checkout__securityCode",
+              placeholder: "Código de segurança",
+            },
+            installments: {
+              id: "form-checkout__installments",
+              placeholder: "Parcelas",
+            },
+            identificationType: {
+              id: "form-checkout__identificationType",
+              placeholder: "Tipo de documento",
+            },
+            identificationNumber: {
+              id: "form-checkout__identificationNumber",
+              placeholder: "Número do documento",
+            },
+            issuer: {
+              id: "form-checkout__issuer",
+              placeholder: "Banco emissor",
+            },
           },
-          cardholderEmail: {
-            id: "form-checkout__cardholderEmail",
-            placeholder: "E-mail",
-          },
-          cardNumber: {
-            id: "form-checkout__cardNumber",
-            placeholder: "Número do cartão",
-          },
-          cardExpirationMonth: {
-            id: "form-checkout__cardExpirationMonth",
-            placeholder: "MM",
-          },
-          cardExpirationYear: {
-            id: "form-checkout__cardExpirationYear",
-            placeholder: "YY",
-          },
-          securityCode: {
-            id: "form-checkout__securityCode",
-            placeholder: "Código de segurança",
-          },
-          installments: {
-            id: "form-checkout__installments",
-            placeholder: "Parcelas",
-          },
-          identificationType: {
-            id: "form-checkout__identificationType",
-            placeholder: "Tipo de documento",
-          },
-          identificationNumber: {
-            id: "form-checkout__identificationNumber",
-            placeholder: "Número do documento",
-          },
-          issuer: {
-            id: "form-checkout__issuer",
-            placeholder: "Banco emissor",
-          },
-        },
-        callbacks: {
-          onFormMounted: (error: any) => {
-            if (error) {
-              console.error('Erro ao montar o formulário:', error);
-              toast.error("Erro ao carregar o formulário de pagamento.");
-              onPaymentError(error);
-            } else {
-              console.log('Formulário do Mercado Pago montado com sucesso');
-              setIsCardPaymentReady(true);
+          callbacks: {
+            onFormMounted: (error: any) => {
+              if (error) {
+                console.error('Erro ao montar o formulário:', error);
+                toast.error("Erro ao carregar o formulário de pagamento.");
+                onPaymentError(error);
+              } else {
+                console.log('Formulário do Mercado Pago montado com sucesso');
+                setIsCardPaymentReady(true);
+              }
+            },
+            onSubmit: (event: any) => {
+              event.preventDefault();
+              console.log('Enviando formulário de pagamento...');
+
+              try {
+                if (cardPaymentRef.current) {
+                  const formData = cardPaymentRef.current.getCardFormData();
+                  console.log('Dados do formulário:', formData);
+
+                  const {
+                    paymentMethodId: payment_method_id,
+                    issuerId: issuer_id,
+                    cardholderEmail: email,
+                    amount,
+                    token,
+                    installments,
+                    identificationNumber,
+                    identificationType,
+                  } = formData;
+
+                  // Chama o callback de sucesso com os dados do formulário
+                  onPaymentSuccess({
+                    token,
+                    issuer_id,
+                    payment_method_id,
+                    transaction_amount: Number(amount),
+                    installments: Number(installments),
+                    payer: {
+                      email,
+                      identification: {
+                        type: identificationType,
+                        number: identificationNumber,
+                      },
+                    },
+                  });
+                }
+              } catch (error) {
+                console.error('Erro ao processar dados do formulário:', error);
+                onPaymentError(error);
+              }
+            },
+            onFetching: (resource: any) => {
+              console.log('Fetching resource: ', resource);
             }
           },
-          onSubmit: (event: any) => {
-            event.preventDefault();
-            console.log('Enviando formulário de pagamento...');
-
-            try {
-              const formData = cardPaymentRef.current.getCardFormData();
-              console.log('Dados do formulário:', formData);
-
-              const {
-                paymentMethodId: payment_method_id,
-                issuerId: issuer_id,
-                cardholderEmail: email,
-                amount,
-                token,
-                installments,
-                identificationNumber,
-                identificationType,
-              } = formData;
-
-              // Chama o callback de sucesso com os dados do formulário
-              onPaymentSuccess({
-                token,
-                issuer_id,
-                payment_method_id,
-                transaction_amount: Number(amount),
-                installments: Number(installments),
-                payer: {
-                  email,
-                  identification: {
-                    type: identificationType,
-                    number: identificationNumber,
-                  },
-                },
-              });
-            } catch (error) {
-              console.error('Erro ao processar dados do formulário:', error);
-              onPaymentError(error);
-            }
-          },
-          onFetching: (resource: any) => {
-            console.log('Fetching resource: ', resource);
-          }
-        },
-      });
+        });
+      }
 
     } catch (e: any) {
       console.error("Erro ao inicializar Mercado Pago:", e);
@@ -205,6 +259,7 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
     return () => {
       if (cardPaymentRef.current && cardPaymentRef.current.unmount) {
         cardPaymentRef.current.unmount();
+        cardPaymentRef.current = null;
       }
     };
   }, [isScriptLoading, scriptError, publicKey, totalAmount, onPaymentSuccess, onPaymentError]);
@@ -254,62 +309,8 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
   }
 
   return (
-    <div className="mp-form-container">
-      <form id="form-checkout">
-        <div className="space-y-4">
-          <div>
-            <label htmlFor="form-checkout__cardholderName" className="block text-sm font-medium mb-1">Titular do cartão</label>
-            <input type="text" id="form-checkout__cardholderName" className="w-full p-2 border rounded" />
-          </div>
-          
-          <div>
-            <label htmlFor="form-checkout__cardholderEmail" className="block text-sm font-medium mb-1">E-mail</label>
-            <input type="email" id="form-checkout__cardholderEmail" className="w-full p-2 border rounded" />
-          </div>
-          
-          <div>
-            <label htmlFor="form-checkout__cardNumber" className="block text-sm font-medium mb-1">Número do cartão</label>
-            <input type="text" id="form-checkout__cardNumber" className="w-full p-2 border rounded" />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="form-checkout__cardExpirationMonth" className="block text-sm font-medium mb-1">Mês de vencimento</label>
-              <input type="text" id="form-checkout__cardExpirationMonth" className="w-full p-2 border rounded" placeholder="MM" />
-            </div>
-            <div>
-              <label htmlFor="form-checkout__cardExpirationYear" className="block text-sm font-medium mb-1">Ano de vencimento</label>
-              <input type="text" id="form-checkout__cardExpirationYear" className="w-full p-2 border rounded" placeholder="YY" />
-            </div>
-          </div>
-          
-          <div>
-            <label htmlFor="form-checkout__securityCode" className="block text-sm font-medium mb-1">Código de segurança</label>
-            <input type="text" id="form-checkout__securityCode" className="w-full p-2 border rounded" />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="form-checkout__identificationType" className="block text-sm font-medium mb-1">Tipo de documento</label>
-              <select id="form-checkout__identificationType" className="w-full p-2 border rounded"></select>
-            </div>
-            <div>
-              <label htmlFor="form-checkout__identificationNumber" className="block text-sm font-medium mb-1">Número do documento</label>
-              <input type="text" id="form-checkout__identificationNumber" className="w-full p-2 border rounded" />
-            </div>
-          </div>
-          
-          <div>
-            <label htmlFor="form-checkout__issuer" className="block text-sm font-medium mb-1">Banco emissor</label>
-            <select id="form-checkout__issuer" className="w-full p-2 border rounded"></select>
-          </div>
-          
-          <div>
-            <label htmlFor="form-checkout__installments" className="block text-sm font-medium mb-1">Parcelas</label>
-            <select id="form-checkout__installments" className="w-full p-2 border rounded"></select>
-          </div>
-        </div>
-      </form>
+    <div ref={containerRef} className="mp-form-container">
+      {/* O formulário será injetado aqui pelo Mercado Pago SDK */}
     </div>
   );
 };
