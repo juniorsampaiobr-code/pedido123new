@@ -213,7 +213,6 @@ const Checkout = () => {
   const selectedPaymentMethodId = form.watch('payment_method_id');
   const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
   
-  // Renomeando para isOnlinePayment para refletir que cobre PIX e Cartão
   const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online';
   const isCashPayment = selectedPaymentMethod?.name === 'Dinheiro';
   
@@ -594,10 +593,8 @@ const Checkout = () => {
     // assumimos que ele quer PIX/Boleto e o fluxo de redirecionamento será iniciado.
     // Se for Pagamento Online E mpPaymentData existe, ele está tentando pagar com cartão.
     if (isOnlinePayment && !mpPaymentData) {
-      // Se o usuário selecionou Pagamento Online, mas não preencheu o cartão,
-      // permitimos a submissão para iniciar o fluxo de PIX/Boleto (redirecionamento).
-      // A única exceção é se o formulário de cartão estiver visível e o usuário
-      // não tiver preenchido nada, mas isso é tratado pelo fluxo de redirecionamento.
+      toast.warning("Por favor, preencha os dados do cartão.");
+      return;
     }
     
     // 3. Mutação
