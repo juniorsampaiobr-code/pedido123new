@@ -88,7 +88,11 @@ const fetchDeliveryStatus = async (restaurantId: string): Promise<boolean> => {
     .eq('id', restaurantId)
     .single();
 
-  if (error) throw new Error(`Erro ao buscar status de entrega: ${error.message}`);
+  if (error) {
+    // Se a coluna não existir ou houver erro, assume que está ativado por padrão
+    console.warn('Erro ao buscar status de entrega:', error);
+    return true;
+  }
   return data.delivery_enabled ?? true;
 };
 
@@ -442,7 +446,7 @@ const Delivery = () => {
                   <Button 
                     type="submit" 
                     className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                    disabled={zonesMutation.isPending || !deliveryEnabled}
+                    disabled={zonesMutation.isPending}
                   >
                     {zonesMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
                   </Button>
