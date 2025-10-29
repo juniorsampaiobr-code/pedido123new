@@ -68,8 +68,12 @@ const checkoutSchema = z.object({
     message: 'CPF deve ter 11 dígitos ou CNPJ 14 dígitos.',
   }),
   change_for: z.preprocess(
-    (val) => String(val).replace(',', '.'),
-    z.coerce.number().optional().nullable(),
+    (val) => {
+      // Se o valor for string vazia, retorna null para evitar erro de coerce.number
+      if (val === '') return null;
+      return String(val).replace(',', '.');
+    },
+    z.coerce.number({ invalid_type_error: 'O troco deve ser um número.' }).optional().nullable(),
   ),
 }).superRefine((data, ctx) => {
   if (data.delivery_option === 'delivery') {
@@ -85,16 +89,10 @@ const checkoutSchema = z.object({
   
   // Se o pagamento for em dinheiro e 'change_for' for fornecido, deve ser maior ou igual ao total
   if (isCashPayment && data.change_for !== null && data.change_for !== undefined) {
-    // Nota: O total do pedido (cart.total) não está disponível diretamente no schema Zod.
-    // Vamos relaxar a validação aqui e confiar na validação do formulário React Hook Form/UI.
-    // Apenas garantimos que se for fornecido, seja um número positivo.
     if (data.change_for <= 0) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'O valor do troco deve ser positivo.', path: ['change_for'] });
     }
   }
-  
-  // Se o pagamento NÃO for em dinheiro, garantimos que o campo seja nulo/undefined para evitar erros de validação.
-  // Isso é tratado pelo React Hook Form, mas é bom ter a clareza no schema.
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -333,7 +331,7 @@ const Checkout = () => {
     
     // Limpar campo de troco ao mudar de método de pagamento
     if (!isCashPayment) {
-      form.setValue('change_for', null);
+      form.setValue('change_for', null, { shouldValidate: true }); // Adicionado shouldValidate: true
     }
 
     if (addressInputMode === 'manual') {
@@ -348,90 +346,7 @@ const Checkout = () => {
       form.setValue('city', '');
       form.setValue('zip_code', '');
     }
-  }, [addressInputMode, form, setDeliveryFee, isCashPayment]);
-
-  useEffect(() => {
-    const calculateFee = async () => {
-      // Se as taxas de entrega estiverem desativadas, não calcular taxa
-      if (!deliveryEnabled) {
-        setDeliveryFee(0);
-        setDeliveryError(null);
-        setDeliveryTime(null);
-        return;
-      }
-
-      if (deliveryOption === 'pickup' || !restaurant?.latitude || !restaurant?.longitude) {
-        setDeliveryFee(0);
-        setDeliveryError(null);
-        setDeliveryTime(null);
-        return;
-      }
-
-      setIsCalculatingFee(true);
-      setDeliveryError(null);
-
-      let customerCoords: [number, number] | null = null;
-      
-      if (lat && lng) {
-        customerCoords = [lat, lng];
-      } else {
-        const [street, number, complement, neighborhood, city, zipCode] = addressFields;
-        const cleanedZip = cleanZipCode(zipCode);
-        const isAddressComplete = street && number && neighborhood && city && cleanedZip.length === 8;
-        
-        if (isAddressComplete) {
-          const fullAddress = `${street}, ${number} ${complement}, ${neighborhood}, ${city}, ${zipCode}`;
-          customerCoords = await geocodeAddress(fullAddress);
-          
-          if (customerCoords) {
-            form.setValue('latitude', customerCoords[0]);
-            form.setValue('longitude', customerCoords[1]);
-            setShowMap(true);
-          }
-        }
-      }
-
-      if (customerCoords) {
-        const restaurantCoords: [number, number] = [restaurant.latitude, restaurant.longitude];
-        const feeResult = calculateDeliveryFee(customerCoords, restaurantCoords, deliveryZones);
-
-        if (feeResult) {
-          setDeliveryFee(feeResult.fee);
-          setDeliveryError(null);
-          setDeliveryTime({ minTime: feeResult.minTime, maxTime: feeResult.maxTime });
-        } else {
-          setDeliveryFee(0);
-          setDeliveryError("Seu endereço está fora da nossa área de entrega.");
-          setDeliveryTime(null);
-        }
-      } else {
-        setDeliveryFee(0);
-        setDeliveryTime(null);
-        
-        const [street, number, complement, neighborhood, city, zipCode] = addressFields;
-        const isAddressAttempted = street && number && neighborhood && city && cleanZipCode(zipCode).length === 8;
-        
-        if (isDeliverySelected && isAddressAttempted) {
-          setDeliveryError("Não foi possível localizar seu endereço para calcular a taxa. Por favor, verifique o endereço ou ajuste o pino no mapa.");
-          
-          if (restaurant?.latitude && restaurant?.longitude) {
-            form.setValue('latitude', restaurant.latitude);
-            form.setValue('longitude', restaurant.longitude);
-            setShowMap(true);
-          }
-        } else {
-          setDeliveryError(null);
-        }
-      }
-      setIsCalculatingFee(false);
-    };
-
-    const timeoutId = setTimeout(() => {
-      calculateFee();
-    }, 500); 
-
-    return () => clearTimeout(timeoutId);
-  }, [addressTrigger, restaurant, deliveryZones, form, setDeliveryFee, isDeliverySelected, lat, lng, addressInputMode, addressFields, deliveryEnabled]);
+  }, [addressInputMode, form, setDeliveryFee, isCashPayment, selectedPaymentMethodId]); // Adicionado selectedPaymentMethodId como dependência
 
   useEffect(() => {
     if (items.length === 0 && !isProcessingPayment) {
@@ -872,11 +787,7 @@ const Checkout = () => {
                             <RadioGroup 
                               onValueChange={(value) => {
                                 field.onChange(value);
-                                // Limpa o troco se o novo método não for Dinheiro
-                                const newMethod = paymentMethods.find(m => m.id === value);
-                                if (newMethod?.name !== 'Dinheiro') {
-                                  form.setValue('change_for', null);
-                                }
+                                // A lógica de limpeza do troco foi movida para o useEffect para garantir que o Zod a veja.
                               }} 
                               defaultValue={field.value} 
                               className="flex flex-col space-y-2"
@@ -945,7 +856,7 @@ const Checkout = () => {
                       </div>
                     )}
                     
-                    {/* Troco (Dinheiro) */}
+                    {/* Troco (Dinheiro) - RENDERIZAÇÃO CONDICIONAL */}
                     {isCashPayment && (
                       <FormField 
                         control={form.control} 
