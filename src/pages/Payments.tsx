@@ -338,7 +338,7 @@ const Payments = () => {
                         <FormControl>
                           <Input 
                             {...field} 
-                            placeholder="TEST-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
+                            placeholder="APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
                             className="h-12"
                           />
                         </FormControl>
@@ -357,7 +357,7 @@ const Payments = () => {
                           <Input 
                             {...field} 
                             type="password"
-                            placeholder="TEST-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
+                            placeholder="APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
                             className="h-12"
                           />
                         </FormControl>
