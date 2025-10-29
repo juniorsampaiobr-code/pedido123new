@@ -216,7 +216,8 @@ const Checkout = () => {
   const selectedPaymentMethodId = form.watch('payment_method_id');
   const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
   // const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online'; // REMOVIDO
-  const isPixPayment = selectedPaymentMethod?.name === 'PIX';
+  const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento online: Pix/Cartão';
+  const isPixPayment = isOnlinePayment; // Mantendo a variável para a lógica de redirecionamento
   // const isCardPayment = isOnlinePayment; // REMOVIDO
   const isCashPayment = selectedPaymentMethod?.name === 'Dinheiro';
   
@@ -495,8 +496,8 @@ const Checkout = () => {
         customerId = newCustomer.id;
       }
 
-      // O status agora é sempre 'pending' (ou 'confirmed' se for PIX, mas vamos simplificar para 'pending' para todos os pagamentos na entrega/retirada)
-      const orderStatus = isPixPayment ? 'pending_payment' : 'pending';
+      // O status agora é sempre 'pending' (ou 'pending_payment' se for Pagamento Online)
+      const orderStatus = isOnlinePayment ? 'pending_payment' : 'pending';
       
       const { data: newOrder, error: orderError } = await supabase.from('orders').insert({
         restaurant_id: restaurant.id, customer_id: customerId, status: orderStatus as Enums<'order_status'>,
@@ -514,10 +515,10 @@ const Checkout = () => {
       const { error: itemsError } = await supabase.from('order_items').insert(itemsInsert);
       if (itemsError) throw new Error(`Erro ao adicionar itens do pedido: ${itemsError.message}`);
 
-      // REMOVIDA TODA A LÓGICA DE PAGAMENTO ONLINE (CARTÃO E PIX)
-      if (isPixPayment) {
+      // Lógica de Pagamento Online (agora usando o novo nome)
+      if (isOnlinePayment) {
         setIsProcessingPayment(true);
-        toast.info("Redirecionando para o pagamento PIX...");
+        toast.info("Redirecionando para o pagamento online...");
         const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
           body: { orderId, items, totalAmount: total, restaurantName: restaurant.name },
         });
@@ -529,8 +530,8 @@ const Checkout = () => {
       return orderId;
     },
     onSuccess: (orderId) => {
-      // Se não for PIX, navega diretamente para o sucesso
-      if (!isPixPayment) {
+      // Se não for Pagamento Online, navega diretamente para o sucesso
+      if (!isOnlinePayment) {
         toast.success(`Pedido #${orderId.slice(-4)} realizado com sucesso!`);
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         navigate(`/order-success/${orderId}`);
@@ -883,7 +884,7 @@ const Checkout = () => {
                     />
                     
                     {/* Detalhes Adicionais (CPF/CNPJ) */}
-                    {(isPixPayment) && ( // Apenas PIX agora
+                    {(isOnlinePayment) && ( // Agora verifica isOnlinePayment
                       <div className="space-y-4 pt-4 border-t">
                         <h3 className="font-semibold flex items-center gap-2">
                           <CreditCard className="h-4 w-4" /> Detalhes Adicionais
