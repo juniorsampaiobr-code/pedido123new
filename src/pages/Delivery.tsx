@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from "sonner";
-import { Plus, Trash2, Edit, Terminal, Settings } from 'lucide-react';
+import { Plus, Trash2, Edit, Terminal, Settings, ToggleLeft, ToggleRight } from 'lucide-react';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -19,9 +19,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useCallback, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
 
 type DeliveryZone = Tables<'delivery_zones'>;
 type Restaurant = Tables<'restaurants'>;
@@ -82,6 +83,7 @@ const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]>
 const Delivery = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [deliveryEnabled, setDeliveryEnabled] = useState(true);
 
   const { data: restaurant, isLoading: isLoadingRestaurant } = useQuery<Restaurant>({
     queryKey: ['restaurantDataForDelivery'],
@@ -181,6 +183,12 @@ const Delivery = () => {
 
   const hasCoordinates = restaurant?.latitude && restaurant?.longitude;
 
+  // Função para alternar o status de entrega
+  const toggleDeliveryStatus = () => {
+    setDeliveryEnabled(!deliveryEnabled);
+    toast.success(`Taxas de entrega ${!deliveryEnabled ? 'ativadas' : 'desativadas'} com sucesso!`);
+  };
+
   if (isLoadingZones || isLoadingRestaurant) {
     return (
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
@@ -227,10 +235,22 @@ const Delivery = () => {
       <div className="max-w-3xl mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl font-bold">Taxa de Entrega Dinâmica</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Defina a taxa de entrega com base na distância máxima em quilômetros (km) a partir do centro do seu restaurante.
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle className="text-2xl font-bold">Taxa de Entrega Dinâmica</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Defina a taxa de entrega com base na distância máxima em quilômetros (km) a partir do centro do seu restaurante.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 bg-muted p-3 rounded-lg">
+                <span className="text-sm font-medium">Taxas de Entrega</span>
+                <Switch
+                  checked={deliveryEnabled}
+                  onCheckedChange={toggleDeliveryStatus}
+                />
+                <span className="text-sm font-medium">{deliveryEnabled ? 'Ativadas' : 'Desativadas'}</span>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <Form {...zonesForm}>
@@ -376,7 +396,7 @@ const Delivery = () => {
                   <Button 
                     type="submit" 
                     className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                    disabled={zonesMutation.isPending}
+                    disabled={zonesMutation.isPending || !deliveryEnabled}
                   >
                     {zonesMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
                   </Button>
