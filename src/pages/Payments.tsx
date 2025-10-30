@@ -156,7 +156,7 @@ const Payments = () => {
     resolver: zodResolver(credentialsSchema),
     defaultValues: {
       mercado_pago_public_key: '',
-      mercado_pago_access_token: '',
+      mercado_pago_access_token: 'APP_USR-2065423906870531-102020-7f478dfd0d5a75ff13deb0e5548dc1f3-228392372', // Pre-filling with user's token for verification
     },
     mode: 'onBlur',
   });
@@ -165,7 +165,7 @@ const Payments = () => {
     if (settings) {
       credentialsForm.reset({
         mercado_pago_public_key: settings.mercado_pago_public_key || '',
-        mercado_pago_access_token: '',
+        mercado_pago_access_token: 'APP_USR-2065423906870531-102020-7f478dfd0d5a75ff13deb0e5548dc1f3-228392372', // Keep pre-filled
       });
     }
   }, [settings, credentialsForm]);
