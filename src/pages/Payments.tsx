@@ -150,7 +150,6 @@ const Payments = () => {
   });
 
   useEffect(() => {
-    console.log('Settings data updated, resetting form:', settings);
     if (settings) {
       credentialsForm.reset({
         mercado_pago_public_key: settings.mercado_pago_public_key || '',
@@ -173,16 +172,17 @@ const Payments = () => {
 
       if (response.error) throw new Error(response.error.message);
       
-      const result = response.data as { message: string, token_verified: boolean };
-      
-      if (!result.token_verified) {
-        toast.warning("Chave pública salva, mas o Access Token fornecido não corresponde ao segredo configurado.");
-      }
-      
-      return result;
+      return response.data as { message: string, token_verified: boolean };
     },
-    onSuccess: () => {
-      toast.success('Credenciais do Mercado Pago salvas com sucesso!');
+    onSuccess: (result) => {
+      if (result.token_verified) {
+        toast.success('Credenciais do Mercado Pago salvas com sucesso!');
+      } else {
+        toast.warning('Atenção!', {
+          description: result.message,
+          duration: 15000,
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ['paymentSettings'] });
     },
     onError: (err) => {
@@ -341,7 +341,7 @@ const Payments = () => {
                             className="h-12"
                           />
                         </FormControl>
-                        <p className="text-xs text-muted-foreground">Chave pública para identificação da aplicação</p>
+                        <p className="text-xs text-muted-foreground">Chave pública para identificação da aplicação. Esta chave é salva aqui.</p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -356,11 +356,13 @@ const Payments = () => {
                           <Input 
                             {...field} 
                             type="password"
-                            placeholder="APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
+                            placeholder="Cole seu Access Token aqui para verificação" 
                             className="h-12"
                           />
                         </FormControl>
-                        <p className="text-xs text-muted-foreground">Token de acesso para processar pagamentos (mantido em segredo)</p>
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-bold text-destructive">Importante:</span> O Access Token é um segredo e deve ser salvo no painel do seu projeto Supabase, não aqui. Este campo serve apenas para verificar se o token que você salvou lá está correto.
+                        </p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -370,7 +372,7 @@ const Payments = () => {
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg mt-6"
                     disabled={credentialsMutation.isPending}
                   >
-                    {credentialsMutation.isPending ? 'Salvando...' : 'Salvar Credenciais'}
+                    {credentialsMutation.isPending ? 'Salvando...' : 'Salvar e Verificar Credenciais'}
                   </Button>
                 </form>
               </Form>

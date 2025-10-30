@@ -27,51 +27,34 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Verificar se já existe uma configuração para este restaurante
-    const { data: existingSetting, error: selectError } = await supabaseAdmin
+    // 1. Upsert (Update or Insert) the payment setting with the public key
+    const { error: dbError } = await supabaseAdmin
       .from('payment_settings')
-      .select('restaurant_id')
-      .eq('restaurant_id', restaurant_id)
-      .single();
-
-    // Ignora o erro 'PGRST116' que significa "nenhuma linha encontrada", pois isso é esperado
-    if (selectError && selectError.code !== 'PGRST116') {
-      console.error('Error checking for existing settings:', selectError);
-      throw new Error(`Failed to check for settings: ${selectError.message}`);
-    }
-
-    let dbError;
-    if (existingSetting) {
-      // 2a. Se existe, ATUALIZA a chave pública
-      console.log(`Existing setting found for restaurant ${restaurant_id}. Updating...`);
-      const { error } = await supabaseAdmin
-        .from('payment_settings')
-        .update({ mercado_pago_public_key: public_key })
-        .eq('restaurant_id', restaurant_id);
-      dbError = error;
-    } else {
-      // 2b. Se não existe, INSERE uma nova configuração
-      console.log(`No setting found for restaurant ${restaurant_id}. Inserting...`);
-      const { error } = await supabaseAdmin
-        .from('payment_settings')
-        .insert({
-          restaurant_id: restaurant_id,
-          mercado_pago_public_key: public_key
-        });
-      dbError = error;
-    }
+      .upsert({
+        restaurant_id: restaurant_id,
+        mercado_pago_public_key: public_key
+      }, { onConflict: 'restaurant_id' });
 
     if (dbError) {
       console.error('Database operation error:', dbError);
       throw new Error(`Failed to save public key: ${dbError.message}`);
     }
 
-    // 3. Verificar o Access Token (mesma lógica de antes)
+    // 2. Verify the provided Access Token against the one stored in Supabase secrets
     const storedAccessToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
     const tokenMatch = storedAccessToken && access_token === storedAccessToken;
 
+    let message = 'Chave pública salva com sucesso.';
+    if (!tokenMatch) {
+        if (storedAccessToken) {
+            message = 'A Chave Pública foi salva, mas o Access Token que você digitou não corresponde ao que está salvo nos Segredos do Supabase. O pagamento online não funcionará até que o segredo correto seja configurado no painel do Supabase.';
+        } else {
+            message = 'A Chave Pública foi salva, mas o segredo MERCADO_PAGO_ACCESS_TOKEN não foi encontrado no seu projeto Supabase. O pagamento online não funcionará até que você o configure no painel do Supabase.';
+        }
+    }
+
     return new Response(JSON.stringify({ 
-        message: 'Credentials saved successfully.',
+        message: message,
         token_verified: tokenMatch,
     }), {
       headers: corsHeaders,
