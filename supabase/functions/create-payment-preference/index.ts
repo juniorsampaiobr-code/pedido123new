@@ -16,9 +16,11 @@ serve(async (req) => {
     const accessToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
     
     if (!accessToken) {
+      console.error("MERCADO_PAGO_ACCESS_TOKEN is not configured.");
       throw new Error("Mercado Pago access token is not configured.");
     }
     if (!clientUrl) {
+      console.error("Client URL is missing.");
       throw new Error("Client URL is required for payment redirection.");
     }
 
@@ -50,7 +52,7 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorBody = await response.json();
-      console.error("Mercado Pago API Error:", errorBody);
+      console.error("Mercado Pago API Error:", errorBody); // Loga o erro da API
       throw new Error(`Failed to create payment preference: ${errorBody.message || response.statusText}`);
     }
 
@@ -62,9 +64,9 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("Edge Function Catch Error:", error); // Loga o erro geral
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       status: 500,
     });
   }
