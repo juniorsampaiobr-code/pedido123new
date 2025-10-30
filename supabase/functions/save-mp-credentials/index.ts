@@ -16,48 +16,59 @@ serve(async (req) => {
     const { public_key, access_token, restaurant_id } = await req.json();
 
     if (!restaurant_id || !public_key || !access_token) {
-      console.error('Missing required fields:', { restaurant_id, public_key: public_key ? 'present' : 'missing', access_token: access_token ? 'present' : 'missing' });
       return new Response(JSON.stringify({ error: 'Missing required fields.' }), {
         status: 400,
         headers: corsHeaders,
       });
     }
 
-    // 1. Initialize Supabase client with Service Role Key for secure database access
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 2. Check if the provided Access Token matches the secret stored in Supabase environment
-    const storedAccessToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
-    
-    let tokenMatch = false;
-    if (storedAccessToken && access_token === storedAccessToken) {
-        tokenMatch = true;
-    } else {
-        console.warn('Access Token mismatch or secret not set in environment.');
+    // 1. Verificar se já existe uma configuração para este restaurante
+    const { data: existingSetting, error: selectError } = await supabaseAdmin
+      .from('payment_settings')
+      .select('restaurant_id')
+      .eq('restaurant_id', restaurant_id)
+      .single();
+
+    // Ignora o erro 'PGRST116' que significa "nenhuma linha encontrada", pois isso é esperado
+    if (selectError && selectError.code !== 'PGRST116') {
+      console.error('Error checking for existing settings:', selectError);
+      throw new Error(`Failed to check for settings: ${selectError.message}`);
     }
 
-    // 3. Save the Public Key in the database using upsert (simpler update/insert)
-    // Since 'restaurant_id' is unique/primary key, upsert works perfectly.
-    const { error: dbError } = await supabaseAdmin
+    let dbError;
+    if (existingSetting) {
+      // 2a. Se existe, ATUALIZA a chave pública
+      console.log(`Existing setting found for restaurant ${restaurant_id}. Updating...`);
+      const { error } = await supabaseAdmin
         .from('payment_settings')
-        .upsert({ 
-            restaurant_id: restaurant_id, 
-            mercado_pago_public_key: public_key 
-        }, { 
-            onConflict: 'restaurant_id' 
+        .update({ mercado_pago_public_key: public_key })
+        .eq('restaurant_id', restaurant_id);
+      dbError = error;
+    } else {
+      // 2b. Se não existe, INSERE uma nova configuração
+      console.log(`No setting found for restaurant ${restaurant_id}. Inserting...`);
+      const { error } = await supabaseAdmin
+        .from('payment_settings')
+        .insert({
+          restaurant_id: restaurant_id,
+          mercado_pago_public_key: public_key
         });
-
+      dbError = error;
+    }
 
     if (dbError) {
-        console.error('Database upsert error:', dbError);
-        return new Response(JSON.stringify({ error: `Failed to save public key: ${dbError.message}` }), {
-            status: 500,
-            headers: corsHeaders,
-        });
+      console.error('Database operation error:', dbError);
+      throw new Error(`Failed to save public key: ${dbError.message}`);
     }
+
+    // 3. Verificar o Access Token (mesma lógica de antes)
+    const storedAccessToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
+    const tokenMatch = storedAccessToken && access_token === storedAccessToken;
 
     return new Response(JSON.stringify({ 
         message: 'Credentials saved successfully.',
