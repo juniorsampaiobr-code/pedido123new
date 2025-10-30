@@ -79,9 +79,11 @@ serve(async (req) => {
     }
 
     // --- 3. Preparar Preferência ---
+    // Sanitiza o nome do restaurante para o statement_descriptor (máx 22 caracteres, apenas alfanumérico)
     let sanitizedRestaurantName = restaurantName
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9 ]/g, '')
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove acentos
+      .replace(/[^a-zA-Z0-9 ]/g, '') // Remove caracteres especiais (exceto espaços)
+      .toUpperCase() // Converte para maiúsculas
       .substring(0, 22)
       .trim();
     
@@ -130,7 +132,7 @@ serve(async (req) => {
       
       console.error("[create-payment-preference] Mercado Pago API Error:", errorBody);
       const cause = errorBody.cause && errorBody.cause.length > 0 ? errorBody.cause[0].description : errorBody.message;
-      throw new Error(`Mercado Pago Error: ${cause || response.statusText}`);
+      throw new Error(`Mercado Pago Error: ${cause || errorBody.message || response.statusText}`);
     }
 
     const data = await response.json();
