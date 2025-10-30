@@ -499,6 +499,7 @@ export type Database = {
           address: string | null
           city: string | null
           created_at: string | null
+          delivery_enabled: boolean | null
           description: string | null
           email: string | null
           id: string
@@ -520,6 +521,7 @@ export type Database = {
           address?: string | null
           city?: string | null
           created_at?: string | null
+          delivery_enabled?: boolean | null
           description?: string | null
           email?: string | null
           id?: string
@@ -541,6 +543,7 @@ export type Database = {
           address?: string | null
           city?: string | null
           created_at?: string | null
+          delivery_enabled?: boolean | null
           description?: string | null
           email?: string | null
           id?: string

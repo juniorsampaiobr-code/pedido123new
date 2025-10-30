@@ -36,8 +36,7 @@ import { LocationPickerMap } from '@/components/LocationPickerMap';
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
 type DeliveryZone = Tables<'delivery_zones'>;
-// Estendendo o tipo Restaurant para incluir delivery_enabled, que existe no DB mas não no types.ts
-type Restaurant = Tables<'restaurants'> & { delivery_enabled: boolean | null };
+type Restaurant = Tables<'restaurants'>; // Usando o tipo correto agora
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const cleanZipCode = (zipCode: string) => zipCode.replace(/\D/g, '');
@@ -97,14 +96,14 @@ type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 const fetchRestaurantData = async (): Promise<Restaurant> => {
   const { data, error } = await supabase
     .from('restaurants')
-    .select('id, name, address, phone, email, street, number, neighborhood, city, zip_code, latitude, longitude')
+    .select('id, name, address, phone, email, street, number, neighborhood, city, zip_code, latitude, longitude, delivery_enabled')
     .eq('is_active', true)
     .limit(1)
     .single();
 
   if (error) throw new Error(`Erro ao buscar restaurante: ${error.message}`);
   if (!data) throw new Error('Nenhum restaurante ativo encontrado.');
-  // Corrigindo TS2740: Forçando o tipo para o tipo estendido, pois a query não seleciona todas as colunas, mas o tipo Restaurant é necessário para o contexto.
+  // A query agora seleciona delivery_enabled, e o tipo Restaurant foi atualizado.
   return data as Restaurant; 
 };
 
@@ -116,8 +115,7 @@ const fetchDeliveryStatus = async (restaurantId: string): Promise<boolean> => {
     .single();
 
   if (error) throw new Error(`Erro ao buscar status de entrega: ${error.message}`);
-  // Usamos 'any' para contornar o erro de tipagem do TS2339
-  return (data as any).delivery_enabled ?? true;
+  return data.delivery_enabled ?? true;
 };
 
 const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[]> => {

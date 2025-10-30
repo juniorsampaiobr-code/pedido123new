@@ -25,8 +25,7 @@ import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 
 type DeliveryZone = Tables<'delivery_zones'>;
-// Estendendo o tipo Restaurant para incluir delivery_enabled, que existe no DB mas não no types.ts
-type Restaurant = Tables<'restaurants'> & { delivery_enabled: boolean | null };
+type Restaurant = Tables<'restaurants'>; // Usando o tipo correto agora
 
 const zoneSchema = z.object({
   id: z.string().optional(),
@@ -67,7 +66,7 @@ const fetchRestaurantData = async (): Promise<Restaurant> => {
 
   if (error) throw new Error(`Erro ao buscar dados do restaurante: ${error.message}`);
   if (!data) throw new Error('Nenhum restaurante encontrado.');
-  return data as Restaurant;
+  return data;
 };
 
 const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]> => {
@@ -93,13 +92,12 @@ const fetchDeliveryStatus = async (restaurantId: string): Promise<boolean> => {
     console.warn('Erro ao buscar status de entrega:', error);
     return true;
   }
-  // Usamos 'any' para contornar o erro de tipagem do TS2339
-  return (data as any).delivery_enabled ?? true;
+  return data.delivery_enabled ?? true;
 };
 
 // Função para atualizar o status das taxas de entrega
 const updateDeliveryStatus = async (restaurantId: string, enabled: boolean) => {
-  const updatePayload: TablesUpdate<'restaurants'> & { delivery_enabled?: boolean } = {
+  const updatePayload: TablesUpdate<'restaurants'> = {
     delivery_enabled: enabled,
   };
   
