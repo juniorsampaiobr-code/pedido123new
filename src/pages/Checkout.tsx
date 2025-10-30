@@ -324,33 +324,54 @@ const Checkout = () => {
     }
   }, [form, updateAddressFields]);
 
+  // Effect 1: Handle payment method specific resets (e.g., clearing change_for)
   useEffect(() => {
-    form.setValue('latitude', null);
-    form.setValue('longitude', null);
-    setShowMap(false);
-    setDeliveryFee(0);
-    setDeliveryError(null);
-    setDeliveryTime(null);
-    // setMpPaymentData(null); // REMOVIDO
-    
     // Limpar campo de troco ao mudar de método de pagamento
     if (!isCashPayment) {
       form.setValue('change_for', null, { shouldValidate: true }); 
     }
+  }, [isCashPayment, form]);
 
-    if (addressInputMode === 'manual') {
-      setSearchCep('');
-      setSearchNumber('');
+  // Effect 2: Handle delivery option and address input mode changes
+  useEffect(() => {
+    // Reset delivery state when delivery option changes
+    if (deliveryOption === 'pickup') {
+        setDeliveryFee(0);
+        setDeliveryError(null);
+        setDeliveryTime(null);
+        form.setValue('latitude', null);
+        form.setValue('longitude', null);
+        setShowMap(false);
     }
-    if (addressInputMode === 'search') {
-      form.setValue('street', '');
-      form.setValue('number', '');
-      form.setValue('complement', '');
-      form.setValue('neighborhood', '');
-      form.setValue('city', '');
-      form.setValue('zip_code', '');
+
+    // Reset address fields based on input mode change
+    if (isDeliverySelected) {
+        // Reset coordinates and map visibility when switching modes
+        form.setValue('latitude', null);
+        form.setValue('longitude', null);
+        setShowMap(false);
+
+        if (addressInputMode === 'manual') {
+            setSearchCep('');
+            setSearchNumber('');
+        }
+        if (addressInputMode === 'search') {
+            // Clear manual fields when switching to search mode
+            form.setValue('street', '');
+            form.setValue('number', '');
+            form.setValue('complement', '');
+            form.setValue('neighborhood', '');
+            form.setValue('city', '');
+            form.setValue('zip_code', '');
+        }
     }
-  }, [addressInputMode, form, setDeliveryFee, isCashPayment, selectedPaymentMethodId]); 
+  }, [deliveryOption, addressInputMode, isDeliverySelected, form, setDeliveryFee]);
+
+  useEffect(() => {
+    if (paymentMethods.length > 0 && !selectedPaymentMethodId) {
+      form.setValue('payment_method_id', paymentMethods[0].id);
+    }
+  }, [paymentMethods, selectedPaymentMethodId, form]);
 
   useEffect(() => {
     const calculateFee = async () => {
@@ -444,25 +465,6 @@ const Checkout = () => {
       return () => clearTimeout(timer);
     }
   }, [items.length, navigate, isProcessingPayment]);
-
-  useEffect(() => {
-    if (paymentMethods.length > 0 && !selectedPaymentMethodId) {
-      form.setValue('payment_method_id', paymentMethods[0].id);
-    }
-  }, [paymentMethods, selectedPaymentMethodId, form]);
-
-  // useEffect(() => { // REMOVIDO: Lógica de Pagamento Online
-  //   if (!isCardPayment) {
-  //     setMpPaymentData(null);
-  //   }
-  // }, [isCardPayment]);
-
-  // useEffect(() => { // REMOVIDO: Lógica de Pagamento Online
-  //   if (isCardPayment) {
-  //     setMpFormKey(prev => prev + 1);
-  //     setMpPaymentData(null);
-  //   }
-  // }, [selectedPaymentMethodId, isCardPayment]);
 
   const orderMutation = useMutation({
     mutationFn: async (formData: CheckoutFormValues) => {
