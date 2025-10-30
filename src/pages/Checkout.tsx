@@ -93,6 +93,19 @@ const checkoutSchema = z.object({
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
+const fetchRestaurantData = async (): Promise<Restaurant> => {
+  const { data, error } = await supabase
+    .from('restaurants')
+    .select('id, name, address, phone, email, street, number, neighborhood, city, zip_code, latitude, longitude')
+    .eq('is_active', true)
+    .limit(1)
+    .single();
+
+  if (error) throw new Error(`Erro ao buscar restaurante: ${error.message}`);
+  if (!data) throw new Error('Nenhum restaurante ativo encontrado.');
+  return data;
+};
+
 const fetchDeliveryStatus = async (restaurantId: string): Promise<boolean> => {
   const { data, error } = await supabase
     .from('restaurants')
@@ -104,36 +117,29 @@ const fetchDeliveryStatus = async (restaurantId: string): Promise<boolean> => {
   return data.delivery_enabled ?? true;
 };
 
-const fetchInitialData = async () => {
-  const { data: restaurantData, error: restaurantError } = await supabase
-    .from('restaurants')
-    .select('id, name, address, phone, email, street, number, neighborhood, city, zip_code, latitude, longitude')
+const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[]> => {
+  const { data, error } = await supabase
+    .from('payment_methods')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
     .eq('is_active', true)
-    .limit(1)
-    .single();
+    .order('name', { ascending: true });
 
-  if (restaurantError) throw new Error(`Erro ao buscar restaurante: ${restaurantError.message}`);
-  if (!restaurantData) throw new Error('Nenhum restaurante ativo encontrado.');
+  if (error) throw new Error(`Erro ao buscar métodos de pagamento: ${error.message}`);
+  const filteredMethods = data.filter(method => method.name !== 'Pagamento Online');
+  return filteredMethods as PaymentMethod[];
+};
 
-  const restaurantId = restaurantData.id;
-  const deliveryEnabled = await fetchDeliveryStatus(restaurantId);
+const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]> => {
+  const { data, error } = await supabase
+    .from('delivery_zones')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .eq('is_active', true)
+    .order('max_distance_km', { ascending: true });
 
-  const [methodsResult, zonesResult] = await Promise.all([
-    supabase.from('payment_methods').select('*').eq('restaurant_id', restaurantId).eq('is_active', true).order('name', { ascending: true }),
-    supabase.from('delivery_zones').select('*').eq('restaurant_id', restaurantId).eq('is_active', true).order('max_distance_km', { ascending: true }),
-  ]);
-
-  if (methodsResult.error) throw new Error(`Erro ao buscar métodos de pagamento: ${methodsResult.error.message}`);
-  if (zonesResult.error) throw new Error(`Erro ao buscar zonas de entrega: ${zonesResult.error.message}`);
-
-  const filteredMethods = methodsResult.data.filter(method => method.name !== 'Pagamento Online');
-
-  return {
-    restaurant: restaurantData,
-    paymentMethods: filteredMethods as PaymentMethod[],
-    deliveryZones: zonesResult.data as DeliveryZone[],
-    deliveryEnabled,
-  };
+  if (error) throw new Error(`Erro ao buscar zonas de entrega: ${error.message}`);
+  return data as DeliveryZone[];
 };
 
 const getIconComponent = (iconName: string) => {
@@ -184,15 +190,36 @@ const Checkout = () => {
   const [showMap, setShowMap] = useState(false);
   const [addressInputMode, setAddressInputMode] = useState<'search' | 'manual'>('search');
 
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['checkoutInitialData'],
-    queryFn: fetchInitialData,
+  // 1. Fetch Restaurant Data (to get ID and coordinates)
+  const { data: restaurant, isLoading: isLoadingRestaurant, isError: isErrorRestaurant, error: errorRestaurant } = useQuery<Restaurant>({
+    queryKey: ['checkoutRestaurantData'],
+    queryFn: fetchRestaurantData,
   });
 
-  const restaurant = data?.restaurant;
-  const paymentMethods = data?.paymentMethods || [];
-  const deliveryZones = data?.deliveryZones || [];
-  const deliveryEnabled = data?.deliveryEnabled ?? true;
+  // 2. Fetch Delivery Status (separate query, easily invalidated)
+  const { data: deliveryEnabled = true, isLoading: isLoadingDeliveryStatus } = useQuery<boolean>({
+    queryKey: ['deliveryStatus', restaurant?.id],
+    queryFn: () => fetchDeliveryStatus(restaurant!.id),
+    enabled: !!restaurant?.id,
+  });
+
+  // 3. Fetch Payment Methods
+  const { data: paymentMethods = [], isLoading: isLoadingMethods } = useQuery<PaymentMethod[]>({
+    queryKey: ['checkoutPaymentMethods', restaurant?.id],
+    queryFn: () => fetchPaymentMethods(restaurant!.id),
+    enabled: !!restaurant?.id,
+  });
+
+  // 4. Fetch Delivery Zones
+  const { data: deliveryZones = [], isLoading: isLoadingZones } = useQuery<DeliveryZone[]>({
+    queryKey: ['checkoutDeliveryZones', restaurant?.id],
+    queryFn: () => fetchDeliveryZones(restaurant!.id),
+    enabled: !!restaurant?.id,
+  });
+
+  const isLoading = isLoadingRestaurant || isLoadingDeliveryStatus || isLoadingMethods || isLoadingZones;
+  const isError = isErrorRestaurant;
+  const error = errorRestaurant;
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),

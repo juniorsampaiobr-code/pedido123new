@@ -170,7 +170,9 @@ const Delivery = () => {
     mutationFn: ({ restaurantId, enabled }: { restaurantId: string; enabled: boolean }) => 
       updateDeliveryStatus(restaurantId, enabled),
     onSuccess: (_, variables) => {
+      // Invalida a query de status de entrega do dashboard e do checkout
       queryClient.invalidateQueries({ queryKey: ['deliveryStatus'] });
+      queryClient.invalidateQueries({ queryKey: ['checkoutDeliveryStatus'] });
       toast.success(`Taxas de entrega ${variables.enabled ? 'ativadas' : 'desativadas'} com sucesso!`);
     },
     onError: (err) => {
@@ -207,6 +209,7 @@ const Delivery = () => {
     onSuccess: () => {
       toast.success('Faixas de entrega salvas com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['deliveryZones'] });
+      queryClient.invalidateQueries({ queryKey: ['checkoutDeliveryZones'] });
     },
     onError: (err) => {
       toast.error(`Erro ao salvar faixas de entrega: ${err.message}`);
