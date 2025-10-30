@@ -15,16 +15,19 @@ const OrderSuccess = () => {
   const queryClient = useQueryClient();
   const { clearCart } = useCart();
 
+  // Status retornado pelo Mercado Pago após redirecionamento (approved, pending, failure)
   const paymentStatus = searchParams.get('status');
 
   const confirmPaymentMutation = useMutation({
     mutationFn: async (id: string) => {
+      // Esta função verifica o status do pagamento no MP usando o orderId como external_reference
       const { error } = await supabase.functions.invoke('confirm-payment', {
         body: { orderId: id },
       });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
+      // A Edge Function confirm-payment já atualiza o status do pedido para 'confirmed' se aprovado.
       toast.success("Pagamento confirmado com sucesso!");
       queryClient.invalidateQueries({ queryKey: ['orderStatus', orderId] });
     },
@@ -36,9 +39,12 @@ const OrderSuccess = () => {
   useEffect(() => {
     if (orderId) {
       clearCart();
+      // Se o Mercado Pago retornar 'approved', tentamos confirmar o pagamento no backend.
       if (paymentStatus === 'approved') {
         confirmPaymentMutation.mutate(orderId);
       }
+      // Se for 'pending' ou 'failure', o status do pedido já deve estar 'pending_payment'
+      // e o usuário pode acompanhar o status.
     }
   }, [orderId, paymentStatus, clearCart]);
 
@@ -62,7 +68,7 @@ const OrderSuccess = () => {
         <Link to="/menu"><Button variant="ghost" className="mb-4"><ArrowLeft className="h-4 w-4 mr-2" /> Voltar ao Cardápio</Button></Link>
       </div>
       
-      {confirmPaymentMutation.isPending && (
+      {confirmPaymentMutation.isPending && paymentStatus === 'approved' && (
         <Card className="w-full max-w-md text-center shadow-xl mb-6">
           <CardContent className="p-6 flex items-center justify-center">
             <Loader2 className="h-5 w-5 mr-3 animate-spin" />

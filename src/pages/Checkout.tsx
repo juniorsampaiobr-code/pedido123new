@@ -36,7 +36,7 @@ import { LocationPickerMap } from '@/components/LocationPickerMap';
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
 type DeliveryZone = Tables<'delivery_zones'>;
-type Restaurant = Tables<'restaurants'>; // Usando o tipo correto agora
+type Restaurant = Tables<'restaurants'>;
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const cleanZipCode = (zipCode: string) => zipCode.replace(/\D/g, '');
@@ -103,7 +103,6 @@ const fetchRestaurantData = async (): Promise<Restaurant> => {
 
   if (error) throw new Error(`Erro ao buscar restaurante: ${error.message}`);
   if (!data) throw new Error('Nenhum restaurante ativo encontrado.');
-  // A query agora seleciona delivery_enabled, e o tipo Restaurant foi atualizado.
   return data as Restaurant; 
 };
 
@@ -529,6 +528,7 @@ const Checkout = () => {
         
         const clientUrl = window.location.origin; 
         
+        // Usando o fluxo de redirecionamento para Pix/Cartão/Boleto
         const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
           body: { 
             orderId, 
@@ -541,7 +541,6 @@ const Checkout = () => {
 
         if (preferenceError) throw new Error(preferenceError.message);
         
-        // Verifica se a resposta da Edge Function contém um erro
         if (preferenceData && preferenceData.error) {
           throw new Error(`Mercado Pago Error: ${preferenceData.error}`);
         }
@@ -562,6 +561,7 @@ const Checkout = () => {
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         navigate(`/order-success/${orderId}`);
       }
+      // Se for online, a navegação é feita pelo redirecionamento do Mercado Pago
     },
     onError: (err) => {
       let userMessage = "Ocorreu um erro ao finalizar seu pedido. Por favor, tente novamente.";
@@ -922,7 +922,7 @@ const Checkout = () => {
                           name="cpf_cnpj" 
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>CPF/CNPJ (para a nota)</FormLabel>
+                              <FormLabel>CPF/CNPJ (para o pagamento online)</FormLabel>
                               <CpfCnpjInput {...field} />
                               <FormMessage />
                             </FormItem>
