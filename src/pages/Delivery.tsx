@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from "sonner";
 import { Plus, Trash2, Edit, Terminal, Settings, ToggleLeft, ToggleRight } from 'lucide-react';
-import { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Form,
@@ -25,7 +25,8 @@ import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 
 type DeliveryZone = Tables<'delivery_zones'>;
-type Restaurant = Tables<'restaurants'>;
+// Estendendo o tipo Restaurant para incluir delivery_enabled, que existe no DB mas não no types.ts
+type Restaurant = Tables<'restaurants'> & { delivery_enabled: boolean | null };
 
 const zoneSchema = z.object({
   id: z.string().optional(),
@@ -66,7 +67,7 @@ const fetchRestaurantData = async (): Promise<Restaurant> => {
 
   if (error) throw new Error(`Erro ao buscar dados do restaurante: ${error.message}`);
   if (!data) throw new Error('Nenhum restaurante encontrado.');
-  return data;
+  return data as Restaurant;
 };
 
 const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]> => {
@@ -89,18 +90,22 @@ const fetchDeliveryStatus = async (restaurantId: string): Promise<boolean> => {
     .single();
 
   if (error) {
-    // Se a coluna não existir ou houver erro, assume que está ativado por padrão
     console.warn('Erro ao buscar status de entrega:', error);
     return true;
   }
-  return data.delivery_enabled ?? true;
+  // Usamos 'any' para contornar o erro de tipagem do TS2339
+  return (data as any).delivery_enabled ?? true;
 };
 
 // Função para atualizar o status das taxas de entrega
 const updateDeliveryStatus = async (restaurantId: string, enabled: boolean) => {
+  const updatePayload: TablesUpdate<'restaurants'> & { delivery_enabled?: boolean } = {
+    delivery_enabled: enabled,
+  };
+  
   const { error } = await supabase
     .from('restaurants')
-    .update({ delivery_enabled: enabled })
+    .update(updatePayload)
     .eq('id', restaurantId);
 
   if (error) throw new Error(`Erro ao atualizar status de entrega: ${error.message}`);

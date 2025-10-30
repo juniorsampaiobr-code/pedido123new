@@ -60,8 +60,9 @@ export const MercadoPagoForm = ({ totalAmount, onPaymentSuccess, onPaymentError 
     document.body.appendChild(script);
 
     return () => {
-      if (document.getElementById(scriptId)) {
-        document.body.removeChild(script);
+      const existingScript = document.getElementById(scriptId);
+      if (existingScript) {
+        document.body.removeChild(existingScript);
       }
     };
   }, [publicKey, onPaymentError]);
