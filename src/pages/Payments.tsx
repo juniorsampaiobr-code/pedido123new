@@ -162,6 +162,8 @@ const Payments = () => {
     mutationFn: async (data: CredentialsFormValues) => {
       if (!restaurantId) throw new Error('ID do restaurante não disponível.');
       
+      console.log('Invoking save-mp-credentials with data:', data);
+
       const response = await supabase.functions.invoke('save-mp-credentials', {
         body: JSON.stringify({
           restaurant_id: restaurantId,
@@ -169,6 +171,8 @@ const Payments = () => {
           access_token: data.mercado_pago_access_token,
         }),
       });
+
+      console.log('Response from save-mp-credentials:', response);
 
       if (response.error) throw new Error(response.error.message);
       
