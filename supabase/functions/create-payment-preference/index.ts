@@ -63,6 +63,13 @@ serve(async (req) => {
       console.warn(`[create-payment-preference] Negative delivery fee calculated. Total: ${totalAmount}, Subtotal: ${subtotal}. This may indicate a rounding issue.`);
     }
 
+    // Sanitize restaurant name for statement descriptor
+    const sanitizedRestaurantName = restaurantName
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
+      .replace(/[^a-zA-Z0-9 ]/g, '') // Remove special characters, keep spaces
+      .substring(0, 22)
+      .trim();
+
     const preference = {
       items: preferenceItems,
       back_urls: {
@@ -72,7 +79,7 @@ serve(async (req) => {
       },
       auto_return: 'approved',
       external_reference: orderId,
-      statement_descriptor: restaurantName.substring(0, 22),
+      statement_descriptor: sanitizedRestaurantName,
     };
 
     console.log('[create-payment-preference] Creating preference with payload:', JSON.stringify(preference, null, 2));
