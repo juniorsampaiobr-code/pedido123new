@@ -512,10 +512,18 @@ const Checkout = () => {
         });
 
         if (preferenceError) throw new Error(preferenceError.message);
-        if (preferenceData.error) throw new Error(preferenceData.error);
         
-        window.location.href = preferenceData.init_point;
-        return; 
+        // Verifica se a resposta da Edge Function contém um erro
+        if (preferenceData && preferenceData.error) {
+          throw new Error(`Mercado Pago Error: ${preferenceData.error}`);
+        }
+        
+        if (preferenceData.init_point) {
+          window.location.href = preferenceData.init_point;
+          return; 
+        } else {
+          throw new Error("Resposta de pagamento inválida: init_point não encontrado.");
+        }
       }
 
       return orderId;
@@ -535,7 +543,7 @@ const Checkout = () => {
         userMessage = "Ocorreu um problema com a configuração de pagamento do restaurante. Por favor, entre em contato com o estabelecimento.";
       } else if (errorMessage.toLowerCase().includes('mercado pago error')) {
         const mpError = errorMessage.split('Mercado Pago Error:')[1];
-        userMessage = `O Mercado Pago retornou um erro: ${mpError || 'Tente novamente.'}. Verifique se sua conta Mercado Pago está totalmente ativada para produção.`;
+        userMessage = `O Mercado Pago retornou um erro: ${mpError || 'Tente novamente.'}`;
       } else if (errorMessage.toLowerCase().includes('fora da nossa área de entrega')) {
         userMessage = "Seu endereço está fora da nossa área de entrega.";
       }
