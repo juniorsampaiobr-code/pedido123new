@@ -25,18 +25,16 @@ serve(async (req) => {
       });
     }
     
-    console.log(`[create-payment-preference] Access Token loaded (first 5 chars): ${accessToken.substring(0, 5)}...`);
-
     if (!clientUrl) {
       console.error("[create-payment-preference] FATAL: Client URL is missing from the request body.");
       throw new Error("Client URL is required for payment redirection.");
     }
 
-    console.log(`[create-payment-preference] Processing ${items.length} items for a total of ${totalAmount}`);
-
-    // Mapeia e valida os itens do carrinho
+    // --- 1. Processar Itens e Calcular Subtotal ---
     const preferenceItems = items.map((item: any) => {
+      // Garante que o preço unitário é um número com 2 casas decimais
       const unit_price = parseFloat(item.price.toFixed(2));
+      
       if (unit_price <= 0 || !item.quantity || item.quantity <= 0) {
         console.warn(`[create-payment-preference] Filtering out invalid item: ${item.name} (Price: ${item.price}, Qty: ${item.quantity})`);
         return null;
@@ -47,7 +45,7 @@ serve(async (req) => {
         unit_price: unit_price,
         currency_id: 'BRL',
       };
-    }).filter(Boolean); // Remove null (invalid) items
+    }).filter(Boolean);
 
     if (preferenceItems.length === 0) {
       console.error("[create-payment-preference] FATAL: No valid items found after filtering.");
@@ -57,41 +55,47 @@ serve(async (req) => {
       });
     }
 
-    // Recalcula o subtotal com base nos itens válidos e calcula a taxa de entrega
+    // Recalcula o subtotal com base nos itens válidos
     const subtotal = preferenceItems.reduce((acc: number, item: any) => acc + (item.unit_price * item.quantity), 0);
-    const deliveryFee = totalAmount - subtotal;
+    
+    // --- 2. Calcular Taxa de Entrega ---
+    let deliveryFee = parseFloat((totalAmount - subtotal).toFixed(2));
+
+    // Se a taxa for negativa (erro de arredondamento ou lógica), forçamos a zero.
+    if (deliveryFee < 0) {
+      console.warn(`[create-payment-preference] Negative delivery fee calculated (${deliveryFee}). Forcing to 0.`);
+      deliveryFee = 0;
+    }
 
     // Adiciona a taxa de entrega como um item separado, se for positiva
     if (deliveryFee > 0) {
       preferenceItems.push({
         title: 'Taxa de Entrega',
         quantity: 1,
-        unit_price: parseFloat(deliveryFee.toFixed(2)),
+        unit_price: deliveryFee,
         currency_id: 'BRL',
       });
       console.log(`[create-payment-preference] Added delivery fee of ${deliveryFee.toFixed(2)}`);
-    } else if (deliveryFee < 0) {
-      console.warn(`[create-payment-preference] Negative delivery fee calculated. Total: ${totalAmount}, Subtotal: ${subtotal}. This may indicate a rounding issue.`);
     }
 
-    // Sanitize restaurant name for statement descriptor
+    // --- 3. Preparar Preferência ---
     let sanitizedRestaurantName = restaurantName
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
-      .replace(/[^a-zA-Z0-9 ]/g, '') // Remove special characters, keep spaces
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9 ]/g, '')
       .substring(0, 22)
       .trim();
     
     if (!sanitizedRestaurantName) {
-      sanitizedRestaurantName = "PEDIDO123"; // Fallback descriptor
+      sanitizedRestaurantName = "PEDIDO123";
     }
 
     const preference = {
       items: preferenceItems,
       payment_methods: {
         excluded_payment_types: [
-          { id: "ticket" } // Exclui Boleto
+          { id: "ticket" }
         ],
-        installments: 1 // Força pagamento à vista
+        installments: 1
       },
       back_urls: {
         success: `${clientUrl}/#/order-success/${orderId}?status=approved`,
@@ -140,7 +144,6 @@ serve(async (req) => {
   } catch (error) {
     console.error("[create-payment-preference] Edge Function Catch Error:", error);
     
-    // Tratamento de erro para garantir que a resposta seja sempre um JSON válido
     const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
     
     return new Response(JSON.stringify({ error: errorMessage }), {
