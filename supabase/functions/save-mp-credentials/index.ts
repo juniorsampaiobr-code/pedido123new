@@ -16,6 +16,7 @@ serve(async (req) => {
     const { public_key, access_token, restaurant_id } = await req.json();
 
     if (!restaurant_id || !public_key || !access_token) {
+      console.error('Missing required fields:', { restaurant_id, public_key: public_key ? 'present' : 'missing', access_token: access_token ? 'present' : 'missing' });
       return new Response(JSON.stringify({ error: 'Missing required fields.' }), {
         status: 400,
         headers: corsHeaders,
@@ -23,9 +24,6 @@ serve(async (req) => {
     }
 
     // 1. Initialize Supabase client with Service Role Key for secure database access
-    // We use the Service Role Key here because we need to check the Access Token against a secret
-    // and potentially perform privileged operations, although for this specific task, 
-    // we only need to save the public key.
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -37,15 +35,22 @@ serve(async (req) => {
     let tokenMatch = false;
     if (storedAccessToken && access_token === storedAccessToken) {
         tokenMatch = true;
+    } else {
+        console.warn('Access Token mismatch or secret not set in environment.');
     }
 
     // 3. Save the Public Key in the database (using the Admin client)
-    const { data: existingSettings } = await supabaseAdmin
+    const { data: existingSettings, error: fetchError } = await supabaseAdmin
         .from('payment_settings')
         .select('id')
         .eq('restaurant_id', restaurant_id)
         .limit(1)
         .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means no rows found
+        console.error('Database fetch error:', fetchError);
+        throw new Error(`Database fetch error: ${fetchError.message}`);
+    }
 
     let dbError;
     if (existingSettings) {
@@ -62,8 +67,8 @@ serve(async (req) => {
     }
 
     if (dbError) {
-        console.error('Database error:', dbError);
-        return new Response(JSON.stringify({ error: 'Failed to save public key.' }), {
+        console.error('Database update/insert error:', dbError);
+        return new Response(JSON.stringify({ error: `Failed to save public key: ${dbError.message}` }), {
             status: 500,
             headers: corsHeaders,
         });
@@ -78,7 +83,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error('General Edge Function Error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: corsHeaders,
       status: 500,
