@@ -151,9 +151,10 @@ const Payments = () => {
 
   useEffect(() => {
     if (settings) {
+      // Resetar o formulário com os dados mais recentes do banco de dados
       credentialsForm.reset({
         mercado_pago_public_key: settings.mercado_pago_public_key || '',
-        mercado_pago_access_token: '',
+        mercado_pago_access_token: '', // Sempre limpa o token de acesso por segurança
       });
     }
   }, [settings, credentialsForm]);
@@ -186,8 +187,9 @@ const Payments = () => {
     },
     onSuccess: () => {
       toast.success('Credenciais do Mercado Pago salvas com sucesso!');
+      // Força a revalidação da query para buscar os novos settings e atualizar o formulário
       queryClient.invalidateQueries({ queryKey: ['paymentSettings'] });
-      credentialsForm.reset({ mercado_pago_access_token: '' });
+      // O reset do formulário agora é tratado pelo useEffect que observa 'settings'
     },
     onError: (err) => {
       toast.error(`Erro ao salvar credenciais: ${err.message}`);
