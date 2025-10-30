@@ -39,35 +39,20 @@ serve(async (req) => {
         console.warn('Access Token mismatch or secret not set in environment.');
     }
 
-    // 3. Save the Public Key in the database (using the Admin client)
-    const { data: existingSettings, error: fetchError } = await supabaseAdmin
+    // 3. Save the Public Key in the database using upsert (simpler update/insert)
+    // Since 'restaurant_id' is unique/primary key, upsert works perfectly.
+    const { error: dbError } = await supabaseAdmin
         .from('payment_settings')
-        .select('id')
-        .eq('restaurant_id', restaurant_id)
-        .limit(1)
-        .single();
+        .upsert({ 
+            restaurant_id: restaurant_id, 
+            mercado_pago_public_key: public_key 
+        }, { 
+            onConflict: 'restaurant_id' 
+        });
 
-    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 means no rows found
-        console.error('Database fetch error:', fetchError);
-        throw new Error(`Database fetch error: ${fetchError.message}`);
-    }
-
-    let dbError;
-    if (existingSettings) {
-        const { error } = await supabaseAdmin
-            .from('payment_settings')
-            .update({ mercado_pago_public_key: public_key })
-            .eq('id', existingSettings.id);
-        dbError = error;
-    } else {
-        const { error } = await supabaseAdmin
-            .from('payment_settings')
-            .insert({ restaurant_id, mercado_pago_public_key: public_key });
-        dbError = error;
-    }
 
     if (dbError) {
-        console.error('Database update/insert error:', dbError);
+        console.error('Database upsert error:', dbError);
         return new Response(JSON.stringify({ error: `Failed to save public key: ${dbError.message}` }), {
             status: 500,
             headers: corsHeaders,
