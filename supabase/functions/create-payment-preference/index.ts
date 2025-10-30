@@ -59,16 +59,19 @@ serve(async (req) => {
         currency_id: 'BRL',
       });
     } else if (deliveryFee < 0) {
-      // Loga uma discrepância, mas continua o processo. O total pode estar ligeiramente incorreto.
       console.warn(`[create-payment-preference] Negative delivery fee calculated. Total: ${totalAmount}, Subtotal: ${subtotal}. This may indicate a rounding issue.`);
     }
 
     // Sanitize restaurant name for statement descriptor
-    const sanitizedRestaurantName = restaurantName
+    let sanitizedRestaurantName = restaurantName
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
       .replace(/[^a-zA-Z0-9 ]/g, '') // Remove special characters, keep spaces
       .substring(0, 22)
       .trim();
+    
+    if (!sanitizedRestaurantName) {
+      sanitizedRestaurantName = "PEDIDO123"; // Fallback descriptor
+    }
 
     const preference = {
       items: preferenceItems,
@@ -94,9 +97,16 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const errorBody = await response.json();
+      const errorBodyText = await response.text();
+      let errorBody;
+      try {
+        errorBody = JSON.parse(errorBodyText);
+      } catch (e) {
+        console.error("[create-payment-preference] Mercado Pago API Error: Could not parse JSON response. Body:", errorBodyText);
+        throw new Error(`Mercado Pago Error: ${response.statusText}`);
+      }
+      
       console.error("[create-payment-preference] Mercado Pago API Error:", errorBody);
-      // Tenta extrair a causa do erro para uma mensagem mais clara
       const cause = errorBody.cause && errorBody.cause.length > 0 ? errorBody.cause[0].description : errorBody.message;
       throw new Error(`Mercado Pago Error: ${cause || response.statusText}`);
     }
