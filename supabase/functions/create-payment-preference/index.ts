@@ -121,14 +121,15 @@ serve(async (req) => {
       body: JSON.stringify(preference),
     });
 
+    const responseBodyText = await response.text();
+    
     if (!response.ok) {
-      const errorBodyText = await response.text();
       let errorBody;
       try {
-        errorBody = JSON.parse(errorBodyText);
+        errorBody = JSON.parse(responseBodyText);
       } catch (e) {
-        console.error("[create-payment-preference] Mercado Pago API Error: Could not parse JSON response. Body:", errorBodyText);
-        throw new Error(`Mercado Pago Error: ${response.statusText}`);
+        console.error("[create-payment-preference] Mercado Pago API Error: Could not parse JSON response. Body:", responseBodyText);
+        throw new Error(`Mercado Pago Error: ${response.statusText}. Raw Body: ${responseBodyText}`);
       }
       
       console.error("[create-payment-preference] Mercado Pago API Error:", errorBody);
@@ -142,7 +143,7 @@ serve(async (req) => {
       throw new Error(`Mercado Pago Error: ${cause}`);
     }
 
-    const data = await response.json();
+    const data = JSON.parse(responseBodyText);
     console.log(`[create-payment-preference] Successfully created preference for orderId: ${orderId}`);
 
     return new Response(JSON.stringify({ init_point: data.init_point }), {
