@@ -13,7 +13,7 @@ serve(async (req) => {
 
   try {
     const { orderId, items, totalAmount, restaurantName, clientUrl } = await req.json();
-    console.log(`[create-payment-preference] Received request for orderId: ${orderId}`);
+    console.log(`[create-payment-preference] Received request for orderId: ${orderId}, Total: ${totalAmount}`);
 
     const accessToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
     
@@ -59,7 +59,8 @@ serve(async (req) => {
     const subtotal = preferenceItems.reduce((acc: number, item: any) => acc + (item.unit_price * item.quantity), 0);
     
     // --- 2. Calcular Taxa de Entrega ---
-    let deliveryFee = parseFloat((totalAmount - subtotal).toFixed(2));
+    // Usamos Math.round para evitar problemas de ponto flutuante ao subtrair
+    let deliveryFee = Math.round((totalAmount - subtotal) * 100) / 100;
 
     // Se a taxa for negativa (erro de arredondamento ou lógica), forçamos a zero.
     if (deliveryFee < 0) {
@@ -72,7 +73,7 @@ serve(async (req) => {
       preferenceItems.push({
         title: 'Taxa de Entrega',
         quantity: 1,
-        unit_price: deliveryFee,
+        unit_price: parseFloat(deliveryFee.toFixed(2)), // Garante 2 casas decimais
         currency_id: 'BRL',
       });
       console.log(`[create-payment-preference] Added delivery fee of ${deliveryFee.toFixed(2)}`);
@@ -159,4 +160,4 @@ serve(async (req) => {
       status: 500,
     });
   }
-})
+});
