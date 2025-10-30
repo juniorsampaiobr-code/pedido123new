@@ -139,8 +139,11 @@ serve(async (req) => {
 
   } catch (error) {
     console.error("[create-payment-preference] Edge Function Catch Error:", error);
-    // Garante que o erro seja retornado ao cliente para diagnóstico
-    return new Response(JSON.stringify({ error: error.message || "Internal Server Error" }), {
+    
+    // Tratamento de erro para garantir que a resposta seja sempre um JSON válido
+    const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
+    
+    return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
