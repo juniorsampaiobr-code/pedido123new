@@ -533,7 +533,7 @@ const Checkout = () => {
             body: { 
               orderId, 
               items, 
-              totalAmount: parseFloat(total.toFixed(2)),
+              totalAmount: parseFloat(total.toFixed(2)), // Garantindo precisão de 2 casas decimais
               restaurantName: restaurant.name, 
               clientUrl 
             },
