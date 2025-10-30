@@ -161,6 +161,11 @@ serve(async (req) => {
     
     const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
     
+    // Log the full error object if available
+    if (error instanceof Error) {
+        console.error("[create-payment-preference] Full Error Stack:", error.stack);
+    }
+
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
