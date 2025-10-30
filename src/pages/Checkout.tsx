@@ -535,13 +535,14 @@ const Checkout = () => {
         userMessage = "Ocorreu um problema com a configuração de pagamento do restaurante. Por favor, entre em contato com o estabelecimento.";
       } else if (errorMessage.toLowerCase().includes('mercado pago error')) {
         const mpError = errorMessage.split('Mercado Pago Error:')[1];
-        userMessage = `Erro do processador de pagamento: ${mpError || 'Tente novamente.'}`;
+        userMessage = `O Mercado Pago retornou um erro: ${mpError || 'Tente novamente.'}. Verifique se sua conta Mercado Pago está totalmente ativada para produção.`;
       } else if (errorMessage.toLowerCase().includes('fora da nossa área de entrega')) {
         userMessage = "Seu endereço está fora da nossa área de entrega.";
       }
 
-      toast.error("Falha ao processar", {
+      toast.error("Falha ao processar o pagamento", {
         description: userMessage,
+        duration: 10000,
       });
       setIsProcessingPayment(false);
     },

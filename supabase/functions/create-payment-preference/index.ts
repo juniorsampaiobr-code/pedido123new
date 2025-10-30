@@ -18,13 +18,15 @@ serve(async (req) => {
     const accessToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
     
     if (!accessToken) {
-      console.error("[create-payment-preference] MERCADO_PAGO_ACCESS_TOKEN is not configured in Supabase secrets.");
+      console.error("[create-payment-preference] FATAL: MERCADO_PAGO_ACCESS_TOKEN is not configured in Supabase secrets.");
       throw new Error("Mercado Pago access token is not configured.");
     }
     if (!clientUrl) {
-      console.error("[create-payment-preference] Client URL is missing from the request body.");
+      console.error("[create-payment-preference] FATAL: Client URL is missing from the request body.");
       throw new Error("Client URL is required for payment redirection.");
     }
+
+    console.log(`[create-payment-preference] Processing ${items.length} items for a total of ${totalAmount}`);
 
     // Mapeia e valida os itens do carrinho
     const preferenceItems = items.map((item: any) => {
@@ -42,7 +44,7 @@ serve(async (req) => {
     }).filter(Boolean); // Remove null (invalid) items
 
     if (preferenceItems.length === 0) {
-      console.error("[create-payment-preference] No valid items found after filtering.");
+      console.error("[create-payment-preference] FATAL: No valid items found after filtering.");
       throw new Error("No valid items to process for payment.");
     }
 
@@ -58,6 +60,7 @@ serve(async (req) => {
         unit_price: parseFloat(deliveryFee.toFixed(2)),
         currency_id: 'BRL',
       });
+      console.log(`[create-payment-preference] Added delivery fee of ${deliveryFee.toFixed(2)}`);
     } else if (deliveryFee < 0) {
       console.warn(`[create-payment-preference] Negative delivery fee calculated. Total: ${totalAmount}, Subtotal: ${subtotal}. This may indicate a rounding issue.`);
     }
@@ -75,6 +78,12 @@ serve(async (req) => {
 
     const preference = {
       items: preferenceItems,
+      payment_methods: {
+        excluded_payment_types: [
+          { id: "ticket" } // Exclui Boleto
+        ],
+        installments: 1 // Força pagamento à vista
+      },
       back_urls: {
         success: `${clientUrl}/#/order-success/${orderId}?status=approved`,
         failure: `${clientUrl}/#/checkout?status=failure`,
@@ -126,4 +135,4 @@ serve(async (req) => {
       status: 500,
     });
   }
-});
+})
