@@ -24,13 +24,30 @@ serve(async (req) => {
       throw new Error("Client URL is required for payment redirection.");
     }
 
-    const preference = {
-      items: items.map((item: any) => ({
-        title: item.name,
-        quantity: item.quantity,
-        unit_price: item.price,
+    // Mapeia os itens do carrinho para o formato do Mercado Pago
+    const preferenceItems = items.map((item: any) => ({
+      title: item.name,
+      quantity: item.quantity,
+      unit_price: parseFloat(item.price.toFixed(2)), // Garante que o preço seja um número com 2 casas decimais
+      currency_id: 'BRL',
+    }));
+
+    // Calcula o subtotal a partir dos itens e, em seguida, a taxa de entrega
+    const subtotal = preferenceItems.reduce((acc: number, item: any) => acc + (item.unit_price * item.quantity), 0);
+    const deliveryFee = totalAmount - subtotal;
+
+    // Adiciona a taxa de entrega como um item separado, se houver
+    if (deliveryFee > 0) {
+      preferenceItems.push({
+        title: 'Taxa de Entrega',
+        quantity: 1,
+        unit_price: parseFloat(deliveryFee.toFixed(2)),
         currency_id: 'BRL',
-      })),
+      });
+    }
+
+    const preference = {
+      items: preferenceItems,
       back_urls: {
         success: `${clientUrl}/#/order-success/${orderId}?status=approved`,
         failure: `${clientUrl}/#/checkout?status=failure`,
@@ -66,7 +83,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Edge Function Catch Error:", error); // Loga o erro geral
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: corsHeaders,
+      headers: { ...corsHeaders,
       status: 500,
     });
   }
