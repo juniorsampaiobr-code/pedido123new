@@ -522,15 +522,28 @@ const Checkout = () => {
         setIsProcessingPayment(true);
         toast.info("Redirecionando para o pagamento online...");
         
-        // --- CORREÇÃO AQUI: Passando clientUrl no body ---
         const clientUrl = window.location.origin; 
         
         const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
-          body: { orderId, items, totalAmount: total, restaurantName: restaurant.name, clientUrl },
+          body: { 
+            orderId, 
+            items, 
+            totalAmount: parseFloat(total.toFixed(2)), // Garantir precisão de 2 casas decimais
+            restaurantName: restaurant.name, 
+            clientUrl 
+          },
         });
-        // ------------------------------------------------
 
-        if (preferenceError) throw new Error(preferenceError.message);
+        if (preferenceError) {
+          // Se a Edge Function falhar, o erro é capturado aqui
+          throw new Error(preferenceError.message);
+        }
+        
+        if (preferenceData.error) {
+          // Se a Edge Function retornar um erro no corpo (ex: erro da API do MP)
+          throw new Error(preferenceData.error);
+        }
+        
         window.location.href = preferenceData.init_point;
         return; 
       }
@@ -546,6 +559,7 @@ const Checkout = () => {
       }
     },
     onError: (err) => {
+      // Exibe a mensagem de erro exata retornada pela Edge Function
       toast.error(`Erro ao finalizar pedido: ${err.message}`);
       setIsProcessingPayment(false);
     },
