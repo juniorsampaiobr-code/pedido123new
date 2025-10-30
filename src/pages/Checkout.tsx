@@ -200,6 +200,7 @@ const Checkout = () => {
     queryKey: ['deliveryStatus', restaurant?.id],
     queryFn: () => fetchDeliveryStatus(restaurant!.id),
     enabled: !!restaurant?.id,
+    initialData: true,
   });
 
   // 3. Fetch Payment Methods
@@ -527,16 +528,20 @@ const Checkout = () => {
         
         const clientUrl = window.location.origin + window.location.pathname; 
         
+        const payload = { 
+          orderId, 
+          items, 
+          totalAmount: parseFloat(total.toFixed(2)), // Garantindo precisão de 2 casas decimais
+          restaurantName: restaurant.name, 
+          clientUrl 
+        };
+        
+        console.log("Payload enviado para create-payment-preference:", payload); // LOG DE DEBUG
+
         try {
           // Usando o fluxo de redirecionamento para Pix/Cartão/Boleto
           const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
-            body: { 
-              orderId, 
-              items, 
-              totalAmount: parseFloat(total.toFixed(2)), // Garantindo precisão de 2 casas decimais
-              restaurantName: restaurant.name, 
-              clientUrl 
-            },
+            body: payload,
           });
 
           if (preferenceError) throw new Error(preferenceError.message);
