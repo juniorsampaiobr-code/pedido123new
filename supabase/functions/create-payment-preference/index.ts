@@ -13,30 +13,44 @@ serve(async (req) => {
 
   try {
     const { orderId, items, totalAmount, restaurantName, clientUrl } = await req.json();
+    console.log(`[create-payment-preference] Received request for orderId: ${orderId}`);
+
     const accessToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
     
     if (!accessToken) {
-      console.error("MERCADO_PAGO_ACCESS_TOKEN is not configured.");
+      console.error("[create-payment-preference] MERCADO_PAGO_ACCESS_TOKEN is not configured in Supabase secrets.");
       throw new Error("Mercado Pago access token is not configured.");
     }
     if (!clientUrl) {
-      console.error("Client URL is missing.");
+      console.error("[create-payment-preference] Client URL is missing from the request body.");
       throw new Error("Client URL is required for payment redirection.");
     }
 
-    // Mapeia os itens do carrinho para o formato do Mercado Pago
-    const preferenceItems = items.map((item: any) => ({
-      title: item.name,
-      quantity: item.quantity,
-      unit_price: parseFloat(item.price.toFixed(2)), // Garante que o preço seja um número com 2 casas decimais
-      currency_id: 'BRL',
-    }));
+    // Mapeia e valida os itens do carrinho
+    const preferenceItems = items.map((item: any) => {
+      const unit_price = parseFloat(item.price.toFixed(2));
+      if (unit_price <= 0 || !item.quantity || item.quantity <= 0) {
+        console.warn(`[create-payment-preference] Filtering out invalid item: ${item.name} (Price: ${item.price}, Qty: ${item.quantity})`);
+        return null;
+      }
+      return {
+        title: item.name,
+        quantity: item.quantity,
+        unit_price: unit_price,
+        currency_id: 'BRL',
+      };
+    }).filter(Boolean); // Remove null (invalid) items
 
-    // Calcula o subtotal a partir dos itens e, em seguida, a taxa de entrega
+    if (preferenceItems.length === 0) {
+      console.error("[create-payment-preference] No valid items found after filtering.");
+      throw new Error("No valid items to process for payment.");
+    }
+
+    // Recalcula o subtotal com base nos itens válidos e calcula a taxa de entrega
     const subtotal = preferenceItems.reduce((acc: number, item: any) => acc + (item.unit_price * item.quantity), 0);
     const deliveryFee = totalAmount - subtotal;
 
-    // Adiciona a taxa de entrega como um item separado, se houver
+    // Adiciona a taxa de entrega como um item separado, se for positiva
     if (deliveryFee > 0) {
       preferenceItems.push({
         title: 'Taxa de Entrega',
@@ -44,6 +58,9 @@ serve(async (req) => {
         unit_price: parseFloat(deliveryFee.toFixed(2)),
         currency_id: 'BRL',
       });
+    } else if (deliveryFee < 0) {
+      // Loga uma discrepância, mas continua o processo. O total pode estar ligeiramente incorreto.
+      console.warn(`[create-payment-preference] Negative delivery fee calculated. Total: ${totalAmount}, Subtotal: ${subtotal}. This may indicate a rounding issue.`);
     }
 
     const preference = {
@@ -58,6 +75,8 @@ serve(async (req) => {
       statement_descriptor: restaurantName.substring(0, 22),
     };
 
+    console.log('[create-payment-preference] Creating preference with payload:', JSON.stringify(preference, null, 2));
+
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
       headers: {
@@ -69,11 +88,14 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorBody = await response.json();
-      console.error("Mercado Pago API Error:", errorBody); // Loga o erro da API
-      throw new Error(`Failed to create payment preference: ${errorBody.message || response.statusText}`);
+      console.error("[create-payment-preference] Mercado Pago API Error:", errorBody);
+      // Tenta extrair a causa do erro para uma mensagem mais clara
+      const cause = errorBody.cause && errorBody.cause.length > 0 ? errorBody.cause[0].description : errorBody.message;
+      throw new Error(`Mercado Pago Error: ${cause || response.statusText}`);
     }
 
     const data = await response.json();
+    console.log(`[create-payment-preference] Successfully created preference for orderId: ${orderId}`);
 
     return new Response(JSON.stringify({ init_point: data.init_point }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -81,7 +103,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error("Edge Function Catch Error:", error); // Loga o erro geral
+    console.error("[create-payment-preference] Edge Function Catch Error:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

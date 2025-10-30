@@ -32,7 +32,6 @@ import { ZipCodeInput } from '@/components/ZipCodeInput';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
 import { geocodeAddress, calculateDeliveryFee } from '@/utils/location';
 import { LocationPickerMap } from '@/components/LocationPickerMap';
-// import { MercadoPagoForm } from '@/components/MercadoPagoForm'; // REMOVIDO
 
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
@@ -69,9 +68,7 @@ const checkoutSchema = z.object({
   }),
   change_for: z.preprocess(
     (val) => {
-      // Se o valor for null, undefined, ou string vazia, retorna null
       if (val === null || val === undefined || val === '') return null;
-      // Caso contrário, tenta converter a string (substituindo vírgula por ponto)
       return String(val).replace(',', '.');
     },
     z.number({ invalid_type_error: 'O troco deve ser um número.' }).optional().nullable(),
@@ -85,7 +82,6 @@ const checkoutSchema = z.object({
     if (data.zip_code.length !== 8) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'CEP é obrigatório e deve ter 8 dígitos.', path: ['zip_code'] });
   }
   
-  // Validação condicional para 'change_for' (apenas verifica se é positivo, se fornecido)
   const isCashPayment = data.payment_method_id === 'Dinheiro'; 
   
   if (isCashPayment && data.change_for !== null && data.change_for !== undefined) {
@@ -97,7 +93,6 @@ const checkoutSchema = z.object({
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
-// Função para buscar o status das taxas de entrega
 const fetchDeliveryStatus = async (restaurantId: string): Promise<boolean> => {
   const { data, error } = await supabase
     .from('restaurants')
@@ -121,8 +116,6 @@ const fetchInitialData = async () => {
   if (!restaurantData) throw new Error('Nenhum restaurante ativo encontrado.');
 
   const restaurantId = restaurantData.id;
-
-  // Buscar o status das taxas de entrega
   const deliveryEnabled = await fetchDeliveryStatus(restaurantId);
 
   const [methodsResult, zonesResult] = await Promise.all([
@@ -133,14 +126,13 @@ const fetchInitialData = async () => {
   if (methodsResult.error) throw new Error(`Erro ao buscar métodos de pagamento: ${methodsResult.error.message}`);
   if (zonesResult.error) throw new Error(`Erro ao buscar zonas de entrega: ${zonesResult.error.message}`);
 
-  // Filtra métodos de pagamento para remover 'Pagamento Online'
   const filteredMethods = methodsResult.data.filter(method => method.name !== 'Pagamento Online');
 
   return {
     restaurant: restaurantData,
     paymentMethods: filteredMethods as PaymentMethod[],
     deliveryZones: zonesResult.data as DeliveryZone[],
-    deliveryEnabled, // Adicionando o status das taxas de entrega
+    deliveryEnabled,
   };
 };
 
@@ -191,8 +183,6 @@ const Checkout = () => {
   const [isSearchingCep, setIsSearchingCep] = useState(false);
   const [showMap, setShowMap] = useState(false);
   const [addressInputMode, setAddressInputMode] = useState<'search' | 'manual'>('search');
-  // const [mpPaymentData, setMpPaymentData] = useState<any>(null); // REMOVIDO
-  // const [mpFormKey, setMpFormKey] = useState(0); // REMOVIDO
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['checkoutInitialData'],
@@ -202,7 +192,7 @@ const Checkout = () => {
   const restaurant = data?.restaurant;
   const paymentMethods = data?.paymentMethods || [];
   const deliveryZones = data?.deliveryZones || [];
-  const deliveryEnabled = data?.deliveryEnabled ?? true; // Status das taxas de entrega
+  const deliveryEnabled = data?.deliveryEnabled ?? true;
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -215,10 +205,7 @@ const Checkout = () => {
   const deliveryOption = form.watch('delivery_option');
   const selectedPaymentMethodId = form.watch('payment_method_id');
   const selectedPaymentMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
-  // const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento Online'; // REMOVIDO
   const isOnlinePayment = selectedPaymentMethod?.name === 'Pagamento online: Pix/Cartão';
-  const isPixPayment = isOnlinePayment; // Mantendo a variável para a lógica de redirecionamento
-  // const isCardPayment = isOnlinePayment; // REMOVIDO
   const isCashPayment = selectedPaymentMethod?.name === 'Dinheiro';
   
   const lat = form.watch('latitude');
@@ -324,17 +311,13 @@ const Checkout = () => {
     }
   }, [form, updateAddressFields]);
 
-  // Effect 1: Handle payment method specific resets (e.g., clearing change_for)
   useEffect(() => {
-    // Limpar campo de troco ao mudar de método de pagamento
     if (!isCashPayment) {
       form.setValue('change_for', null, { shouldValidate: true }); 
     }
   }, [isCashPayment, form]);
 
-  // Effect 2: Handle delivery option and address input mode changes
   useEffect(() => {
-    // Reset delivery state when delivery option changes
     if (deliveryOption === 'pickup') {
         setDeliveryFee(0);
         setDeliveryError(null);
@@ -344,9 +327,7 @@ const Checkout = () => {
         setShowMap(false);
     }
 
-    // Reset address fields based on input mode change
     if (isDeliverySelected) {
-        // Reset coordinates and map visibility when switching modes
         form.setValue('latitude', null);
         form.setValue('longitude', null);
         setShowMap(false);
@@ -356,7 +337,6 @@ const Checkout = () => {
             setSearchNumber('');
         }
         if (addressInputMode === 'search') {
-            // Clear manual fields when switching to search mode
             form.setValue('street', '');
             form.setValue('number', '');
             form.setValue('complement', '');
@@ -375,7 +355,6 @@ const Checkout = () => {
 
   useEffect(() => {
     const calculateFee = async () => {
-      // Se as taxas de entrega estiverem desativadas, não calcular taxa
       if (!deliveryEnabled) {
         setDeliveryFee(0);
         setDeliveryError(null);
@@ -498,7 +477,6 @@ const Checkout = () => {
         customerId = newCustomer.id;
       }
 
-      // O status agora é sempre 'pending' (ou 'pending_payment' se for Pagamento Online)
       const orderStatus = isOnlinePayment ? 'pending_payment' : 'pending';
       
       const { data: newOrder, error: orderError } = await supabase.from('orders').insert({
@@ -517,7 +495,6 @@ const Checkout = () => {
       const { error: itemsError } = await supabase.from('order_items').insert(itemsInsert);
       if (itemsError) throw new Error(`Erro ao adicionar itens do pedido: ${itemsError.message}`);
 
-      // Lógica de Pagamento Online (agora usando o novo nome)
       if (isOnlinePayment) {
         setIsProcessingPayment(true);
         toast.info("Redirecionando para o pagamento online...");
@@ -528,21 +505,14 @@ const Checkout = () => {
           body: { 
             orderId, 
             items, 
-            totalAmount: parseFloat(total.toFixed(2)), // Garantir precisão de 2 casas decimais
+            totalAmount: parseFloat(total.toFixed(2)),
             restaurantName: restaurant.name, 
             clientUrl 
           },
         });
 
-        if (preferenceError) {
-          // Se a Edge Function falhar, o erro é capturado aqui
-          throw new Error(preferenceError.message);
-        }
-        
-        if (preferenceData.error) {
-          // Se a Edge Function retornar um erro no corpo (ex: erro da API do MP)
-          throw new Error(preferenceData.error);
-        }
+        if (preferenceError) throw new Error(preferenceError.message);
+        if (preferenceData.error) throw new Error(preferenceData.error);
         
         window.location.href = preferenceData.init_point;
         return; 
@@ -551,7 +521,6 @@ const Checkout = () => {
       return orderId;
     },
     onSuccess: (orderId) => {
-      // Se não for Pagamento Online, navega diretamente para o sucesso
       if (!isOnlinePayment) {
         toast.success(`Pedido #${orderId.slice(-4)} realizado com sucesso!`);
         queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -559,17 +528,28 @@ const Checkout = () => {
       }
     },
     onError: (err) => {
-      // Exibe a mensagem de erro exata retornada pela Edge Function
-      toast.error(`Erro ao finalizar pedido: ${err.message}`);
+      let userMessage = "Ocorreu um erro ao finalizar seu pedido. Por favor, tente novamente.";
+      const errorMessage = err.message || '';
+
+      if (errorMessage.toLowerCase().includes('access token') || errorMessage.toLowerCase().includes('credentials')) {
+        userMessage = "Ocorreu um problema com a configuração de pagamento do restaurante. Por favor, entre em contato com o estabelecimento.";
+      } else if (errorMessage.toLowerCase().includes('mercado pago error')) {
+        const mpError = errorMessage.split('Mercado Pago Error:')[1];
+        userMessage = `Erro do processador de pagamento: ${mpError || 'Tente novamente.'}`;
+      } else if (errorMessage.toLowerCase().includes('fora da nossa área de entrega')) {
+        userMessage = "Seu endereço está fora da nossa área de entrega.";
+      }
+
+      toast.error("Falha ao processar", {
+        description: userMessage,
+      });
       setIsProcessingPayment(false);
     },
   });
 
   const onSubmit = (data: CheckoutFormValues) => {
-    // 1. Validação de Troco (Runtime)
     if (isCashPayment) {
       const changeFor = data.change_for;
-      // Se o usuário preencheu o campo, validamos se é suficiente
       if (changeFor !== null && changeFor !== undefined) {
         if (changeFor < total) {
           toast.error(`O valor do troco (R$ ${changeFor.toFixed(2).replace('.', ',')}) deve ser maior ou igual ao total do pedido (R$ ${total.toFixed(2).replace('.', ',')}).`);
@@ -577,14 +557,6 @@ const Checkout = () => {
         }
       }
     }
-    
-    // 2. Validação de Pagamento Online (REMOVIDA)
-    // if (isCardPayment && !mpPaymentData) {
-    //   toast.warning("Por favor, preencha os dados do cartão.");
-    //   return;
-    // }
-    
-    // 3. Mutação
     orderMutation.mutate(data);
   };
   
@@ -600,7 +572,6 @@ const Checkout = () => {
 
   const isSubmitting = orderMutation.isPending || isProcessingPayment || isCalculatingFee;
   const isDeliveryValid = !isDeliverySelected || (!deliveryError && deliveryFee >= 0);
-  // A validação do botão de submit agora é mais simples
   const isSubmitButtonEnabled = !isSubmitting && isDeliveryValid;
 
   return (
@@ -874,7 +845,6 @@ const Checkout = () => {
                             <RadioGroup 
                               onValueChange={(value) => {
                                 field.onChange(value);
-                                // Limpa o troco se o novo método não for Dinheiro
                                 const newMethod = paymentMethods.find(m => m.id === value);
                                 if (newMethod?.name !== 'Dinheiro') {
                                   form.setValue('change_for', null, { shouldValidate: true });
@@ -905,8 +875,7 @@ const Checkout = () => {
                       )} 
                     />
                     
-                    {/* Detalhes Adicionais (CPF/CNPJ) */}
-                    {(isOnlinePayment) && ( // Agora verifica isOnlinePayment
+                    {(isOnlinePayment) && (
                       <div className="space-y-4 pt-4 border-t">
                         <h3 className="font-semibold flex items-center gap-2">
                           <CreditCard className="h-4 w-4" /> Detalhes Adicionais
@@ -925,7 +894,6 @@ const Checkout = () => {
                       </div>
                     )}
                     
-                    {/* Troco (Dinheiro) - RENDERIZAÇÃO CONDICIONAL */}
                     {isCashPayment && (
                       <FormField 
                         control={form.control} 
@@ -947,7 +915,6 @@ const Checkout = () => {
                       />
                     )}
                     
-                    {/* Notas do Pedido */}
                     <FormField 
                       control={form.control} 
                       name="notes" 
