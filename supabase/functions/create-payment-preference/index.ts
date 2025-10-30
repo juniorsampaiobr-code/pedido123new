@@ -19,8 +19,16 @@ serve(async (req) => {
     
     if (!accessToken) {
       console.error("[create-payment-preference] FATAL: MERCADO_PAGO_ACCESS_TOKEN is not configured in Supabase secrets.");
-      throw new Error("Mercado Pago access token is not configured.");
+      // Retorna 400 para o cliente, mas loga o erro 500 no console do servidor
+      return new Response(JSON.stringify({ error: "Mercado Pago access token is not configured." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
+    
+    // Log de diagnóstico: verifica se o token foi carregado (apenas os primeiros 5 caracteres)
+    console.log(`[create-payment-preference] Access Token loaded (first 5 chars): ${accessToken.substring(0, 5)}...`);
+
     if (!clientUrl) {
       console.error("[create-payment-preference] FATAL: Client URL is missing from the request body.");
       throw new Error("Client URL is required for payment redirection.");
@@ -45,7 +53,10 @@ serve(async (req) => {
 
     if (preferenceItems.length === 0) {
       console.error("[create-payment-preference] FATAL: No valid items found after filtering.");
-      throw new Error("No valid items to process for payment.");
+      throw new Response(JSON.stringify({ error: "No valid items to process for payment." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
 
     // Recalcula o subtotal com base nos itens válidos e calcula a taxa de entrega
@@ -130,7 +141,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error("[create-payment-preference] Edge Function Catch Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    // Garante que o erro seja retornado ao cliente para diagnóstico
+    return new Response(JSON.stringify({ error: error.message || "Internal Server Error" }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
