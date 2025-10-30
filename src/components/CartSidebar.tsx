@@ -8,6 +8,7 @@ import {
   SheetTitle,
   SheetFooter,
   SheetClose,
+  SheetDescription, // Importando SheetDescription
 } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -27,6 +28,9 @@ export const CartSidebar = ({ isOpen, onOpenChange }: CartSidebarProps) => {
       <SheetContent className="flex flex-col">
         <SheetHeader>
           <SheetTitle className="text-2xl">Seu Carrinho</SheetTitle>
+          <SheetDescription className="sr-only">
+            Lista de itens no seu carrinho e resumo do pedido.
+          </SheetDescription>
         </SheetHeader>
         <Separator />
         

@@ -131,8 +131,14 @@ serve(async (req) => {
       }
       
       console.error("[create-payment-preference] Mercado Pago API Error:", errorBody);
-      const cause = errorBody.cause && errorBody.cause.length > 0 ? errorBody.cause[0].description : errorBody.message;
-      throw new Error(`Mercado Pago Error: ${cause || errorBody.message || response.statusText}`);
+      
+      // Safely extract error cause
+      let cause = errorBody.message || response.statusText;
+      if (errorBody.cause && Array.isArray(errorBody.cause) && errorBody.cause.length > 0) {
+          cause = errorBody.cause[0].description || errorBody.cause[0].code || cause;
+      }
+      
+      throw new Error(`Mercado Pago Error: ${cause}`);
     }
 
     const data = await response.json();
