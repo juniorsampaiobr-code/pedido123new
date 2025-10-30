@@ -12,19 +12,14 @@ serve(async (req) => {
   }
 
   try {
-    const { orderId, items, totalAmount, restaurantName } = await req.json();
+    const { orderId, items, totalAmount, restaurantName, clientUrl } = await req.json();
     const accessToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
     
-    // Usar a variável de ambiente VITE_CLIENT_URL se disponível, caso contrário, usar a lógica anterior
-    const clientUrl = Deno.env.get('VITE_CLIENT_URL') || (
-      Deno.env.get('SUPABASE_URL')?.includes('localhost') 
-        ? 'http://localhost:8080' 
-        : `https://${new URL(Deno.env.get('SUPABASE_URL')).hostname.split('.')[0]}.lovable.dev`
-    );
-
-
     if (!accessToken) {
       throw new Error("Mercado Pago access token is not configured.");
+    }
+    if (!clientUrl) {
+      throw new Error("Client URL is required for payment redirection.");
     }
 
     const preference = {

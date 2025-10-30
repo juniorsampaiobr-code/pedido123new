@@ -408,7 +408,7 @@ const Checkout = () => {
           
           if (customerCoords) {
             form.setValue('latitude', customerCoords[0]);
-            form.setValue('longitude', customerCoords[1]);
+            form.setValue('longitude', coords[1]);
             setShowMap(true);
           }
         }
@@ -521,9 +521,15 @@ const Checkout = () => {
       if (isOnlinePayment) {
         setIsProcessingPayment(true);
         toast.info("Redirecionando para o pagamento online...");
+        
+        // --- MUDANÇA AQUI: Passando window.location.origin para a Edge Function ---
+        const clientUrl = window.location.origin; 
+        
         const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
-          body: { orderId, items, totalAmount: total, restaurantName: restaurant.name },
+          body: { orderId, items, totalAmount: total, restaurantName: restaurant.name, clientUrl },
         });
+        // -------------------------------------------------------------------------
+
         if (preferenceError) throw new Error(preferenceError.message);
         window.location.href = preferenceData.init_point;
         return; 
