@@ -56,16 +56,21 @@ serve(async (req) => {
     }
 
     // Recalcula o subtotal com base nos itens válidos
-    const subtotal = preferenceItems.reduce((acc: number, item: any) => acc + (item.unit_price * item.quantity), 0);
+    const calculatedSubtotal = preferenceItems.reduce((acc: number, item: any) => acc + (item.unit_price * item.quantity), 0);
     
+    // Garante que o total e o subtotal são tratados como números de duas casas decimais
+    const fixedTotalAmount = parseFloat(totalAmount.toFixed(2));
+    const fixedSubtotal = parseFloat(calculatedSubtotal.toFixed(2));
+
     // --- 2. Calcular Taxa de Entrega ---
-    // Usamos Math.round para evitar problemas de ponto flutuante ao subtrair
-    let deliveryFee = Math.round((totalAmount - subtotal) * 100) / 100;
+    let deliveryFee = fixedTotalAmount - fixedSubtotal;
 
     // Se a taxa for negativa (erro de arredondamento ou lógica), forçamos a zero.
-    if (deliveryFee < 0) {
-      console.warn(`[create-payment-preference] Negative delivery fee calculated (${deliveryFee}). Forcing to 0.`);
+    if (deliveryFee < 0.01) { // Usamos 0.01 para cobrir pequenos erros de precisão
+      console.warn(`[create-payment-preference] Negative or near-zero delivery fee calculated (${deliveryFee}). Forcing to 0.`);
       deliveryFee = 0;
+    } else {
+      deliveryFee = parseFloat(deliveryFee.toFixed(2));
     }
 
     // Adiciona a taxa de entrega como um item separado, se for positiva
@@ -73,7 +78,7 @@ serve(async (req) => {
       preferenceItems.push({
         title: 'Taxa de Entrega',
         quantity: 1,
-        unit_price: parseFloat(deliveryFee.toFixed(2)), // Garante 2 casas decimais
+        unit_price: deliveryFee,
         currency_id: 'BRL',
       });
       console.log(`[create-payment-preference] Added delivery fee of ${deliveryFee.toFixed(2)}`);
