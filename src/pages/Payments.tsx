@@ -150,11 +150,11 @@ const Payments = () => {
   });
 
   useEffect(() => {
+    console.log('Settings data updated, resetting form:', settings);
     if (settings) {
-      // Resetar o formulário com os dados mais recentes do banco de dados
       credentialsForm.reset({
         mercado_pago_public_key: settings.mercado_pago_public_key || '',
-        mercado_pago_access_token: '', // Sempre limpa o token de acesso por segurança
+        mercado_pago_access_token: '',
       });
     }
   }, [settings, credentialsForm]);
@@ -163,8 +163,6 @@ const Payments = () => {
     mutationFn: async (data: CredentialsFormValues) => {
       if (!restaurantId) throw new Error('ID do restaurante não disponível.');
       
-      console.log('Invoking save-mp-credentials with data:', data);
-
       const response = await supabase.functions.invoke('save-mp-credentials', {
         body: JSON.stringify({
           restaurant_id: restaurantId,
@@ -173,23 +171,19 @@ const Payments = () => {
         }),
       });
 
-      console.log('Response from save-mp-credentials:', response);
-
       if (response.error) throw new Error(response.error.message);
       
       const result = response.data as { message: string, token_verified: boolean };
       
       if (!result.token_verified) {
-        toast.warning("Chave pública salva, mas o Access Token fornecido não corresponde ao segredo configurado. Verifique o token.");
+        toast.warning("Chave pública salva, mas o Access Token fornecido não corresponde ao segredo configurado.");
       }
       
       return result;
     },
     onSuccess: () => {
       toast.success('Credenciais do Mercado Pago salvas com sucesso!');
-      // Força a revalidação da query para buscar os novos settings e atualizar o formulário
       queryClient.invalidateQueries({ queryKey: ['paymentSettings'] });
-      // O reset do formulário agora é tratado pelo useEffect que observa 'settings'
     },
     onError: (err) => {
       toast.error(`Erro ao salvar credenciais: ${err.message}`);
