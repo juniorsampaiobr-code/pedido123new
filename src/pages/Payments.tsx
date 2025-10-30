@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { toast } from "sonner";
-import { Key, ExternalLink, DollarSign, Smartphone, Package, Store, CreditCard } from 'lucide-react';
+import { Key, ExternalLink, DollarSign, Smartphone, Package, Store, CreditCard, AlertCircle } from 'lucide-react';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import {
   Form,
@@ -21,6 +21,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type PaymentMethod = Tables<'payment_methods'>;
 type PaymentSettings = Tables<'payment_settings'>;
@@ -302,18 +303,9 @@ const Payments = () => {
                 <Key className="h-6 w-6 text-primary" />
                 Credenciais Mercado Pago
               </div>
-              <a 
-                href="https://www.mercadopago.com.br/developers/panel/credentials" 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                <Button variant="outline" size="sm">
-                  Pegue sua credencial do mercado pago aqui! <ExternalLink className="h-4 w-4 ml-2" />
-                </Button>
-              </a>
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Configure suas chaves de API do Mercado Pago
+              Configure suas chaves de API do Mercado Pago para aceitar pagamentos online.
             </p>
           </CardHeader>
           <CardContent>
@@ -327,7 +319,27 @@ const Payments = () => {
               </div>
             ) : (
               <Form {...credentialsForm}>
-                <form onSubmit={credentialsForm.handleSubmit(handleCredentialsSubmit)} className="space-y-4">
+                <form onSubmit={credentialsForm.handleSubmit(handleCredentialsSubmit)} className="space-y-6">
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Ação Necessária: Configure seu Access Token</AlertTitle>
+                    <AlertDescription>
+                      O **Access Token** é uma chave secreta e **deve** ser salvo nos segredos do seu projeto Supabase para funcionar.
+                      <ol className="list-decimal list-inside mt-2 space-y-1">
+                        <li>
+                          <a href="https://www.mercadopago.com.br/developers/panel/credentials" target="_blank" rel="noopener noreferrer" className="font-bold underline">
+                            Copie seu Access Token de Produção
+                          </a> no painel do Mercado Pago.
+                        </li>
+                        <li>
+                          <a href="https://supabase.com/dashboard/project/vtskautbkbhqwinuassp/settings/functions" target="_blank" rel="noopener noreferrer" className="font-bold underline">
+                            Clique aqui para ir aos Segredos do Supabase
+                          </a> e salve-o com o nome `MERCADO_PAGO_ACCESS_TOKEN`.
+                        </li>
+                      </ol>
+                    </AlertDescription>
+                  </Alert>
+
                   <FormField
                     control={credentialsForm.control}
                     name="mercado_pago_public_key"
@@ -341,7 +353,7 @@ const Payments = () => {
                             className="h-12"
                           />
                         </FormControl>
-                        <p className="text-xs text-muted-foreground">Chave pública para identificação da aplicação. Esta chave é salva aqui.</p>
+                        <p className="text-xs text-muted-foreground">Esta chave é pública e pode ser salva aqui.</p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -351,17 +363,17 @@ const Payments = () => {
                     name="mercado_pago_access_token"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Access Token</FormLabel>
+                        <FormLabel>Verificar Access Token</FormLabel>
                         <FormControl>
                           <Input 
                             {...field} 
                             type="password"
-                            placeholder="Cole seu Access Token aqui para verificação" 
+                            placeholder="Cole seu Access Token aqui para verificar" 
                             className="h-12"
                           />
                         </FormControl>
                         <p className="text-xs text-muted-foreground">
-                          <span className="font-bold text-destructive">Importante:</span> O Access Token é um segredo e deve ser salvo no painel do seu projeto Supabase, não aqui. Este campo serve apenas para verificar se o token que você salvou lá está correto.
+                          Este campo serve apenas para **verificar** se o token que você salvou no Supabase está correto. Ele **não** salva o token aqui.
                         </p>
                         <FormMessage />
                       </FormItem>
@@ -372,7 +384,7 @@ const Payments = () => {
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg mt-6"
                     disabled={credentialsMutation.isPending}
                   >
-                    {credentialsMutation.isPending ? 'Salvando...' : 'Salvar e Verificar Credenciais'}
+                    {credentialsMutation.isPending ? 'Salvando...' : 'Salvar Chave Pública e Verificar Token'}
                   </Button>
                 </form>
               </Form>
@@ -384,7 +396,7 @@ const Payments = () => {
           <CardHeader>
             <CardTitle className="text-2xl font-bold">Métodos de Pagamento</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Configure os métodos de pagamento aceitos pelo seu estabelecimento
+              Ative ou desative os métodos de pagamento aceitos pelo seu estabelecimento.
             </p>
           </CardHeader>
           <CardContent>
