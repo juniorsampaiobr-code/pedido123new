@@ -83,7 +83,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Edge Function Catch Error:", error); // Loga o erro geral
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
   }
