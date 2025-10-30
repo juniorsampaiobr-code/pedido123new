@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { toast } from "sonner";
-import { Key, ExternalLink, DollarSign, Smartphone, Package, Store, CreditCard, AlertCircle } from 'lucide-react';
+import { Key, ExternalLink, DollarSign, Smartphone, Package, Store, CreditCard, AlertCircle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Tables, TablesInsert } from '@/integrations/supabase/types';
 import {
   Form,
@@ -67,6 +67,12 @@ const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[
     .eq('restaurant_id', restaurantId)
     .order('name', { ascending: true });
 
+  if (error) throw new Error(error.message);
+  return data;
+};
+
+const checkCredentialsStatus = async (): Promise<{ configured: boolean }> => {
+  const { data, error } = await supabase.functions.invoke('check-mp-credentials');
   if (error) throw new Error(error.message);
   return data;
 };
@@ -141,6 +147,11 @@ const Payments = () => {
     enabled: !!restaurantId,
   });
 
+  const { data: credentialsStatus, isLoading: isLoadingStatus } = useQuery<{ configured: boolean }>({
+    queryKey: ['credentialsStatus'],
+    queryFn: checkCredentialsStatus,
+  });
+
   const credentialsForm = useForm<CredentialsFormValues>({
     resolver: zodResolver(credentialsSchema),
     defaultValues: {
@@ -185,6 +196,7 @@ const Payments = () => {
         });
       }
       queryClient.invalidateQueries({ queryKey: ['paymentSettings'] });
+      queryClient.invalidateQueries({ queryKey: ['credentialsStatus'] });
     },
     onError: (err) => {
       toast.error(`Erro ao salvar credenciais: ${err.message}`);
@@ -320,11 +332,13 @@ const Payments = () => {
             ) : (
               <Form {...credentialsForm}>
                 <form onSubmit={credentialsForm.handleSubmit(handleCredentialsSubmit)} className="space-y-6">
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Ação Necessária: Configure seu Access Token</AlertTitle>
+                  <Alert variant={credentialsStatus?.configured ? "default" : "destructive"}>
+                    {isLoadingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : credentialsStatus?.configured ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4" />}
+                    <AlertTitle>
+                      {isLoadingStatus ? "Verificando Status do Access Token..." : credentialsStatus?.configured ? "Access Token Configurado Corretamente!" : "Ação Necessária: Access Token Não Encontrado!"}
+                    </AlertTitle>
                     <AlertDescription>
-                      O **Access Token** é uma chave secreta e **deve** ser salvo nos segredos do seu projeto Supabase para funcionar.
+                      {isLoadingStatus ? "Aguarde um momento..." : credentialsStatus?.configured ? "O Access Token foi encontrado nos segredos do seu projeto Supabase. O pagamento online deve funcionar." : "O Access Token não foi encontrado ou está vazio nos segredos do seu projeto Supabase. O pagamento online não funcionará até que você o configure."}
                       <ol className="list-decimal list-inside mt-2 space-y-1">
                         <li>
                           <a href="https://www.mercadopago.com.br/developers/panel/credentials" target="_blank" rel="noopener noreferrer" className="font-bold underline">
