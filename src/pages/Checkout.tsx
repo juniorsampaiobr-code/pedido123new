@@ -126,8 +126,7 @@ const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[
     .order('name', { ascending: true });
 
   if (error) throw new Error(`Erro ao buscar métodos de pagamento: ${error.message}`);
-  const filteredMethods = data.filter(method => method.name !== 'Pagamento Online');
-  return filteredMethods as PaymentMethod[];
+  return data as PaymentMethod[];
 };
 
 const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]> => {
@@ -504,10 +503,10 @@ const Checkout = () => {
         customerId = newCustomer.id;
       }
 
-      const orderStatus = isOnlinePayment ? 'pending_payment' : 'pending';
+      const orderStatus: Enums<'order_status'> = isOnlinePayment ? 'pending_payment' : 'pending';
       
       const { data: newOrder, error: orderError } = await supabase.from('orders').insert({
-        restaurant_id: restaurant.id, customer_id: customerId, status: orderStatus as Enums<'order_status'>,
+        restaurant_id: restaurant.id, customer_id: customerId, status: orderStatus,
         total_amount: total, delivery_fee: deliveryFee, notes: formData.notes,
         delivery_address: deliveryAddress,
       }).select('id').single();
@@ -526,30 +525,35 @@ const Checkout = () => {
         setIsProcessingPayment(true);
         toast.info("Redirecionando para o pagamento online...");
         
-        const clientUrl = window.location.origin; 
+        const clientUrl = window.location.origin + window.location.pathname; 
         
-        // Usando o fluxo de redirecionamento para Pix/Cartão/Boleto
-        const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
-          body: { 
-            orderId, 
-            items, 
-            totalAmount: parseFloat(total.toFixed(2)),
-            restaurantName: restaurant.name, 
-            clientUrl 
-          },
-        });
+        try {
+          // Usando o fluxo de redirecionamento para Pix/Cartão/Boleto
+          const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
+            body: { 
+              orderId, 
+              items, 
+              totalAmount: parseFloat(total.toFixed(2)),
+              restaurantName: restaurant.name, 
+              clientUrl 
+            },
+          });
 
-        if (preferenceError) throw new Error(preferenceError.message);
-        
-        if (preferenceData && preferenceData.error) {
-          throw new Error(`Mercado Pago Error: ${preferenceData.error}`);
-        }
-        
-        if (preferenceData.init_point) {
-          window.location.href = preferenceData.init_point;
-          return; 
-        } else {
-          throw new Error("Resposta de pagamento inválida: init_point não encontrado.");
+          if (preferenceError) throw new Error(preferenceError.message);
+          
+          if (preferenceData && preferenceData.error) {
+            throw new Error(`Mercado Pago Error: ${preferenceData.error}`);
+          }
+          
+          if (preferenceData && preferenceData.init_point) {
+            window.location.href = preferenceData.init_point;
+            return; 
+          } else {
+            throw new Error("Resposta de pagamento inválida: init_point não encontrado.");
+          }
+        } catch (error: any) {
+          console.error("Erro ao criar preferência de pagamento:", error);
+          throw new Error(`Falha ao processar pagamento online: ${error.message}`);
         }
       }
 
@@ -559,6 +563,7 @@ const Checkout = () => {
       if (!isOnlinePayment) {
         toast.success(`Pedido #${orderId.slice(-4)} realizado com sucesso!`);
         queryClient.invalidateQueries({ queryKey: ['orders'] });
+        clearCart();
         navigate(`/order-success/${orderId}`);
       }
       // Se for online, a navegação é feita pelo redirecionamento do Mercado Pago
@@ -574,6 +579,8 @@ const Checkout = () => {
         userMessage = `O Mercado Pago retornou um erro: ${mpError || 'Tente novamente.'}`;
       } else if (errorMessage.toLowerCase().includes('fora da nossa área de entrega')) {
         userMessage = "Seu endereço está fora da nossa área de entrega.";
+      } else if (errorMessage.toLowerCase().includes('falha ao processar pagamento online')) {
+        userMessage = errorMessage.split('Falha ao processar pagamento online:')[1] || "Erro ao processar pagamento online. Por favor, tente novamente.";
       }
 
       toast.error("Falha ao processar o pagamento", {
