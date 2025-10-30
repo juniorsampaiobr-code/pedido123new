@@ -514,17 +514,6 @@ const Checkout = () => {
         if (preferenceError) throw new Error(preferenceError.message);
         if (preferenceData.error) throw new Error(preferenceData.error);
         
-        // --- TEMPORARY DIAGNOSTIC CODE START ---
-        if (preferenceData.token_loaded) {
-          toast.success("Diagnóstico de Token OK!", {
-            description: `Token carregado com sucesso. Prefixo: ${preferenceData.token_prefix}.`,
-            duration: 10000,
-          });
-          setIsProcessingPayment(false);
-          return; // Stop here for diagnosis
-        }
-        // --- TEMPORARY DIAGNOSTIC CODE END ---
-        
         window.location.href = preferenceData.init_point;
         return; 
       }
@@ -549,8 +538,6 @@ const Checkout = () => {
         userMessage = `O Mercado Pago retornou um erro: ${mpError || 'Tente novamente.'}. Verifique se sua conta Mercado Pago está totalmente ativada para produção.`;
       } else if (errorMessage.toLowerCase().includes('fora da nossa área de entrega')) {
         userMessage = "Seu endereço está fora da nossa área de entrega.";
-      } else if (errorMessage.toLowerCase().includes('internal server error during token check')) {
-        userMessage = "Erro crítico: Falha ao carregar o Access Token no ambiente de execução do servidor. Por favor, verifique se o segredo `MERCADO_PAGO_ACCESS_TOKEN` está configurado corretamente no painel do Supabase.";
       }
 
       toast.error("Falha ao processar o pagamento", {
