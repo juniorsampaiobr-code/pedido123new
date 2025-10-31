@@ -89,6 +89,19 @@ const checkoutSchema = z.object({
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'O valor do troco deve ser positivo.', path: ['change_for'] });
     }
   }
+
+  // Nova regra: CPF/CNPJ é obrigatório para pagamento online
+  const isOnlinePayment = data.payment_method_id === 'Pagamento online: Pix/Cartão';
+  if (isOnlinePayment) {
+    const cleanedCpfCnpj = cleanCpfCnpj(data.cpf_cnpj || '');
+    if (cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14) {
+      ctx.addIssue({ 
+        code: z.ZodIssueCode.custom, 
+        message: 'CPF/CNPJ é obrigatório para pagamento online.', 
+        path: ['cpf_cnpj'] 
+      });
+    }
+  }
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -414,7 +427,7 @@ const Checkout = () => {
           
           if (customerCoords) {
             form.setValue('latitude', customerCoords[0]);
-            form.setValue('longitude', customerCoords[1]);
+            form.setValue('longitude', coords[1]);
             setShowMap(true);
           }
         }
@@ -934,14 +947,14 @@ const Checkout = () => {
                     {(isOnlinePayment) && (
                       <div className="space-y-4 pt-4 border-t">
                         <h3 className="font-semibold flex items-center gap-2">
-                          <CreditCard className="h-4 w-4" /> Detalhes Adicionais
+                          <CreditCard className="h-4 w-4" /> Detalhes Adicionais *
                         </h3>
                         <FormField 
                           control={form.control} 
                           name="cpf_cnpj" 
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>CPF/CNPJ (para o pagamento online)</FormLabel>
+                              <FormLabel>CPF/CNPJ (obrigatório para pagamento online)</FormLabel>
                               <CpfCnpjInput {...field} />
                               <FormMessage />
                             </FormItem>
