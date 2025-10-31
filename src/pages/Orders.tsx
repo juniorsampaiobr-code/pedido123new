@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShoppingCart, Terminal, RefreshCw, Clock, CheckCircle, XCircle, Truck, Package, Utensils, Check, X, DollarSign } from 'lucide-react';
+import { ShoppingCart, Terminal, RefreshCw, Check, X, DollarSign } from 'lucide-react';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { OrderDetailsModal } from "@/components/OrderDetailsModal";
@@ -15,26 +15,45 @@ import { toast } from "sonner";
 import { useSound } from "@/layouts/DashboardLayout";
 import { useOutletContext } from "react-router-dom";
 import { DashboardContextType } from "@/layouts/DashboardLayout";
+import { PaginationComponent } from "@/components/PaginationComponent"; // Novo componente de paginação
 
 type Order = Tables<'orders'> & { customer: Tables<'customers'> | null };
 
 const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: React.ElementType, color: string }> = {
-  pending: { label: 'Pendente', icon: Clock, color: 'bg-yellow-500 hover:bg-yellow-600' },
-  confirmed: { label: 'Confirmado', icon: CheckCircle, color: 'bg-blue-500 hover:bg-blue-600' },
-  preparing: { label: 'Em Preparação', icon: Utensils, color: 'bg-orange-500 hover:bg-orange-600' },
-  ready: { label: 'Pronto', icon: Package, color: 'bg-green-500 hover:bg-green-600' },
-  delivering: { label: 'Em Entrega', icon: Truck, color: 'bg-indigo-500 hover:bg-indigo-600' },
-  delivered: { label: 'Entregue', icon: CheckCircle, color: 'bg-primary hover:bg-primary/90' },
-  cancelled: { label: 'Cancelado', icon: XCircle, color: 'bg-destructive hover:bg-destructive/90' },
+  pending: { label: 'Pendente', icon: ShoppingCart, color: 'bg-yellow-500 hover:bg-yellow-600' },
+  confirmed: { label: 'Confirmado', icon: Check, color: 'bg-blue-500 hover:bg-blue-600' },
+  preparing: { label: 'Em Preparação', icon: Check, color: 'bg-orange-500 hover:bg-orange-600' },
+  ready: { label: 'Pronto', icon: Check, color: 'bg-green-500 hover:bg-green-600' },
+  delivering: { label: 'Em Entrega', icon: Check, color: 'bg-indigo-500 hover:bg-indigo-600' },
+  delivered: { label: 'Entregue', icon: Check, color: 'bg-primary hover:bg-primary/90' },
+  cancelled: { label: 'Cancelado', icon: X, color: 'bg-destructive hover:bg-destructive/90' },
   pending_payment: { label: 'Aguardando Pag.', icon: DollarSign, color: 'bg-gray-500 hover:bg-gray-600' },
 };
 
-const fetchOrders = async (restaurantId: string, status: Enums<'order_status'> | 'all'): Promise<Order[]> => {
-  let query = supabase.from('orders').select('*, customer:customers(name, phone)').eq('restaurant_id', restaurantId).order('created_at', { ascending: false });
-  if (status !== 'all') query = query.eq('status', status);
-  const { data, error } = await query;
+interface FetchOrdersResult {
+  orders: Order[];
+  count: number;
+}
+
+const PAGE_SIZE = 12;
+
+const fetchOrders = async (restaurantId: string, status: Enums<'order_status'> | 'all', page: number): Promise<FetchOrdersResult> => {
+  const from = page * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  let query = supabase.from('orders').select('*, customer:customers(name, phone)', { count: 'exact' }).eq('restaurant_id', restaurantId);
+  
+  if (status !== 'all') {
+    query = query.eq('status', status);
+  }
+  
+  const { data, error, count } = await query
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
   if (error) throw new Error(`Erro ao buscar pedidos: ${error.message}`);
-  return data as Order[];
+  
+  return { orders: data as Order[], count: count || 0 };
 };
 
 const OrderCard = ({ order, onViewDetails, onAccept, onDecline }: { order: Order, onViewDetails: (order: Order) => void, onAccept: (orderId: string) => void, onDecline: (orderId: string) => void }) => {
@@ -54,7 +73,7 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline }: { order: Order
           <p className="text-2xl font-extrabold text-primary">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total_amount)}</p>
         </div>
         <div className="flex justify-end pt-2 border-t gap-2">
-          {order.status === 'pending' && (
+          {(order.status === 'pending' || order.status === 'pending_payment') && (
             <>
               <Button variant="destructive" size="sm" onClick={() => onDecline(order.id)}><X className="h-4 w-4 mr-1" /> Recusar</Button>
               <Button variant="default" size="sm" onClick={() => onAccept(order.id)}><Check className="h-4 w-4 mr-1" /> Aceitar</Button>
@@ -70,12 +89,17 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline }: { order: Order
 const OrdersList = ({ status, onViewDetails, restaurantId }: { status: Enums<'order_status'> | 'all', onViewDetails: (order: Order) => void, restaurantId: string }) => {
   const queryClient = useQueryClient();
   const { stopSoundLoop } = useSound();
+  const [currentPage, setCurrentPage] = useState(0); // 0-indexed page
 
-  const { data: orders, isLoading, isError, error, refetch } = useQuery<Order[]>({
-    queryKey: ['orders', status, restaurantId],
-    queryFn: () => fetchOrders(restaurantId, status),
+  const { data, isLoading, isError, error, refetch } = useQuery<FetchOrdersResult>({
+    queryKey: ['orders', status, restaurantId, currentPage],
+    queryFn: () => fetchOrders(restaurantId, status, currentPage),
     enabled: !!restaurantId,
   });
+
+  const orders = data?.orders || [];
+  const totalCount = data?.count || 0;
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: Enums<'order_status'> }) => {
@@ -102,12 +126,40 @@ const OrdersList = ({ status, onViewDetails, restaurantId }: { status: Enums<'or
     stopSoundLoop();
     onViewDetails(order);
   };
+  
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page - 1); // Componente de paginação é 1-indexed
+  }, []);
 
   if (isLoading) return <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{[...Array(4)].map((_, i) => <Card key={i}><CardContent className="p-4 space-y-3"><Skeleton className="h-32 w-full" /></CardContent></Card>)}</div>;
   if (isError) return <Alert variant="destructive"><Terminal className="h-4 w-4" /><AlertTitle>Erro ao carregar pedidos</AlertTitle><AlertDescription>{error instanceof Error ? error.message : "Ocorreu um erro desconhecido."}</AlertDescription><Button onClick={() => refetch()} className="mt-3" variant="secondary" size="sm"><RefreshCw className="h-4 w-4 mr-2" /> Tentar Novamente</Button></Alert>;
   if (!orders || orders.length === 0) return <div className="text-center py-12 bg-card rounded-lg border"><ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" /><p className="text-lg font-semibold">Nenhum pedido encontrado.</p><p className="text-sm text-muted-foreground">Verifique o status selecionado ou aguarde novos pedidos.</p></div>;
 
-  return <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{orders.map((order) => <OrderCard key={order.id} order={order} onViewDetails={handleViewDetails} onAccept={handleAccept} onDecline={handleDecline} />)}</div>;
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {orders.map((order) => (
+          <OrderCard 
+            key={order.id} 
+            order={order} 
+            onViewDetails={handleViewDetails} 
+            onAccept={handleAccept} 
+            onDecline={handleDecline} 
+          />
+        ))}
+      </div>
+      
+      {totalPages > 1 && (
+        <div className="flex justify-center pt-4">
+          <PaginationComponent 
+            currentPage={currentPage + 1} 
+            totalPages={totalPages} 
+            onPageChange={handlePageChange} 
+          />
+        </div>
+      )}
+    </div>
+  );
 };
 
 const Orders = () => {
@@ -119,7 +171,7 @@ const Orders = () => {
   const handleCloseModal = () => { setIsModalOpen(false); setSelectedOrder(null); };
 
   const statusTabs: { value: Enums<'order_status'> | 'all', label: string }[] = [
-    { value: 'pending_payment', label: 'Aguardando Pag.' }, // Primeiro
+    { value: 'pending_payment', label: 'Aguardando Pag.' }, 
     { value: 'pending', label: 'Pendentes' }, 
     { value: 'confirmed', label: 'Confirmados' },
     { value: 'preparing', label: 'Em Preparação' }, 
