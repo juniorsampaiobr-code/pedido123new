@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'application/json',
 }
 
 serve(async (req) => {
@@ -31,21 +32,26 @@ serve(async (req) => {
     }
 
     // --- 1. Processar Itens e Calcular Subtotal ---
+    let calculatedSubtotal = 0;
+    
     const preferenceItems = items.map((item: any) => {
-      // Adicionando verificação de segurança para garantir que price é um número
-      const priceValue = typeof item.price === 'number' ? item.price : parseFloat(item.price);
+      // Garante que price e quantity são números válidos
+      const priceValue = parseFloat(item.price);
+      const quantityValue = parseInt(item.quantity);
       
-      if (isNaN(priceValue) || priceValue <= 0 || !item.quantity || item.quantity <= 0) {
+      if (isNaN(priceValue) || priceValue <= 0 || isNaN(quantityValue) || quantityValue <= 0) {
         console.warn(`[create-payment-preference] Filtering out invalid item: ${item.name} (Price: ${item.price}, Qty: ${item.quantity})`);
         return null;
       }
       
-      // Garante que o preço unitário é um número com 2 casas decimais
+      // O Mercado Pago espera o preço unitário com 2 casas decimais
       const unit_price = parseFloat(priceValue.toFixed(2));
       
+      calculatedSubtotal += unit_price * quantityValue;
+
       return {
         title: item.name,
-        quantity: item.quantity,
+        quantity: quantityValue,
         unit_price: unit_price,
         currency_id: 'BRL',
       };
@@ -59,19 +65,16 @@ serve(async (req) => {
       });
     }
 
-    // Recalcula o subtotal com base nos itens válidos
-    const calculatedSubtotal = preferenceItems.reduce((acc: number, item: any) => acc + (item.unit_price * item.quantity), 0);
-    
     // Garante que o total e o subtotal são tratados como números de duas casas decimais
     const fixedTotalAmount = parseFloat(totalAmount.toFixed(2));
     const fixedSubtotal = parseFloat(calculatedSubtotal.toFixed(2));
 
     // --- 2. Calcular Taxa de Entrega ---
+    // Calcula a diferença entre o total do carrinho (incluindo taxa) e o subtotal dos itens
     let deliveryFee = fixedTotalAmount - fixedSubtotal;
 
     // Se a taxa for negativa (erro de arredondamento ou lógica), forçamos a zero.
-    if (deliveryFee < 0.01) { // Usamos 0.01 para cobrir pequenos erros de precisão
-      console.warn(`[create-payment-preference] Negative or near-zero delivery fee calculated (${deliveryFee}). Forcing to 0.`);
+    if (deliveryFee < 0.01) { 
       deliveryFee = 0;
     } else {
       deliveryFee = parseFloat(deliveryFee.toFixed(2));
@@ -87,6 +90,17 @@ serve(async (req) => {
       });
       console.log(`[create-payment-preference] Added delivery fee of ${deliveryFee.toFixed(2)}`);
     }
+    
+    // Verifica se a soma dos itens na preferência corresponde ao totalAmount
+    const finalPreferenceTotal = preferenceItems.reduce((acc: number, item: any) => acc + (item.unit_price * item.quantity), 0);
+    
+    if (Math.abs(finalPreferenceTotal - fixedTotalAmount) > 0.01) {
+        console.error(`[create-payment-preference] FATAL: Total mismatch. Expected: ${fixedTotalAmount}, Calculated from items: ${finalPreferenceTotal}`);
+        throw new Error(`Inconsistência no valor total do pedido. Total esperado: R$${fixedTotalAmount.toFixed(2)}, Total calculado: R$${finalPreferenceTotal.toFixed(2)}.`);
+    }
+    
+    console.log(`[create-payment-preference] Final total verified: R$${finalPreferenceTotal.toFixed(2)}`);
+
 
     // --- 3. Preparar Preferência ---
     // Sanitiza o nome do restaurante para o statement_descriptor (máx 22 caracteres, apenas alfanumérico)
