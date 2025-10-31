@@ -548,6 +548,7 @@ const Checkout = () => {
           if (preferenceError) throw new Error(preferenceError.message);
           
           if (preferenceData && preferenceData.error) {
+            // Captura o erro detalhado da Edge Function
             throw new Error(`Mercado Pago Error: ${preferenceData.error}`);
           }
           
@@ -559,6 +560,7 @@ const Checkout = () => {
           }
         } catch (error: any) {
           console.error("Erro ao criar preferência de pagamento:", error);
+          // Propaga o erro para o bloco onError principal
           throw new Error(`Falha ao processar pagamento online: ${error.message}`);
         }
       }
@@ -577,17 +579,20 @@ const Checkout = () => {
       let userMessage = "Ocorreu um erro ao finalizar seu pedido. Por favor, tente novamente.";
       const errorMessage = err.message || '';
 
-      if (errorMessage.toLowerCase().includes('access token') || errorMessage.toLowerCase().includes('credentials')) {
+      // Tenta extrair a mensagem de erro do Mercado Pago
+      if (errorMessage.includes('Mercado Pago Error:')) {
+        userMessage = errorMessage.split('Mercado Pago Error:')[1].trim();
+        if (userMessage.includes('access token')) {
+          userMessage = "O Access Token do Mercado Pago está incorreto ou ausente. Por favor, verifique as configurações do restaurante.";
+        }
+      } else if (errorMessage.toLowerCase().includes('access token') || errorMessage.toLowerCase().includes('credentials')) {
         userMessage = "Ocorreu um problema com a configuração de pagamento do restaurante. Por favor, entre em contato com o estabelecimento.";
-      } else if (errorMessage.toLowerCase().includes('mercado pago error')) {
-        const mpError = errorMessage.split('Mercado Pago Error:')[1];
-        userMessage = `O Mercado Pago retornou um erro: ${mpError || 'Tente novamente.'}`;
       } else if (errorMessage.toLowerCase().includes('fora da nossa área de entrega')) {
         userMessage = "Seu endereço está fora da nossa área de entrega.";
-      } else if (errorMessage.toLowerCase().includes('falha ao processar pagamento online')) {
-        userMessage = errorMessage.split('Falha ao processar pagamento online:')[1] || "Erro ao processar pagamento online. Por favor, tente novamente.";
       } else if (errorMessage.toLowerCase().includes('inconsistência no valor total')) {
         userMessage = "Erro de cálculo no pedido. Por favor, tente limpar o carrinho e refazer o pedido.";
+      } else if (errorMessage.toLowerCase().includes('falha ao processar pagamento online')) {
+        userMessage = errorMessage.split('Falha ao processar pagamento online:')[1] || "Erro ao processar pagamento online. Por favor, tente novamente.";
       }
 
       toast.error("Falha ao processar o pagamento", {
