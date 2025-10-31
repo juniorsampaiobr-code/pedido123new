@@ -32,13 +32,17 @@ serve(async (req) => {
 
     // --- 1. Processar Itens e Calcular Subtotal ---
     const preferenceItems = items.map((item: any) => {
-      // Garante que o preço unitário é um número com 2 casas decimais
-      const unit_price = parseFloat(item.price.toFixed(2));
+      // Adicionando verificação de segurança para garantir que price é um número
+      const priceValue = typeof item.price === 'number' ? item.price : parseFloat(item.price);
       
-      if (unit_price <= 0 || !item.quantity || item.quantity <= 0) {
+      if (isNaN(priceValue) || priceValue <= 0 || !item.quantity || item.quantity <= 0) {
         console.warn(`[create-payment-preference] Filtering out invalid item: ${item.name} (Price: ${item.price}, Qty: ${item.quantity})`);
         return null;
       }
+      
+      // Garante que o preço unitário é um número com 2 casas decimais
+      const unit_price = parseFloat(priceValue.toFixed(2));
+      
       return {
         title: item.name,
         quantity: item.quantity,
