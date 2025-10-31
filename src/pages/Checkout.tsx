@@ -794,6 +794,7 @@ const Checkout = () => {
                               <FormItem className="col-span-2">
                                 <FormLabel>Rua *</FormLabel>
                                 <Input {...field} disabled={addressInputMode === 'search'} />
+                                <FormMessage />
                               </FormItem>
                             )} 
                           />
@@ -804,6 +805,7 @@ const Checkout = () => {
                               <FormItem className="col-span-1">
                                 <FormLabel>Número *</FormLabel>
                                 <Input {...field} disabled={addressInputMode === 'search'} />
+                                <FormMessage />
                               </FormItem>
                             )} 
                           />
@@ -815,6 +817,7 @@ const Checkout = () => {
                             <FormItem>
                               <FormLabel>Complemento (Opcional)</FormLabel>
                               <Input placeholder="Apto, Bloco, Casa, etc." {...field} disabled={false} />
+                              <FormMessage />
                             </FormItem>
                           )} 
                         />
@@ -826,6 +829,7 @@ const Checkout = () => {
                               <FormItem>
                                 <FormLabel>Bairro *</FormLabel>
                                 <Input {...field} disabled={addressInputMode === 'search'} />
+                                <FormMessage />
                               </FormItem>
                             )} 
                           />
@@ -836,6 +840,7 @@ const Checkout = () => {
                               <FormItem>
                                 <FormLabel>Cidade *</FormLabel>
                                 <Input {...field} disabled={addressInputMode === 'search'} />
+                                <FormMessage />
                               </FormItem>
                             )} 
                           />
@@ -847,6 +852,7 @@ const Checkout = () => {
                             <FormItem>
                               <FormLabel>CEP *</FormLabel>
                               <ZipCodeInput {...field} disabled={addressInputMode === 'search'} />
+                              <FormMessage />
                             </FormItem>
                           )} 
                         />
@@ -947,14 +953,14 @@ const Checkout = () => {
                     {(isOnlinePayment) && (
                       <div className="space-y-4 pt-4 border-t">
                         <h3 className="font-semibold flex items-center gap-2">
-                          <CreditCard className="h-4 w-4" /> Detalhes Adicionais *
+                          <CreditCard className="h-4 w-4" /> Detalhes Adicionais
                         </h3>
                         <FormField 
                           control={form.control} 
                           name="cpf_cnpj" 
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>CPF/CNPJ (obrigatório para pagamento online)</FormLabel>
+                              <FormLabel>CPF/CNPJ * (obrigatório para pagamento online)</FormLabel>
                               <CpfCnpjInput {...field} />
                               <FormMessage />
                             </FormItem>
