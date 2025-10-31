@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { orderId, items, totalAmount, restaurantName, clientUrl } = await req.json();
+    const { orderId, items, totalAmount, restaurantName, clientUrl, customerEmail, customerCpfCnpj } = await req.json();
     console.log(`[create-payment-preference] Received request for orderId: ${orderId}, Total: ${totalAmount}`);
 
     const accessToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
@@ -70,17 +70,14 @@ serve(async (req) => {
     const fixedSubtotal = parseFloat(calculatedSubtotal.toFixed(2));
 
     // --- 2. Calcular Taxa de Entrega ---
-    // Calcula a diferença entre o total do carrinho (incluindo taxa) e o subtotal dos itens
     let deliveryFee = fixedTotalAmount - fixedSubtotal;
 
-    // Se a taxa for negativa (erro de arredondamento ou lógica), forçamos a zero.
     if (deliveryFee < 0.01) { 
       deliveryFee = 0;
     } else {
       deliveryFee = parseFloat(deliveryFee.toFixed(2));
     }
 
-    // Adiciona a taxa de entrega como um item separado, se for positiva
     if (deliveryFee > 0) {
       preferenceItems.push({
         title: 'Taxa de Entrega',
@@ -91,7 +88,6 @@ serve(async (req) => {
       console.log(`[create-payment-preference] Added delivery fee of ${deliveryFee.toFixed(2)}`);
     }
     
-    // Verifica se a soma dos itens na preferência corresponde ao totalAmount
     const finalPreferenceTotal = preferenceItems.reduce((acc: number, item: any) => acc + (item.unit_price * item.quantity), 0);
     
     if (Math.abs(finalPreferenceTotal - fixedTotalAmount) > 0.01) {
@@ -103,20 +99,32 @@ serve(async (req) => {
 
 
     // --- 3. Preparar Preferência ---
-    // Sanitiza o nome do restaurante para o statement_descriptor (máx 22 caracteres, apenas alfanumérico)
     let sanitizedRestaurantName = restaurantName
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove acentos
-      .replace(/[^a-zA-Z0-9 ]/g, '') // Remove caracteres especiais (exceto espaços)
-      .toUpperCase() // Converte para maiúsculas
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
+      .replace(/[^a-zA-Z0-9 ]/g, '') 
+      .toUpperCase() 
       .substring(0, 22)
       .trim();
     
     if (!sanitizedRestaurantName) {
       sanitizedRestaurantName = "PEDIDO123";
     }
+    
+    // Determinar o tipo de identificação (CPF ou CNPJ)
+    let identificationType = 'CPF';
+    if (customerCpfCnpj && customerCpfCnpj.length === 14) {
+        identificationType = 'CNPJ';
+    }
 
     const preference = {
       items: preferenceItems,
+      payer: {
+        email: customerEmail,
+        identification: customerCpfCnpj ? {
+            type: identificationType,
+            number: customerCpfCnpj,
+        } : undefined,
+      },
       payment_methods: {
         excluded_payment_types: [
           { id: "ticket" }
@@ -157,7 +165,6 @@ serve(async (req) => {
       
       console.error("[create-payment-preference] Mercado Pago API Error:", errorBody);
       
-      // Safely extract error cause
       let cause = errorBody.message || response.statusText;
       if (errorBody.cause && Array.isArray(errorBody.cause) && errorBody.cause.length > 0) {
           cause = errorBody.cause[0].description || errorBody.cause[0].code || cause;
@@ -179,7 +186,6 @@ serve(async (req) => {
     
     const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
     
-    // Log the full error object if available
     if (error instanceof Error) {
         console.error("[create-payment-preference] Full Error Stack:", error.stack);
     }

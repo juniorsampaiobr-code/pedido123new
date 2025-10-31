@@ -526,20 +526,21 @@ const Checkout = () => {
         setIsProcessingPayment(true);
         toast.info("Redirecionando para o pagamento online...");
         
-        const clientUrl = window.location.origin; // Usando apenas a origem
+        const clientUrl = window.location.origin; 
         
         const payload = { 
           orderId, 
           items, 
-          totalAmount: parseFloat(total.toFixed(2)), // Garantindo precisão de 2 casas decimais
+          totalAmount: parseFloat(total.toFixed(2)), 
           restaurantName: restaurant.name, 
-          clientUrl 
+          clientUrl,
+          customerEmail: formData.email || 'cliente@pedido123.com', // MP exige email
+          customerCpfCnpj: formData.cpf_cnpj, // Incluindo CPF/CNPJ
         };
         
-        console.log("Payload enviado para create-payment-preference:", payload); // LOG DE DEBUG
+        console.log("Payload enviado para create-payment-preference:", payload); 
 
         try {
-          // Usando o fluxo de redirecionamento para Pix/Cartão/Boleto
           const { data: preferenceData, error: preferenceError } = await supabase.functions.invoke('create-payment-preference', {
             body: payload,
           });
@@ -571,7 +572,6 @@ const Checkout = () => {
         clearCart();
         navigate(`/order-success/${orderId}`);
       }
-      // Se for online, a navegação é feita pelo redirecionamento do Mercado Pago
     },
     onError: (err) => {
       let userMessage = "Ocorreu um erro ao finalizar seu pedido. Por favor, tente novamente.";
@@ -586,6 +586,8 @@ const Checkout = () => {
         userMessage = "Seu endereço está fora da nossa área de entrega.";
       } else if (errorMessage.toLowerCase().includes('falha ao processar pagamento online')) {
         userMessage = errorMessage.split('Falha ao processar pagamento online:')[1] || "Erro ao processar pagamento online. Por favor, tente novamente.";
+      } else if (errorMessage.toLowerCase().includes('inconsistência no valor total')) {
+        userMessage = "Erro de cálculo no pedido. Por favor, tente limpar o carrinho e refazer o pedido.";
       }
 
       toast.error("Falha ao processar o pagamento", {
