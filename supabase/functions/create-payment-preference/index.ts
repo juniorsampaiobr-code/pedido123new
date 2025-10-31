@@ -116,14 +116,19 @@ serve(async (req) => {
         identificationType = 'CNPJ';
     }
 
+    const payerIdentification = customerCpfCnpj ? {
+        type: identificationType,
+        number: customerCpfCnpj,
+    } : undefined;
+    
+    console.log(`[create-payment-preference] Payer Identification: ${JSON.stringify(payerIdentification)}`);
+
+
     const preference = {
       items: preferenceItems,
       payer: {
         email: customerEmail,
-        identification: customerCpfCnpj ? {
-            type: identificationType,
-            number: customerCpfCnpj,
-        } : undefined,
+        identification: payerIdentification,
       },
       payment_methods: {
         excluded_payment_types: [
@@ -141,7 +146,7 @@ serve(async (req) => {
       statement_descriptor: sanitizedRestaurantName,
     };
 
-    console.log('[create-payment-preference] Creating preference with payload:', JSON.stringify(preference, null, 2));
+    console.log('[create-payment-preference] Creating preference with payload (excluding items for brevity):', JSON.stringify({ ...preference, items: '...' }, null, 2));
 
     const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST',
