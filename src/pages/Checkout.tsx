@@ -426,7 +426,7 @@ const Checkout = () => {
           customerCoords = await geocodeAddress(fullAddress);
           
           if (customerCoords) {
-            form.setValue('latitude', customerCoords[0]);
+            form.setValue('latitude', coords[0]);
             form.setValue('longitude', coords[1]);
             setShowMap(true);
           }
@@ -961,7 +961,9 @@ const Checkout = () => {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>CPF/CNPJ * (obrigatório para pagamento online)</FormLabel>
-                              <CpfCnpjInput {...field} />
+                              <FormControl>
+                                <CpfCnpjInput {...field} />
+                              </FormControl>
                               <FormMessage />
                             </FormItem>
                           )} 
