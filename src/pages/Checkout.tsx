@@ -526,7 +526,7 @@ const Checkout = () => {
         setIsProcessingPayment(true);
         toast.info("Redirecionando para o pagamento online...");
         
-        const clientUrl = window.location.origin + window.location.pathname; 
+        const clientUrl = window.location.origin; // Usando apenas a origem
         
         const payload = { 
           orderId, 
