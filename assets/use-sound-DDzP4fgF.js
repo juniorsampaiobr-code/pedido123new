@@ -1,0 +1,1 @@
+import{r as o}from"./vendor-Dj3GGzPJ.js";const e=o.createContext(null),r=()=>{const t=o.useContext(e);if(!t)throw new Error("useSound must be used within the SoundContext.Provider (DashboardLayout)");return t};export{e as S,r as u};
