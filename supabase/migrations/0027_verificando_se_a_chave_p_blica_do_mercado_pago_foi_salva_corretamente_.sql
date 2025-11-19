@@ -1,0 +1,1 @@
+SELECT mercado_pago_public_key FROM payment_settings WHERE restaurant_id = (SELECT id FROM restaurants LIMIT 1);

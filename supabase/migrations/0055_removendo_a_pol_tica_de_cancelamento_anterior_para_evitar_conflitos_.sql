@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Authenticated users can cancel their own orders V2" ON public.orders;

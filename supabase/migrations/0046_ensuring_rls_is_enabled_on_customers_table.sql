@@ -1,0 +1,1 @@
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;

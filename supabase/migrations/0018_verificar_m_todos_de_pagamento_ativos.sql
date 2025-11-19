@@ -1,0 +1,1 @@
+SELECT * FROM payment_methods WHERE is_active = true;

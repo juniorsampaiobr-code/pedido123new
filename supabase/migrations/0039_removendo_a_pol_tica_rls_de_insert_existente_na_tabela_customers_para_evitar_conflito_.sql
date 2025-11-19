@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Allow insert for anonymous checkout" ON public.customers;

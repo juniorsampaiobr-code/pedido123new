@@ -1,0 +1,84 @@
+import { useNavigate } from 'react-router-dom';
+import { useCart } from '@/hooks/use-cart';
+import { Button } from '@/components/ui/button';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+  SheetClose,
+  SheetDescription, // Importando SheetDescription
+} from '@/components/ui/sheet';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { CartItem } from './CartItem';
+import { ShoppingCart } from 'lucide-react';
+
+interface CartSidebarProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export const CartSidebar = ({ isOpen, onOpenChange }: CartSidebarProps) => {
+  const navigate = useNavigate();
+  const { items, subtotal, total, clearCart } = useCart();
+
+  const handleCheckout = () => {
+    // 1. Fecha o sidebar
+    onOpenChange(false);
+    // 2. Navega programaticamente
+    navigate('/pre-checkout');
+  };
+
+  return (
+    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+      <SheetContent className="flex flex-col">
+        <SheetHeader>
+          <SheetTitle className="text-2xl">Seu Carrinho</SheetTitle>
+          <SheetDescription className="sr-only">
+            Lista de itens no seu carrinho e resumo do pedido.
+          </SheetDescription>
+        </SheetHeader>
+        <Separator />
+        
+        {items.length === 0 ? (
+          <div className="flex-grow flex flex-col items-center justify-center text-center">
+            <ShoppingCart className="h-16 w-16 text-muted-foreground mb-4" />
+            <p className="text-lg font-semibold">Seu carrinho está vazio</p>
+            <p className="text-sm text-muted-foreground">Adicione produtos do cardápio para começar.</p>
+          </div>
+        ) : (
+          <>
+            <ScrollArea className="flex-grow -mx-6 px-6">
+              <div className="divide-y">
+                {items.map(item => (
+                  <CartItem key={item.id} item={item} />
+                ))}
+              </div>
+            </ScrollArea>
+            
+            <div className="border-t pt-4 mt-4 space-y-4">
+              <div className="w-full space-y-2">
+                <div className="flex justify-between text-base">
+                  <span className="text-muted-foreground">Subtotal:</span>
+                  <span className="font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total:</span>
+                  <span className="text-primary">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}</span>
+                </div>
+              </div>
+              <div className="flex gap-2 w-full">
+                <Button variant="outline" onClick={clearCart} className="flex-1">Limpar Carrinho</Button>
+                <Button className="w-full flex-1" onClick={handleCheckout}>
+                  Finalizar Pedido
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+};

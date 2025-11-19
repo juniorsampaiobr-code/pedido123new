@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Users can update their customer profile" ON public.customers;
