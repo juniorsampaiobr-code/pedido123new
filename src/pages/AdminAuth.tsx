@@ -31,6 +31,34 @@ const checkUserRole = async (userId: string): Promise<Enums<'app_role'> | null> 
   return data?.role || null;
 };
 
+// Novo: Função para configurar a loja inicial e promover o usuário a admin, se for o primeiro
+const setupNewStoreAndRole = async (user: User): Promise<Enums<'app_role'> | null> => {
+  // 1. Check current role
+  let role = await checkUserRole(user.id);
+
+  // 2. If user is not admin/moderator, check if a restaurant exists and potentially run setup
+  if (role !== 'admin' && role !== 'moderator') {
+    // Chamamos a Edge Function para verificar e configurar a loja inicial
+    const fullName = user.user_metadata.full_name || 'Novo Restaurante';
+    
+    const { error: setupError } = await supabase.functions.invoke('setup-initial-admin-store', {
+      body: { userId: user.id, fullName: fullName },
+    });
+    
+    if (setupError) {
+      console.error("Error setting up initial store:", setupError);
+      // Não lançamos erro aqui, apenas retornamos null para que o handleRedirect possa lidar com o acesso negado
+      return null; 
+    }
+    
+    // Se a Edge Function rodou com sucesso (ou não precisou rodar), refetch a role
+    role = await checkUserRole(user.id);
+  }
+  
+  return role;
+};
+
+
 const AdminAuth = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
@@ -42,7 +70,8 @@ const AdminAuth = () => {
   const [session, setSession] = useState<Session | null>(null);
 
   const handleRedirect = async (user: User) => {
-    const role = await checkUserRole(user.id);
+    // 1. Tenta configurar a loja e obter a role atualizada
+    const role = await setupNewStoreAndRole(user);
     
     if (role === 'admin' || role === 'moderator') {
       toast.success("Login de administrador efetuado com sucesso!");
@@ -75,6 +104,7 @@ const AdminAuth = () => {
       (event, session) => {
         setSession(session);
         if (session?.user) {
+          // O setupNewStoreAndRole dentro de handleRedirect cuidará da lógica de ser o primeiro usuário
           handleRedirect(session.user);
         }
       }
@@ -145,7 +175,7 @@ const AdminAuth = () => {
         
         toast.success("Login realizado com sucesso!");
       }
-      // O onAuthStateChange cuidará do redirecionamento
+      // O onAuthStateChange cuidará do redirecionamento e do setup da loja
     } catch (error: any) {
       if (error.message.includes("Email not confirmed")) {
         toast.error("Por favor, verifique seu e-mail para confirmar sua conta.");
