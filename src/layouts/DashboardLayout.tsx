@@ -15,6 +15,7 @@ import { MobileSidebar } from "@/components/MobileSidebar";
 import { useIsMobile } from "@/hooks/use-mobile"; 
 import { SoundContext, useSound } from "@/hooks/use-sound"; // Importando do novo hook
 import { AdminProfileModal } from "@/components/AdminProfileModal"; // NOVO IMPORT
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Importando Alert
 
 type Restaurant = Tables<'restaurants'>;
 type SoundStatus = 'disabled' | 'enabled' | 'error';
