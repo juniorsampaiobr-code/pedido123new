@@ -37,22 +37,21 @@ const setupNewStoreAndRole = async (user: User): Promise<Enums<'app_role'> | nul
   // 1. Check current role
   let role = await checkUserRole(user.id);
 
-  // 2. If user is not admin/moderator, check if a restaurant exists and potentially run setup
+  // 2. If user is not admin/moderator, ensure admin access via Edge Function
   if (role !== 'admin' && role !== 'moderator') {
-    // Chamamos a Edge Function para verificar e configurar a loja inicial
-    const fullName = user.user_metadata.full_name || 'Novo Restaurante';
+    // Chamamos a Edge Function para verificar e configurar a loja inicial/promover a role
+    const fullName = user.user_metadata.full_name || 'Novo Usuário';
     
-    const { error: setupError } = await supabase.functions.invoke('setup-initial-admin-store', {
+    const { error: setupError } = await supabase.functions.invoke('ensure-admin-access', {
       body: { userId: user.id, fullName: fullName },
     });
     
     if (setupError) {
-      console.error("Error setting up initial store:", setupError);
-      // Se a Edge Function falhar, não podemos garantir a role, retornamos null
+      console.error("Error setting up admin access:", setupError);
       return null; 
     }
     
-    // Se a Edge Function rodou com sucesso (ou não precisou rodar), refetch a role
+    // Se a Edge Function rodou com sucesso, refetch a role
     role = await checkUserRole(user.id);
   }
   
