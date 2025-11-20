@@ -8,27 +8,37 @@ import {
   Users,
   Copy,
   ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOutletContext } from 'react-router-dom';
-import { DashboardContextType } from '@/layouts/DashboardLayout'; // Importar o tipo do contexto
+import { DashboardContextType } from '@/layouts/DashboardLayout';
+import { useDashboardStats } from "@/hooks/use-dashboard-stats"; // Importando o novo hook
+import { Skeleton } from "@/components/ui/skeleton";
 
-const DashboardStatCard = ({ icon: Icon, title, value, description }: { icon: React.ElementType, title: string, value: string, description: string }) => (
+const DashboardStatCard = ({ icon: Icon, title, value, description, isLoading }: { icon: React.ElementType, title: string, value: string, description: string, isLoading: boolean }) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-sm font-medium">{title}</CardTitle>
       <Icon className="h-4 w-4 text-muted-foreground" />
     </CardHeader>
     <CardContent>
-      <div className="text-2xl font-bold">{value}</div>
+      {isLoading ? (
+        <Skeleton className="h-7 w-3/4" />
+      ) : (
+        <div className="text-2xl font-bold">{value}</div>
+      )}
       <p className="text-xs text-muted-foreground">{description}</p>
     </CardContent>
   </Card>
 );
 
 const Dashboard = () => {
-  const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
+  const { userRestaurantId } = useOutletContext<DashboardContextType>();
   const menuLink = `${window.location.origin}${window.location.pathname}#/menu`;
+
+  // Usando o novo hook para buscar estatísticas
+  const { data: stats, isLoading: isLoadingStats } = useDashboardStats(userRestaurantId);
 
   const copyLink = () => {
     navigator.clipboard.writeText(menuLink);
@@ -54,6 +64,9 @@ const Dashboard = () => {
       </main>
     );
   }
+  
+  const formatCurrency = (amount: number) => 
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount);
 
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
@@ -65,27 +78,31 @@ const Dashboard = () => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <DashboardStatCard
           title="Pedidos Hoje"
-          value="0"
-          description="Nenhum pedido hoje"
+          value={isLoadingStats ? '' : String(stats.ordersTodayCount)}
+          description={isLoadingStats ? 'Carregando...' : stats.ordersTodayCount === 0 ? "Nenhum pedido hoje" : `${stats.ordersTodayCount} pedidos`}
           icon={ShoppingCart}
+          isLoading={isLoadingStats}
         />
         <DashboardStatCard
           title="Produtos"
-          value="2"
-          description="Total de produtos"
+          value={isLoadingStats ? '' : String(stats.productsCount)}
+          description={isLoadingStats ? 'Carregando...' : `Total de produtos`}
           icon={Package}
+          isLoading={isLoadingStats}
         />
         <DashboardStatCard
           title="Vendas do Mês"
-          value="R$ 291,00"
-          description="Receita mensal"
+          value={isLoadingStats ? '' : formatCurrency(stats.salesMonthTotal)}
+          description={isLoadingStats ? 'Carregando...' : "Receita mensal"}
           icon={LineChart}
+          isLoading={isLoadingStats}
         />
         <DashboardStatCard
           title="Clientes"
-          value="1"
-          description="Total de clientes"
+          value={isLoadingStats ? '' : String(stats.customersCount)}
+          description={isLoadingStats ? 'Carregando...' : `Total de clientes`}
           icon={Users}
+          isLoading={isLoadingStats}
         />
       </div>
 
