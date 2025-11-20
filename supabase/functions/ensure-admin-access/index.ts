@@ -23,9 +23,17 @@ serve(async (req) => {
     }
 
     // Use the Service Role Key for administrative actions
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+        console.error("[ensure-admin-access] FATAL: Missing Supabase environment variables.");
+        throw new Error("Supabase environment variables are not configured correctly.");
+    }
+
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      SUPABASE_URL,
+      SERVICE_ROLE_KEY,
       {
         auth: {
           autoRefreshToken: false,
@@ -132,6 +140,8 @@ serve(async (req) => {
   } catch (error) {
     console.error("[ensure-admin-access] General Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
+    
+    // Retorna o erro 500 com a mensagem de erro detalhada no corpo
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: corsHeaders,
       status: 500,

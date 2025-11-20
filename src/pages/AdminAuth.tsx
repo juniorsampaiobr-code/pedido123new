@@ -48,13 +48,24 @@ const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role
     
     const fullName = user.user_metadata.full_name || 'Novo Usuário';
     
-    const { error: setupError } = await supabase.functions.invoke('ensure-admin-access', {
+    const { error: setupError, data: setupData } = await supabase.functions.invoke('ensure-admin-access', {
       body: { userId: user.id, fullName: fullName },
     });
     
     if (setupError) {
       console.error("Error setting up admin access:", setupError);
-      throw new Error("Falha ao configurar acesso de administrador.");
+      
+      // Tenta extrair a mensagem de erro detalhada do corpo da resposta da Edge Function
+      let errorMessage = "Falha ao configurar acesso de administrador.";
+      if (setupData && typeof setupData === 'object' && 'error' in setupData) {
+          errorMessage = setupData.error as string;
+      } else if (setupError.message.includes("non-2xx status code")) {
+          errorMessage = `Erro interno do servidor (500). Verifique os logs do Supabase.`;
+      } else {
+          errorMessage = setupError.message;
+      }
+      
+      throw new Error(errorMessage);
     }
     
     // Se a Edge Function rodou com sucesso, refetch a role e o restaurantId
