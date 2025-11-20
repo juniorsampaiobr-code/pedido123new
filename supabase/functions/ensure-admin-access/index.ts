@@ -87,45 +87,58 @@ serve(async (req) => {
 
     // 3. Garante que o usuário tenha a role 'admin' e esteja vinculado ao restaurantId
     
-    // Tenta encontrar a role existente (que deve ter sido criada pelo trigger handle_new_user)
-    const { data: existingRole, error: roleCheckError } = await supabaseAdmin
+    // Tenta encontrar a role 'admin' ou 'user'
+    const { data: existingRoles, error: roleCheckError } = await supabaseAdmin
       .from('user_roles')
       .select('id, role')
-      .eq('user_id', userId)
-      .limit(1)
-      .single();
+      .eq('user_id', userId);
       
-    if (roleCheckError && roleCheckError.code !== 'PGRST116') {
-        console.warn(`[ensure-admin-access] DB Warning checking existing role: ${roleCheckError.message}`);
+    if (roleCheckError) {
+        console.warn(`[ensure-admin-access] DB Warning checking existing roles: ${roleCheckError.message}`);
     }
     
-    console.log(`[ensure-admin-access] Role check result: ${JSON.stringify(existingRole)}`);
-    console.log(`[ensure-admin-access] Target restaurantId for role update: ${restaurantId}`);
+    const adminRole = existingRoles?.find(r => r.role === 'admin');
+    const userRole = existingRoles?.find(r => r.role === 'user');
+    
+    console.log(`[ensure-admin-access] Admin Role found: ${!!adminRole}, User Role found: ${!!userRole}`);
 
-
-    if (existingRole) {
-        // Atualiza a role existente para 'admin' e vincula ao restaurante
+    if (adminRole) {
+        // Se a role 'admin' já existe, apenas garante que o restaurant_id esteja vinculado
+        const { error: updateRoleError } = await supabaseAdmin
+          .from('user_roles')
+          .update({ restaurant_id: restaurantId })
+          .eq('id', adminRole.id);
+          
+        if (updateRoleError) {
+          console.error(`[ensure-admin-access] DB Error updating existing admin role restaurant_id: ${updateRoleError.message}`);
+          throw new Error(`Failed to update existing admin role: ${updateRoleError.message}`);
+        }
+        console.log(`[ensure-admin-access] Existing admin role linked to restaurant.`);
+        
+    } else if (userRole) {
+        // Se a role 'user' existe, promove para 'admin' e vincula o restaurant_id
         const { error: updateRoleError } = await supabaseAdmin
           .from('user_roles')
           .update({ role: 'admin', restaurant_id: restaurantId })
-          .eq('id', existingRole.id);
+          .eq('id', userRole.id);
           
         if (updateRoleError) {
-          console.error(`[ensure-admin-access] DB Error updating role: ${updateRoleError.message}`);
-          throw new Error(`Failed to update role to admin: ${updateRoleError.message}`);
+          console.error(`[ensure-admin-access] DB Error promoting user role: ${updateRoleError.message}`);
+          throw new Error(`Failed to promote user role to admin: ${updateRoleError.message}`);
         }
-        console.log(`[ensure-admin-access] Role updated successfully.`);
+        console.log(`[ensure-admin-access] User role promoted to admin.`);
+        
     } else {
-        // Insere a role 'admin' se nenhuma role foi encontrada (fallback)
+        // Fallback: Insere a role 'admin' se nenhuma role foi encontrada
         const { error: insertRoleError } = await supabaseAdmin
           .from('user_roles')
           .insert({ user_id: userId, role: 'admin', restaurant_id: restaurantId });
           
         if (insertRoleError) {
-          console.error(`[ensure-admin-access] DB Error inserting role: ${insertRoleError.message}`);
+          console.error(`[ensure-admin-access] DB Error inserting admin role: ${insertRoleError.message}`);
           throw new Error(`Failed to insert admin role: ${insertRoleError.message}`);
         }
-        console.log(`[ensure-admin-access] Role inserted successfully.`);
+        console.log(`[ensure-admin-access] Admin role inserted successfully.`);
     }
 
     return new Response(JSON.stringify({ 
