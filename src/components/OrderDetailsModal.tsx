@@ -63,7 +63,7 @@ interface OrderDetailsModalProps {
   onClose: () => void;
 }
 
-export const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) => {
+const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) => {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -232,3 +232,5 @@ export const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalP
     </Dialog>
   );
 };
+
+export { OrderDetailsModal };

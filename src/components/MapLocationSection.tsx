@@ -103,4 +103,6 @@ const MapLocationSectionComponent = ({
   );
 };
 
-export const MapLocationSection = memo(MapLocationSectionComponent);
+const MapLocationSection = memo(MapLocationSectionComponent);
+
+export { MapLocationSection };
