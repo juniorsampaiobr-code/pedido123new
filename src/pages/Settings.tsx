@@ -204,6 +204,7 @@ const Settings = () => {
       }
 
     } catch (err: any) {
+      toast.dismiss(loadingToast);
       toast.error(`Erro na busca: ${err.message}`);
     } finally {
       setIsSearchingCep(false);
