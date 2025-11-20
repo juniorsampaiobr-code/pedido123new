@@ -1,0 +1,1 @@
+import{j as s}from"./tanstack-DVJTcRV8.js";import{a as t}from"./index-Q2vd15TQ.js";import{S as e}from"./shopping-cart-KQLA8Sp0.js";const i=({className:r})=>s.jsxs("div",{className:t("flex items-center gap-2",r),children:[s.jsx(e,{className:"h-6 w-6 text-primary"}),s.jsx("span",{className:"text-xl font-bold text-foreground",children:"Pedido 123"})]});export{i as L};
