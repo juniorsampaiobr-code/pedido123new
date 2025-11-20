@@ -16,30 +16,36 @@ import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importando Load
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 
-const checkUserRole = async (userId: string): Promise<Enums<'app_role'> | null> => {
+const checkUserRoleAndRestaurant = async (userId: string): Promise<{ role: Enums<'app_role'> | null, restaurantId: string | null }> => {
   const { data, error } = await supabase
     .from('user_roles')
-    .select('role')
+    .select('role, restaurant_id')
     .eq('user_id', userId)
     .in('role', ['admin', 'moderator'])
     .limit(1)
     .single();
 
   if (error && error.code !== 'PGRST116') {
-    console.error("Error checking role:", error);
-    return null;
+    console.error("Error checking role and restaurant:", error);
+    return { role: null, restaurantId: null };
   }
-  return data?.role || null;
+  
+  if (!data) {
+      return { role: null, restaurantId: null };
+  }
+  
+  return { role: data.role, restaurantId: data.restaurant_id };
 };
 
 // Novo: Função para configurar a loja inicial e promover o usuário a admin, se for o primeiro
-const setupNewStoreAndRole = async (user: User): Promise<Enums<'app_role'> | null> => {
-  // 1. Check current role
-  let role = await checkUserRole(user.id);
+const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role'> | null, restaurantId: string | null }> => {
+  // 1. Check current role and restaurant link
+  let { role, restaurantId } = await checkUserRoleAndRestaurant(user.id);
 
-  // 2. If user is not admin/moderator, ensure admin access via Edge Function
-  if (role !== 'admin' && role !== 'moderator') {
-    // Chamamos a Edge Function para verificar e configurar a loja inicial/promover a role
+  // 2. If user is not admin/moderator OR is admin/moderator but missing restaurantId, run setup
+  if (role !== 'admin' && role !== 'moderator' || !restaurantId) {
+    console.log(`[AdminAuth] Running setup for user ${user.id}. Current role: ${role}, Restaurant ID: ${restaurantId}`);
+    
     const fullName = user.user_metadata.full_name || 'Novo Usuário';
     
     const { error: setupError } = await supabase.functions.invoke('ensure-admin-access', {
@@ -48,14 +54,16 @@ const setupNewStoreAndRole = async (user: User): Promise<Enums<'app_role'> | nul
     
     if (setupError) {
       console.error("Error setting up admin access:", setupError);
-      return null; 
+      throw new Error("Falha ao configurar acesso de administrador.");
     }
     
-    // Se a Edge Function rodou com sucesso, refetch a role
-    role = await checkUserRole(user.id);
+    // Se a Edge Function rodou com sucesso, refetch a role e o restaurantId
+    const updatedData = await checkUserRoleAndRestaurant(user.id);
+    role = updatedData.role;
+    restaurantId = updatedData.restaurantId;
   }
   
-  return role;
+  return { role, restaurantId };
 };
 
 
@@ -74,13 +82,18 @@ const AdminAuth = () => {
     setIsAuthLoading(true);
     try {
       // 1. Tenta configurar a loja e obter a role atualizada
-      const role = await setupNewStoreAndRole(user);
+      const { role, restaurantId } = await setupNewStoreAndRole(user);
       
       if (role === 'admin' || role === 'moderator') {
-        toast.success("Acesso ao painel concedido.");
-        navigate("/dashboard", { replace: true });
+        if (restaurantId) {
+            toast.success("Acesso ao painel concedido.");
+            navigate("/dashboard", { replace: true });
+        } else {
+            // Se a role é admin, mas o restaurantId ainda está faltando (erro na Edge Function)
+            throw new Error("Sua conta de administrador não está vinculada a um restaurante. Tente novamente ou contate o suporte.");
+        }
       } else {
-        // Se a role não for admin/moderator após o setup (ex: Edge Function falhou ou não é o primeiro usuário)
+        // Se a role não for admin/moderator após o setup
         toast.error("Acesso negado.", {
           description: "Esta conta não possui permissão de administrador/moderador. Redirecionando para o menu.",
           duration: 5000,
@@ -93,7 +106,10 @@ const AdminAuth = () => {
       }
     } catch (error) {
       console.error("Error during admin setup/redirect:", error);
-      toast.error("Erro crítico de autenticação. Tente novamente.");
+      toast.error("Erro crítico de autenticação.", {
+          description: error instanceof Error ? error.message : "Ocorreu um erro desconhecido. Tente novamente.",
+          duration: 8000,
+      });
       await supabase.auth.signOut();
       setIsAuthLoading(false);
     }

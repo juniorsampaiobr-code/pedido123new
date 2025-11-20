@@ -132,12 +132,8 @@ const DashboardLayoutComponent = () => {
       
       // Se o usuário tem role, mas não tem restaurant_id, algo está errado
       if ((role === 'admin' || role === 'moderator') && !restaurantId) {
-          toast.error("Erro de configuração.", {
-            description: "Sua conta não está vinculada a um restaurante. Entre em contato com o suporte.",
-            duration: 5000,
-          });
-          await supabase.auth.signOut();
-          navigate("/admin-auth", { replace: true });
+          // Não desloga aqui, apenas mostra o erro no layout, pois o AdminAuth tentará corrigir
+          console.error("Admin logged in but missing restaurant ID.");
       }
     };
 
@@ -329,14 +325,11 @@ const DashboardLayoutComponent = () => {
   const handleSignOut = async () => { await supabase.auth.signOut(); };
 
   // Se estiver carregando a role, o restaurant_id ou os dados do restaurante, mostra o spinner
-  if (userRole === undefined || isRestaurantLoading || !userRestaurantId) {
+  if (userRole === undefined || isRestaurantLoading) {
     return <LoadingSpinner />;
   }
   
   // Se o usuário não for admin/moderator, ele já foi redirecionado no useEffect.
-  // Se ele chegou aqui e userRole não é undefined, mas também não é admin/moderator, 
-  // significa que o redirecionamento está em andamento, mas por segurança, 
-  // garantimos que o layout não seja renderizado.
   if (userRole !== 'admin' && userRole !== 'moderator') {
     return <LoadingSpinner />;
   }
@@ -349,7 +342,7 @@ const DashboardLayoutComponent = () => {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Erro de Configuração</AlertTitle>
             <AlertDescription>
-              Sua conta de administrador não está vinculada a nenhum restaurante. Entre em contato com o suporte.
+              Sua conta não está vinculada a um restaurante. Por favor, tente fazer login novamente. Se o erro persistir, entre em contato com o suporte.
             </AlertDescription>
           </Alert>
         </div>
