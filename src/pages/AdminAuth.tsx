@@ -12,6 +12,7 @@ import { Loader2, Lock, UserPlus } from "lucide-react";
 import { Enums } from "@/integrations/supabase/types";
 import { PhoneInput } from "@/components/PhoneInput";
 import { Separator } from "@/components/ui/separator";
+import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importando LoadingSpinner
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 
@@ -47,7 +48,7 @@ const setupNewStoreAndRole = async (user: User): Promise<Enums<'app_role'> | nul
     
     if (setupError) {
       console.error("Error setting up initial store:", setupError);
-      // Não lançamos erro aqui, apenas retornamos null para que o handleRedirect possa lidar com o acesso negado
+      // Se a Edge Function falhar, não podemos garantir a role, retornamos null
       return null; 
     }
     
@@ -61,8 +62,9 @@ const setupNewStoreAndRole = async (user: User): Promise<Enums<'app_role'> | nul
 
 const AdminAuth = () => {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false); // Inicializa como false (Login)
+  const [isAuthLoading, setIsAuthLoading] = useState(true); // Novo estado para carregamento de autenticação/permissão
+  const [isFormLoading, setIsFormLoading] = useState(false); // Estado para submissão do formulário
+  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -70,42 +72,59 @@ const AdminAuth = () => {
   const [session, setSession] = useState<Session | null>(null);
 
   const handleRedirect = async (user: User) => {
-    // 1. Tenta configurar a loja e obter a role atualizada
-    const role = await setupNewStoreAndRole(user);
-    
-    if (role === 'admin' || role === 'moderator') {
-      toast.success("Login de administrador efetuado com sucesso!");
-      navigate("/dashboard", { replace: true });
-    } else {
-      toast.error("Acesso negado.", {
-        description: "Esta conta não possui permissão de administrador/moderador. Redirecionando para o menu.",
-        duration: 5000,
-      });
-      // Desloga o usuário para evitar confusão
+    setIsAuthLoading(true);
+    try {
+      // 1. Tenta configurar a loja e obter a role atualizada
+      const role = await setupNewStoreAndRole(user);
+      
+      if (role === 'admin' || role === 'moderator') {
+        toast.success("Acesso ao painel concedido.");
+        navigate("/dashboard", { replace: true });
+      } else {
+        // Se a role não for admin/moderator após o setup (ex: Edge Function falhou ou não é o primeiro usuário)
+        toast.error("Acesso negado.", {
+          description: "Esta conta não possui permissão de administrador/moderador. Redirecionando para o menu.",
+          duration: 5000,
+        });
+        // Desloga o usuário para evitar confusão
+        await supabase.auth.signOut();
+        // Redireciona para o menu público
+        const menuUrl = `${window.location.origin}${window.location.pathname}#/menu`;
+        window.location.href = menuUrl;
+      }
+    } catch (error) {
+      console.error("Error during admin setup/redirect:", error);
+      toast.error("Erro crítico de autenticação. Tente novamente.");
       await supabase.auth.signOut();
-      // Redireciona para o menu público
-      const menuUrl = `${window.location.origin}${window.location.pathname}#/menu`;
-      console.log("Redirecting non-admin to menu:", menuUrl);
-      window.location.href = menuUrl;
+      setIsAuthLoading(false);
     }
   };
 
   useEffect(() => {
-    // 1. Verifica a sessão inicial
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
+      
       if (session?.user) {
+        // Se houver sessão, inicia o processo de verificação de permissões
         handleRedirect(session.user);
+      } else {
+        // Nenhuma sessão, mostra o formulário
+        setIsAuthLoading(false);
       }
-    });
+    };
     
-    // 2. Monitora mudanças de estado
+    checkSession();
+    
+    // Monitora mudanças de estado
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
-        if (session?.user) {
-          // O setupNewStoreAndRole dentro de handleRedirect cuidará da lógica de ser o primeiro usuário
+        if (event === 'SIGNED_IN' && session?.user) {
+          // Quando o login/signup é concluído, o handleRedirect é chamado
           handleRedirect(session.user);
+        } else if (event === 'SIGNED_OUT') {
+          setIsAuthLoading(false);
         }
       }
     );
@@ -140,7 +159,7 @@ const AdminAuth = () => {
     e.preventDefault();
     if (!validateForm()) return;
     
-    setIsLoading(true);
+    setIsFormLoading(true);
 
     try {
       if (isSignUp) {
@@ -160,9 +179,11 @@ const AdminAuth = () => {
         if (error) throw error;
         
         if (data.session) {
+          // O onAuthStateChange/handleRedirect será chamado automaticamente
           toast.success("Conta de administrador criada e login efetuado!");
         } else {
           toast.success("Conta criada! Verifique seu email para confirmar.");
+          setIsFormLoading(false); // Se precisar de confirmação, não fica em loading de auth
         }
         
       } else {
@@ -174,29 +195,20 @@ const AdminAuth = () => {
         if (error) throw error;
         
         toast.success("Login realizado com sucesso!");
+        // O onAuthStateChange/handleRedirect será chamado automaticamente
       }
-      // O onAuthStateChange cuidará do redirecionamento e do setup da loja
     } catch (error: any) {
       if (error.message.includes("Email not confirmed")) {
         toast.error("Por favor, verifique seu e-mail para confirmar sua conta.");
       } else {
         toast.error(error.message || "Erro ao processar autenticação");
       }
-    } finally {
-      setIsLoading(false);
+      setIsFormLoading(false);
     }
   };
 
-  if (session?.user) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-          <p className="text-lg font-semibold">Verificando permissões...</p>
-          <p className="text-sm text-muted-foreground">Aguarde enquanto redirecionamos você.</p>
-        </div>
-      </div>
-    );
+  if (isAuthLoading) {
+    return <LoadingSpinner />;
   }
 
   return (
@@ -273,9 +285,9 @@ const AdminAuth = () => {
                 type="submit"
                 className="w-full"
                 size="lg"
-                disabled={isLoading}
+                disabled={isFormLoading}
               >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : isSignUp ? "Criar Conta Admin" : "Entrar no Painel"}
+                {isFormLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : isSignUp ? "Criar Conta Admin" : "Entrar no Painel"}
               </Button>
             </form>
             
