@@ -3,7 +3,7 @@ import { HashRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { CartProvider } from "./hooks/use-cart";
+import CartProvider from "./hooks/use-cart"; // Importação corrigida
 import { TooltipProvider } from "./components/ui/tooltip";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 
