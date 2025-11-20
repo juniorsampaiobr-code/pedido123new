@@ -21,7 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { DashboardContextType } from '@/layouts/DashboardLayout';
+import { DashboardContextType } from '@/layouts/DashboardLayout'; // Importar o tipo do contexto
 
 type BusinessHour = Tables<'business_hours'>;
 
@@ -56,11 +56,12 @@ const hoursFormSchema = z.object({
 
 type HoursFormValues = z.infer<typeof hoursFormSchema>;
 
+// Usar userRestaurantId na função fetch
 const fetchBusinessHours = async (restaurantId: string): Promise<BusinessHour[]> => {
   const { data, error } = await supabase
     .from('business_hours')
     .select('*')
-    .eq('restaurant_id', restaurantId)
+    .eq('restaurant_id', restaurantId) // Usar restaurantId
     .order('day_of_week', { ascending: true });
 
   if (error) throw new Error(`Erro ao buscar horários: ${error.message}`);
@@ -68,13 +69,14 @@ const fetchBusinessHours = async (restaurantId: string): Promise<BusinessHour[]>
 };
 
 const Hours = () => {
-  const { restaurant } = useOutletContext<DashboardContextType>();
+  const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
   const queryClient = useQueryClient();
 
+  // Usar userRestaurantId no queryKey e na função fetch
   const { data: fetchedHours, isLoading, isError, error } = useQuery<BusinessHour[]>({
-    queryKey: ['businessHours', restaurant.id],
-    queryFn: () => fetchBusinessHours(restaurant.id),
-    enabled: !!restaurant.id,
+    queryKey: ['businessHours', userRestaurantId],
+    queryFn: () => fetchBusinessHours(userRestaurantId!), // Usar userRestaurantId
+    enabled: !!userRestaurantId, // Só busca se userRestaurantId estiver disponível
   });
 
   const form = useForm<HoursFormValues>({
@@ -110,17 +112,17 @@ const Hours = () => {
 
   const mutation = useMutation({
     mutationFn: async (data: HoursFormValues) => {
-      if (!restaurant.id) throw new Error('ID do restaurante não disponível.');
+      if (!userRestaurantId) throw new Error('ID do restaurante não disponível.'); // Usar userRestaurantId
 
       const { error: deleteError } = await supabase
         .from('business_hours')
         .delete()
-        .eq('restaurant_id', restaurant.id);
+        .eq('restaurant_id', userRestaurantId); // Usar userRestaurantId
       
       if (deleteError) throw new Error(`Erro ao limpar horários antigos: ${deleteError.message}`);
 
       const inserts = data.hours.map(h => ({
-        restaurant_id: restaurant.id,
+        restaurant_id: userRestaurantId, // Usar userRestaurantId
         day_of_week: h.day_of_week,
         is_open: h.is_open,
         open_time: h.is_open ? h.open_time : null,
@@ -135,7 +137,7 @@ const Hours = () => {
     },
     onSuccess: () => {
       toast.success('Horários de funcionamento salvos com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['businessHours'] });
+      queryClient.invalidateQueries({ queryKey: ['businessHours', userRestaurantId] }); // Usar userRestaurantId
     },
     onError: (err) => {
       toast.error(`Erro ao salvar horários: ${err.message}`);
@@ -158,7 +160,7 @@ const Hours = () => {
           </p>
         </CardHeader>
         <CardContent>
-          {isDataLoading ? (
+          {isDataLoading && (
             <div className="space-y-4">
               {[...Array(7)].map((_, i) => (
                 <div key={i} className="flex items-center justify-between py-3 border-b last:border-b-0">
@@ -172,11 +174,13 @@ const Hours = () => {
               ))}
               <Skeleton className="h-12 w-full mt-6" />
             </div>
-          ) : isError ? (
+          )}
+          {isError && (
             <div className="text-destructive">
               Erro ao carregar horários: {error?.message || "Erro desconhecido"}
             </div>
-          ) : (
+          )}
+          {!isDataLoading && !isError && (
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 {fields.map((field, index) => {
@@ -200,6 +204,7 @@ const Hours = () => {
                                   <Switch
                                     checked={switchField.value}
                                     onCheckedChange={switchField.onChange}
+                                    disabled={!userRestaurantId} // Usar userRestaurantId
                                   />
                                 </FormControl>
                                 <FormLabel className="text-sm font-normal w-16 text-left">
@@ -221,6 +226,7 @@ const Hours = () => {
                                       {...timeField} 
                                       value={timeField.value || ''}
                                       onChange={(e) => timeField.onChange(e.target.value)}
+                                      disabled={!userRestaurantId || isClosed} // Usar userRestaurantId
                                     />
                                   </FormControl>
                                   <FormMessage />
@@ -238,6 +244,7 @@ const Hours = () => {
                                       {...timeField} 
                                       value={timeField.value || ''}
                                       onChange={(e) => timeField.onChange(e.target.value)}
+                                      disabled={!userRestaurantId || isClosed} // Usar userRestaurantId
                                     />
                                   </FormControl>
                                   <FormMessage />
@@ -255,7 +262,7 @@ const Hours = () => {
                 <Button 
                   type="submit" 
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg mt-6"
-                  disabled={mutation.isPending}
+                  disabled={mutation.isPending || !userRestaurantId} // Usar userRestaurantId
                 >
                   {mutation.isPending ? 'Salvando...' : 'Salvar Horários'}
                 </Button>

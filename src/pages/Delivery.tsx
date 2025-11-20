@@ -23,6 +23,8 @@ import { useEffect, useMemo, useCallback, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '@/layouts/DashboardLayout'; // Importar o tipo do contexto
 
 type DeliveryZone = Tables<'delivery_zones'>;
 type Restaurant = Tables<'restaurants'>; // Usando o tipo correto agora
@@ -57,11 +59,12 @@ const zonesFormSchema = z.object({
 
 type ZonesFormValues = z.infer<typeof zonesFormSchema>;
 
-const fetchRestaurantData = async (): Promise<Restaurant> => {
+// Usar userRestaurantId na função fetch
+const fetchRestaurantData = async (restaurantId: string): Promise<Restaurant> => {
   const { data, error } = await supabase
     .from('restaurants')
     .select('*')
-    .limit(1)
+    .eq('id', restaurantId) // Usar restaurantId
     .single();
 
   if (error) throw new Error(`Erro ao buscar dados do restaurante: ${error.message}`);
@@ -69,23 +72,24 @@ const fetchRestaurantData = async (): Promise<Restaurant> => {
   return data;
 };
 
+// Usar userRestaurantId na função fetch
 const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]> => {
   const { data, error } = await supabase
     .from('delivery_zones')
     .select('*')
-    .eq('restaurant_id', restaurantId)
+    .eq('restaurant_id', restaurantId) // Usar restaurantId
     .order('max_distance_km', { ascending: true });
 
   if (error) throw new Error(`Erro ao buscar zonas de entrega: ${error.message}`);
   return data;
 };
 
-// Função para buscar o status das taxas de entrega
+// Função para buscar o status das taxas de entrega (usando userRestaurantId)
 const fetchDeliveryStatus = async (restaurantId: string): Promise<boolean> => {
   const { data, error } = await supabase
     .from('restaurants')
     .select('delivery_enabled')
-    .eq('id', restaurantId)
+    .eq('id', restaurantId) // Usar restaurantId
     .single();
 
   if (error) {
@@ -96,7 +100,7 @@ const fetchDeliveryStatus = async (restaurantId: string): Promise<boolean> => {
   return data.delivery_enabled ?? true;
 };
 
-// Função para atualizar o status das taxas de entrega
+// Função para atualizar o status das taxas de entrega (usando userRestaurantId)
 const updateDeliveryStatus = async (restaurantId: string, enabled: boolean) => {
   const updatePayload: TablesUpdate<'restaurants'> = {
     delivery_enabled: enabled,
@@ -105,7 +109,7 @@ const updateDeliveryStatus = async (restaurantId: string, enabled: boolean) => {
   const { error } = await supabase
     .from('restaurants')
     .update(updatePayload)
-    .eq('id', restaurantId);
+    .eq('id', restaurantId); // Usar restaurantId
 
   if (error) throw new Error(`Erro ao atualizar status de entrega: ${error.message}`);
 };
@@ -113,23 +117,28 @@ const updateDeliveryStatus = async (restaurantId: string, enabled: boolean) => {
 const Delivery = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
 
+  // Usar userRestaurantId no queryKey e na função fetch
   const { data: restaurant, isLoading: isLoadingRestaurant } = useQuery<Restaurant>({
-    queryKey: ['restaurantDataForDelivery'],
-    queryFn: fetchRestaurantData,
+    queryKey: ['restaurantDataForDelivery', userRestaurantId],
+    queryFn: () => fetchRestaurantData(userRestaurantId!), // Usar userRestaurantId
+    enabled: !!userRestaurantId, // Só busca se userRestaurantId estiver disponível
   });
 
+  // Usar userRestaurantId no queryKey e na função fetch
   const { data: deliveryZones, isLoading: isLoadingZones, isError: isErrorZones, error: errorZones } = useQuery<DeliveryZone[]>({
-    queryKey: ['deliveryZones', restaurant?.id],
-    queryFn: () => fetchDeliveryZones(restaurant!.id),
-    enabled: !!restaurant?.id,
+    queryKey: ['deliveryZones', userRestaurantId],
+    queryFn: () => fetchDeliveryZones(userRestaurantId!), // Usar userRestaurantId
+    enabled: !!userRestaurantId, // Só busca se userRestaurantId estiver disponível
   });
 
-  // Query para buscar o status atual das taxas de entrega
+  // Query para buscar o status atual das taxas de entrega (usando userRestaurantId)
+  // Usar userRestaurantId no queryKey e na função fetch
   const { data: deliveryEnabled, isLoading: isLoadingDeliveryStatus } = useQuery<boolean>({
-    queryKey: ['deliveryStatus', restaurant?.id],
-    queryFn: () => fetchDeliveryStatus(restaurant!.id),
-    enabled: !!restaurant?.id,
+    queryKey: ['deliveryStatus', userRestaurantId],
+    queryFn: () => fetchDeliveryStatus(userRestaurantId!), // Usar userRestaurantId
+    enabled: !!userRestaurantId, // Só busca se userRestaurantId estiver disponível
     // Removendo initialData: true para refletir o estado real do DB
   });
 
@@ -169,7 +178,7 @@ const Delivery = () => {
     }
   }, [deliveryZones, updateFormWithZones]);
 
-  // Mutação para atualizar o status das taxas de entrega
+  // Mutação para atualizar o status das taxas de entrega (usando userRestaurantId)
   const deliveryStatusMutation = useMutation({
     mutationFn: ({ restaurantId, enabled }: { restaurantId: string; enabled: boolean }) => 
       updateDeliveryStatus(restaurantId, enabled),
@@ -187,10 +196,10 @@ const Delivery = () => {
 
   const zonesMutation = useMutation({
     mutationFn: async (data: ZonesFormValues) => {
-      if (!restaurant?.id) throw new Error('ID do restaurante não disponível.');
+      if (!userRestaurantId) throw new Error('ID do restaurante não disponível.'); // Usar userRestaurantId
 
       const updates = data.zones.map(zone => ({
-        restaurant_id: restaurant.id,
+        restaurant_id: userRestaurantId, // Usar userRestaurantId
         delivery_fee: zone.delivery_fee,
         max_distance_km: zone.max_distance_km,
         min_delivery_time_minutes: zone.min_delivery_time_minutes,
@@ -203,7 +212,7 @@ const Delivery = () => {
       const { error: deleteError } = await supabase
         .from('delivery_zones')
         .delete()
-        .eq('restaurant_id', restaurant.id);
+        .eq('restaurant_id', userRestaurantId); // Usar userRestaurantId
       if (deleteError) throw new Error(`Erro ao limpar zonas antigas: ${deleteError.message}`);
 
       const { error: insertError } = await supabase
@@ -213,7 +222,7 @@ const Delivery = () => {
     },
     onSuccess: () => {
       toast.success('Faixas de entrega salvas com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['deliveryZones'] });
+      queryClient.invalidateQueries({ queryKey: ['deliveryZones', userRestaurantId] }); // Usar userRestaurantId
       queryClient.invalidateQueries({ queryKey: ['checkoutDeliveryZones'] });
     },
     onError: (err) => {
@@ -237,11 +246,11 @@ const Delivery = () => {
 
   const hasCoordinates = restaurant?.latitude && restaurant?.longitude;
 
-  // Função para alternar o status de entrega
+  // Função para alternar o status de entrega (usando userRestaurantId)
   const toggleDeliveryStatus = (enabled: boolean) => {
-    if (restaurant?.id) {
+    if (userRestaurantId) { // Usar userRestaurantId
       deliveryStatusMutation.mutate({ 
-        restaurantId: restaurant.id, 
+        restaurantId: userRestaurantId, // Usar userRestaurantId
         enabled: enabled 
       });
     }
@@ -447,14 +456,14 @@ const Delivery = () => {
                       zonesMutation.isPending && "opacity-70 cursor-not-allowed"
                     )}
                     onClick={handleNewZone}
-                    disabled={zonesMutation.isPending}
+                    disabled={zonesMutation.isPending || !userRestaurantId} // Usar userRestaurantId
                   >
                     <Plus className="mr-2 h-4 w-4" /> Adicionar taxa dinâmica
                   </Button>
                   <Button 
                     type="submit" 
                     className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                    disabled={zonesMutation.isPending}
+                    disabled={zonesMutation.isPending || !userRestaurantId} // Usar userRestaurantId
                   >
                     {zonesMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
                   </Button>

@@ -10,6 +10,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '@/layouts/DashboardLayout'; // Importar o tipo do contexto
 
 const DashboardStatCard = ({ icon: Icon, title, value, description }: { icon: React.ElementType, title: string, value: string, description: string }) => (
   <Card>
@@ -25,12 +27,33 @@ const DashboardStatCard = ({ icon: Icon, title, value, description }: { icon: Re
 );
 
 const Dashboard = () => {
+  const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
   const menuLink = `${window.location.origin}${window.location.pathname}#/menu`;
 
   const copyLink = () => {
     navigator.clipboard.writeText(menuLink);
     toast.success("Link copiado para a área de transferência!");
   };
+
+  // Se não tiver userRestaurantId, mostra um erro ou carregando
+  if (!userRestaurantId) {
+    return (
+      <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
+        <div className="max-w-3xl mx-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle>Erro de Configuração</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">
+                ID do restaurante não encontrado. Por favor, recarregue a página.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">

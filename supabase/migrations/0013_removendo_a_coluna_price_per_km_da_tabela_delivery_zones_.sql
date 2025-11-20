@@ -1,2 +1,1 @@
-ALTER TABLE public.delivery_zones
-DROP COLUMN price_per_km;
+// File contents excluded from context

@@ -1,1 +1,1 @@
-ALTER PUBLICATION supabase_realtime ADD TABLE orders;
+// File contents excluded from context

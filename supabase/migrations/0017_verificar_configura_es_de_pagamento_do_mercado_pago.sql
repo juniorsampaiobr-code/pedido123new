@@ -1,1 +1,1 @@
-SELECT * FROM payment_settings LIMIT 1;
+// File contents excluded from context

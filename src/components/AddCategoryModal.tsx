@@ -38,7 +38,7 @@ type CategoryFormValues = z.infer<typeof categorySchema>;
 interface AddCategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  restaurantId: string | null; // Agora é uma prop
+  restaurantId: string | null; // Agora é uma prop obrigatória
 }
 
 export const AddCategoryModal = ({ isOpen, onClose, restaurantId }: AddCategoryModalProps) => {
@@ -71,8 +71,8 @@ export const AddCategoryModal = ({ isOpen, onClose, restaurantId }: AddCategoryM
     onSuccess: () => {
       toast.success('Categoria criada com sucesso!');
       // Invalida as queries de categorias e produtos para atualizar o menu
-      queryClient.invalidateQueries({ queryKey: ['categoriesWithProducts'] });
-      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      queryClient.invalidateQueries({ queryKey: ['categoriesWithProducts', restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ['categories', restaurantId] });
       onClose();
       form.reset();
     },

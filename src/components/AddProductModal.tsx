@@ -63,6 +63,7 @@ type ProductFormValues = z.infer<typeof productSchema>;
 interface AddProductModalProps {
   isOpen: boolean;
   onClose: () => void;
+  restaurantId: string | null; // Receber restaurantId como prop
 }
 
 const fetchCategories = async (restaurantId: string): Promise<Category[]> => {
@@ -75,28 +76,14 @@ const fetchCategories = async (restaurantId: string): Promise<Category[]> => {
   return data;
 };
 
-export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
+export const AddProductModal = ({ isOpen, onClose, restaurantId }: AddProductModalProps) => {
   const queryClient = useQueryClient();
-  const [restaurantId, setRestaurantId] = useState<string | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false); // Novo estado
-
-  // Busca o ID do restaurante e o armazena no estado
-  useQuery({
-    queryKey: ['restaurantId'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('restaurants').select('id').limit(1).single();
-      if (error) throw new Error(error.message);
-      setRestaurantId(data.id);
-      return data.id;
-    },
-    staleTime: Infinity, // Não precisa refetch constante
-    enabled: isOpen,
-  });
 
   const { data: categories, isLoading: isLoadingCategories } = useQuery({
     queryKey: ['categories', restaurantId],
     queryFn: () => fetchCategories(restaurantId!),
-    enabled: !!restaurantId,
+    enabled: !!restaurantId && isOpen, // Só busca se restaurantId estiver disponível e o modal estiver aberto
   });
 
   const form = useForm<ProductFormValues>({
@@ -228,7 +215,7 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
                       <FormItem>
                         <FormLabel>Categoria *</FormLabel>
                         <div className="flex gap-2">
-                          <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingCategories}>
+                          <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingCategories || !restaurantId}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Selecione uma categoria" />
@@ -247,6 +234,7 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
                             variant="outline" 
                             size="icon" 
                             onClick={() => setIsCategoryModalOpen(true)} // Ação corrigida
+                            disabled={!restaurantId} // Desabilitar se não tiver restaurantId
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
@@ -321,7 +309,7 @@ export const AddProductModal = ({ isOpen, onClose }: AddProductModalProps) => {
                 <DialogClose asChild>
                   <Button type="button" variant="outline">Cancelar</Button>
                 </DialogClose>
-                <Button type="submit" disabled={mutation.isPending}>
+                <Button type="submit" disabled={mutation.isPending || !restaurantId}>
                   {mutation.isPending ? 'Criando...' : 'Criar Produto'}
                 </Button>
               </DialogFooter>

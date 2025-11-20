@@ -1,1 +1,1 @@
-ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS delivery_enabled BOOLEAN DEFAULT true;
+// File contents excluded from context

@@ -61,6 +61,7 @@ interface EditProductModalProps {
   product: Product | null;
 }
 
+// Receber restaurantId como parâmetro
 const fetchCategories = async (restaurantId: string): Promise<Category[]> => {
   const { data, error } = await supabase
     .from('categories')
@@ -75,21 +76,18 @@ export const EditProductModal = ({ isOpen, onClose, product }: EditProductModalP
   const queryClient = useQueryClient();
   const [restaurantId, setRestaurantId] = useState<string | null>(null);
 
-  useQuery({
-    queryKey: ['restaurantId'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('restaurants').select('id').limit(1).single();
-      if (error) throw new Error(error.message);
-      setRestaurantId(data.id);
-      return data.id;
-    },
-    enabled: isOpen,
-  });
+  // Busca o restaurantId do produto sendo editado
+  useEffect(() => {
+      if (product?.restaurant_id) {
+          setRestaurantId(product.restaurant_id);
+      }
+  }, [product, isOpen]);
 
+  // Usar restaurantId no queryKey
   const { data: categories, isLoading: isLoadingCategories } = useQuery({
     queryKey: ['categories', restaurantId],
     queryFn: () => fetchCategories(restaurantId!),
-    enabled: !!restaurantId,
+    enabled: !!restaurantId && isOpen,
   });
 
   const form = useForm<ProductFormValues>({
@@ -154,7 +152,7 @@ export const EditProductModal = ({ isOpen, onClose, product }: EditProductModalP
     },
     onSuccess: () => {
       toast.success('Produto atualizado com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products', restaurantId] }); // Usar restaurantId
       queryClient.invalidateQueries({ queryKey: ['menuData'] }); // Invalida o menu também
       onClose();
     },
@@ -186,7 +184,7 @@ export const EditProductModal = ({ isOpen, onClose, product }: EditProductModalP
                 <FormField control={form.control} name="category_id" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Categoria</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingCategories}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isLoadingCategories || !restaurantId}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione uma categoria" />
@@ -214,7 +212,9 @@ export const EditProductModal = ({ isOpen, onClose, product }: EditProductModalP
             </div>
             <DialogFooter className="pt-4 border-t">
               <DialogClose asChild><Button type="button" variant="outline">Cancelar</Button></DialogClose>
-              <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Salvando...' : 'Salvar Alterações'}</Button>
+              <Button type="submit" disabled={mutation.isPending || !restaurantId}>
+                {mutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
+              </Button>
             </DialogFooter>
           </form>
         </Form>

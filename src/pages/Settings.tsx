@@ -27,6 +27,8 @@ import { useSound } from '@/hooks/use-sound'; // Importando do novo hook
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Importando Alert
 import { MapLocationSection } from '@/components/MapLocationSection'; // Importando o componente memoizado
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '@/layouts/DashboardLayout'; // Importar o tipo do contexto
 
 type Restaurant = Tables<'restaurants'>;
 
@@ -54,11 +56,12 @@ const restaurantSchema = z.object({
 
 type RestaurantFormValues = z.infer<typeof restaurantSchema>;
 
-const fetchRestaurantData = async (): Promise<Restaurant> => {
+// Usar userRestaurantId na função fetch
+const fetchRestaurantData = async (restaurantId: string): Promise<Restaurant> => {
   const { data, error } = await supabase
     .from('restaurants')
     .select('*')
-    .limit(1)
+    .eq('id', restaurantId) // Usar restaurantId
     .single();
 
   if (error) throw new Error(`Erro ao buscar dados do restaurante: ${error.message}`);
@@ -69,15 +72,18 @@ const fetchRestaurantData = async (): Promise<Restaurant> => {
 const Settings = () => {
   const queryClient = useQueryClient();
   const { playSound } = useSound();
+  const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
   const [soundFile, setSoundFile] = useState<File | null>(null);
   const [searchCep, setSearchCep] = useState('');
   const [searchNumber, setSearchNumber] = useState('');
   const [isSearchingCep, setIsSearchingCep] = useState(false);
   const [showMap, setShowMap] = useState(false);
 
+  // Usar userRestaurantId no queryKey e na função fetch
   const { data: restaurant, isLoading, isError, error } = useQuery<Restaurant>({
-    queryKey: ['restaurantSettings'],
-    queryFn: fetchRestaurantData,
+    queryKey: ['restaurantSettings', userRestaurantId],
+    queryFn: () => fetchRestaurantData(userRestaurantId!), // Usar userRestaurantId
+    enabled: !!userRestaurantId, // Só busca se userRestaurantId estiver disponível
     staleTime: 1000 * 60 * 5,
   });
 
@@ -213,27 +219,26 @@ const Settings = () => {
 
   const restaurantMutation = useMutation({
     mutationFn: async (data: RestaurantFormValues) => {
-      if (!restaurant?.id) throw new Error('ID do restaurante não disponível.');
-      const { id, ...updateData } = { ...data, id: restaurant.id };
-      const { error } = await supabase.from('restaurants').update(updateData).eq('id', id);
+      if (!userRestaurantId) throw new Error('ID do restaurante não disponível.'); // Usar userRestaurantId
+      const { error } = await supabase.from('restaurants').update(data).eq('id', userRestaurantId); // Usar userRestaurantId
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Configurações salvas com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['restaurantSettings'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurantSettings', userRestaurantId] }); // Usar userRestaurantId
     },
     onError: (err) => toast.error(`Erro ao salvar configurações: ${err.message}`),
   });
 
   const soundMutation = useMutation({
     mutationFn: async (file: File) => {
-      if (!restaurant?.id) throw new Error('ID do restaurante não disponível.');
+      if (!userRestaurantId) throw new Error('ID do restaurante não disponível.'); // Usar userRestaurantId
       
       if (file.type !== 'audio/mpeg' && file.type !== 'audio/mp3') {
         throw new Error('O arquivo deve ser do tipo MP3.');
       }
       
-      const filePath = `${restaurant.id}/notification.mp3`;
+      const filePath = `${userRestaurantId}/notification.mp3`; // Usar userRestaurantId
 
       console.log(`[Sound Upload] Attempting upload to settings/${filePath}`);
       const { error: uploadError } = await supabase.storage
@@ -255,12 +260,12 @@ const Settings = () => {
       // Adicionando o parâmetro de cache para forçar o recarregamento no DashboardLayout
       const notificationUrl = `${publicUrlData.publicUrl}?t=${new Date().getTime()}`; 
       
-      console.log(`[DB Update] Updating restaurant ID: ${restaurant.id} with URL: ${notificationUrl}`);
+      console.log(`[DB Update] Updating restaurant ID: ${userRestaurantId} with URL: ${notificationUrl}`); // Usar userRestaurantId
       
       const { error: dbError } = await supabase
         .from('restaurants')
         .update({ notification_sound_url: notificationUrl })
-        .eq('id', restaurant.id);
+        .eq('id', userRestaurantId); // Usar userRestaurantId
       
       if (dbError) {
         console.error("[DB Update Error] Supabase Error:", dbError);
@@ -269,7 +274,7 @@ const Settings = () => {
     },
     onSuccess: () => {
       toast.success('Som de notificação atualizado com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['restaurantSettings'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurantSettings', userRestaurantId] }); // Usar userRestaurantId
       setSoundFile(null);
     },
     onError: (err: any) => {
@@ -303,11 +308,16 @@ const Settings = () => {
             <CardTitle className="text-2xl font-bold">Configurações do Restaurante</CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {isLoading && (
               <Skeleton className="h-96 w-full" />
-            ) : isError ? (
+            )}
+            {isError && (
               <p className="text-destructive">Erro ao carregar dados: {error.message}</p>
-            ) : (
+            )}
+            {!userRestaurantId && !isLoading && (
+                <p className="text-destructive">Erro: ID do restaurante não encontrado.</p>
+            )}
+            {restaurant && !isError && !isLoading && (
               <Form {...form}>
                 <form onSubmit={form.handleSubmit((data) => restaurantMutation.mutate(data))} className="space-y-6">
                   <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nome do Restaurante *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
@@ -373,7 +383,7 @@ const Settings = () => {
                     <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
                   <FormField control={form.control} name="is_active" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><FormLabel className="font-normal">Restaurante Ativo</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
-                  <Button type="submit" className="w-full h-12 text-lg" disabled={restaurantMutation.isPending}>{restaurantMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}</Button>
+                  <Button type="submit" className="w-full h-12 text-lg" disabled={restaurantMutation.isPending || !userRestaurantId}>{restaurantMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}</Button>
                 </form>
               </Form>
             )}
@@ -426,7 +436,7 @@ const Settings = () => {
             <Button 
               onClick={handleSoundSave} 
               className="w-full h-12 text-lg" 
-              disabled={!soundFile || soundMutation.isPending}
+              disabled={!soundFile || soundMutation.isPending || !userRestaurantId}
             >
               {soundMutation.isPending ? 'Salvando Som...' : 'Salvar Som de Notificação'}
             </Button>

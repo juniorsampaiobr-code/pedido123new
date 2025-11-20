@@ -23,18 +23,13 @@ type CategoryWithProducts = {
   products: Product[];
 };
 
-const fetchCategoriesWithProducts = async (): Promise<CategoryWithProducts[]> => {
-  const { data: restaurantData, error: restaurantError } = await supabase
-    .from('restaurants')
-    .select('id')
-    .limit(1)
-    .single();
+// Receber restaurantId como prop
+interface CategoryManagerProps {
+  restaurantId: string | null;
+}
 
-  if (restaurantError) throw new Error(`Erro ao buscar restaurante: ${restaurantError.message}`);
-  if (!restaurantData) throw new Error('Nenhum restaurante ativo encontrado.');
-
-  const restaurantId = restaurantData.id;
-
+const fetchCategoriesWithProducts = async (restaurantId: string): Promise<CategoryWithProducts[]> => {
+  // Usar restaurantId nas queries
   const { data: categories, error: categoriesError } = await supabase
     .from('categories')
     .select('*')
@@ -46,7 +41,7 @@ const fetchCategoriesWithProducts = async (): Promise<CategoryWithProducts[]> =>
   const { data: products, error: productsError } = await supabase
     .from('products')
     .select('id, name, category_id, is_available')
-    .eq('restaurant_id', restaurantId);
+    .eq('restaurant_id', restaurantId); // Usar restaurantId
 
   if (productsError) throw new Error(`Erro ao buscar produtos: ${productsError.message}`);
 
@@ -58,21 +53,25 @@ const fetchCategoriesWithProducts = async (): Promise<CategoryWithProducts[]> =>
   return categoriesWithProducts;
 };
 
-export const CategoryManager = () => {
+// Atualizar a assinatura do componente
+export const CategoryManager = ({ restaurantId }: CategoryManagerProps) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
+  // Usar restaurantId no queryKey e na função fetch
   const { data: categories, isLoading, isError, error } = useQuery<CategoryWithProducts[]>({
-    queryKey: ['categoriesWithProducts'],
-    queryFn: fetchCategoriesWithProducts,
+    queryKey: ['categoriesWithProducts', restaurantId],
+    queryFn: () => fetchCategoriesWithProducts(restaurantId!),
+    enabled: !!restaurantId, // Só busca se restaurantId estiver disponível
   });
 
   return (
     <>
-      <AddCategoryModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+      {/* Passar restaurantId para o modal */}
+      <AddCategoryModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} restaurantId={restaurantId} />
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Categorias</h2>
-          <Button onClick={() => setIsAddModalOpen(true)}>
+          <Button onClick={() => setIsAddModalOpen(true)} disabled={!restaurantId}>
             <Plus className="mr-2 h-4 w-4" /> Nova Categoria
           </Button>
         </div>

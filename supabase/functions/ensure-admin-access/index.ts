@@ -34,41 +34,33 @@ serve(async (req) => {
       }
     );
 
-    // 1. Check if any restaurant exists
-    const { data: existingRestaurants, error: restError } = await supabaseAdmin
-      .from('restaurants')
-      .select('id')
-      .limit(1);
+    // 1. Always create a new restaurant for the new admin user
+    console.log(`[ensure-admin-access] Creating a new restaurant for user ${userId}.`);
 
-    if (restError && restError.code !== 'PGRST116') throw new Error(`Database error checking restaurants: ${restError.message}`);
-
-    const isFirstStore = existingRestaurants === null || existingRestaurants.length === 0;
-    const targetRole = isFirstStore ? 'admin' : 'moderator'; // Novo usuário em um sistema existente se torna 'moderator'
-
-    // 2. Handle Restaurant Creation (Only if it's the first store)
-    if (isFirstStore) {
-      console.log(`[ensure-admin-access] First store detected. Creating restaurant for user ${userId}.`);
-
-      const restaurantName = fullName ? `${fullName}'s Restaurante` : 'Novo Restaurante';
-      
-      const { error: insertError } = await supabaseAdmin
-        .from('restaurants')
-        .insert({ 
-          name: restaurantName, 
-          description: 'Seu novo restaurante Pedido 123!',
-          owner_user_id: userId,
-          is_active: true,
-        });
-
-      if (insertError) throw new Error(`Failed to create restaurant: ${insertError.message}`);
-    }
+    const restaurantName = fullName ? `${fullName}'s Restaurante` : 'Novo Restaurante';
     
-    // 3. Ensure user has the correct role (admin for first user, moderator for subsequent users)
+    const { data: newRestaurant, error: insertRestaurantError } = await supabaseAdmin
+      .from('restaurants')
+      .insert({ 
+        name: restaurantName, 
+        description: 'Seu novo restaurante Pedido 123!',
+        owner_user_id: userId, // Vincula o restaurante ao usuário
+        is_active: true,
+      })
+      .select('id')
+      .single();
+
+    if (insertRestaurantError) throw new Error(`Failed to create restaurant: ${insertRestaurantError.message}`);
+    
+    const restaurantId = newRestaurant.id;
+    console.log(`[ensure-admin-access] New restaurant created with ID: ${restaurantId}`);
+
+    // 2. Ensure user has the 'admin' role and is linked to the new restaurant
     
     // Check if 'user' role exists for this user (inserted by handle_new_user trigger)
     const { data: existingRole, error: roleCheckError } = await supabaseAdmin
       .from('user_roles')
-      .select('id, role')
+      .select('id')
       .eq('user_id', userId)
       .limit(1)
       .single();
@@ -78,25 +70,26 @@ serve(async (req) => {
     }
 
     if (existingRole) {
-        // Update existing role to the target role (admin or moderator)
+        // Update existing 'user' role to 'admin' and link to the new restaurant
         const { error: updateRoleError } = await supabaseAdmin
           .from('user_roles')
-          .update({ role: targetRole })
+          .update({ role: 'admin', restaurant_id: restaurantId })
           .eq('id', existingRole.id);
           
-        if (updateRoleError) throw new Error(`Failed to update role to ${targetRole}: ${updateRoleError.message}`);
+        if (updateRoleError) throw new Error(`Failed to update role to admin: ${updateRoleError.message}`);
     } else {
-        // Insert the target role if no role was found (fallback)
+        // Insert the 'admin' role if no role was found (fallback)
         const { error: insertRoleError } = await supabaseAdmin
           .from('user_roles')
-          .insert({ user_id: userId, role: targetRole });
+          .insert({ user_id: userId, role: 'admin', restaurant_id: restaurantId });
           
-        if (insertRoleError) throw new Error(`Failed to insert ${targetRole} role: ${insertRoleError.message}`);
+        if (insertRoleError) throw new Error(`Failed to insert admin role: ${insertRoleError.message}`);
     }
 
     return new Response(JSON.stringify({ 
-      message: `Admin access ensured. Role set to ${targetRole}.`, 
-      role: targetRole
+      message: `Admin access ensured. New restaurant created and linked.`, 
+      role: 'admin',
+      restaurant_id: restaurantId
     }), {
       headers: corsHeaders,
       status: 200,

@@ -22,7 +22,7 @@ This project is built with a modern, component-based architecture. Key technolog
 To maintain code quality and consistency, please adhere to the following library usage guidelines:
 
 -   **UI Components**:
-    -   Always prioritize using components from the `@/components/ui` directory (shadcn/ui).
+    -   Always prioritize using components from the `@/components/ui` directory (shadasecn/ui).
     -   For custom, application-specific components, create new files in `@/components`. These can compose existing shadcn/ui components.
     -   **Do not** modify the files inside `@/components/ui` directly.
 

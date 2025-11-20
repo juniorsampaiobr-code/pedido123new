@@ -66,6 +66,7 @@ interface FetchOrdersResult {
 
 const PAGE_SIZE = 12;
 
+// Usar userRestaurantId na função fetch
 const fetchOrders = async (restaurantId: string, status: Enums<'order_status'> | 'all', page: number): Promise<FetchOrdersResult> => {
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
@@ -158,7 +159,7 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSele
 const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSelectedOrders, totalOrdersInView }: { 
   status: Enums<'order_status'> | 'all', 
   onViewDetails: (order: Order) => void, 
-  restaurantId: string,
+  restaurantId: string, // Receber restaurantId como prop
   selectedOrders: string[],
   setSelectedOrders: React.Dispatch<React.SetStateAction<string[]>>,
   totalOrdersInView: number,
@@ -167,10 +168,11 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
   const { stopSoundLoop } = useSound();
   const [currentPage, setCurrentPage] = useState(0); // 0-indexed page
 
+  // Usar restaurantId no queryKey e na função fetch
   const { data, isLoading, isError, error, refetch } = useQuery<FetchOrdersResult>({
     queryKey: ['orders', status, restaurantId, currentPage],
     queryFn: () => fetchOrders(restaurantId, status, currentPage),
-    enabled: !!restaurantId,
+    enabled: !!restaurantId, // Só busca se restaurantId estiver disponível
   });
 
   const orders = data?.orders || [];
@@ -299,7 +301,7 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
 };
 
 const Orders = () => {
-  const { restaurant } = useOutletContext<DashboardContextType>();
+  const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -310,7 +312,7 @@ const Orders = () => {
   const handleCloseModal = () => { setIsModalOpen(false); setSelectedOrder(null); };
   
   const handleRefreshAll = () => {
-    queryClient.invalidateQueries({ queryKey: ['orders'] });
+    queryClient.invalidateQueries({ queryKey: ['orders', userRestaurantId] }); // Usar userRestaurantId
     toast.info("Atualizando pedidos...", { description: "Buscando novos dados no servidor." });
   };
 
@@ -337,7 +339,7 @@ const Orders = () => {
       }
       setSelectedOrders([]);
       setMassAction('');
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders', userRestaurantId] }); // Usar userRestaurantId
     },
     onError: (err) => {
       toast.error(`Erro na ação em massa: ${err.message}`);
@@ -367,6 +369,11 @@ const Orders = () => {
   ];
 
   const isMassActionPending = massActionMutation.isPending;
+
+  // Garantir que userRestaurantId esteja disponível antes de renderizar
+  if (!userRestaurantId) {
+      return <div className="flex h-screen items-center justify-center">Carregando...</div>;
+  }
 
   return (
     <>
@@ -434,7 +441,8 @@ const Orders = () => {
           )}
         </div>
         
-        {restaurant?.id ? (
+        {/* Usar userRestaurantId aqui */}
+        {userRestaurantId ? (
           <Tabs defaultValue="pending">
             <TabsList className="w-full overflow-x-auto justify-start">{statusTabs.map(tab => <TabsTrigger key={tab.value} value={tab.value} className="whitespace-nowrap">{tab.label}</TabsTrigger>)}</TabsList>
             {statusTabs.map(tab => (
@@ -442,7 +450,7 @@ const Orders = () => {
                 <OrdersList 
                   status={tab.value} 
                   onViewDetails={handleViewDetails} 
-                  restaurantId={restaurant.id} 
+                  restaurantId={userRestaurantId} // Passar userRestaurantId
                   selectedOrders={selectedOrders}
                   setSelectedOrders={setSelectedOrders}
                   totalOrdersInView={selectedOrders.length}

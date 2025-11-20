@@ -22,6 +22,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '@/layouts/DashboardLayout'; // Importar o tipo do contexto
 
 type PaymentMethod = Tables<'payment_methods'>;
 type PaymentSettings = Tables<'payment_settings'>;
@@ -42,17 +44,19 @@ const methodsSchema = z.object({
 
 type MethodsFormValues = z.infer<typeof methodsSchema>;
 
+// Usar userRestaurantId na função fetch
 const fetchRestaurantId = async () => {
-  const { data, error } = await supabase.from('restaurants').select('id').limit(1).single();
-  if (error) throw new Error(error.message);
-  return data.id;
+  // Esta função não é mais necessária, pois o restaurantId vem do contexto
+  // Mantida para compatibilidade, mas não deve ser usada.
+  throw new Error("Restaurant ID should be obtained from context, not fetched.");
 };
 
+// Usar userRestaurantId na função fetch
 const fetchPaymentSettings = async (restaurantId: string): Promise<PaymentSettings | null> => {
   const { data, error } = await supabase
     .from('payment_settings')
     .select('*')
-    .eq('restaurant_id', restaurantId)
+    .eq('restaurant_id', restaurantId) // Usar restaurantId
     .limit(1)
     .single();
 
@@ -60,11 +64,12 @@ const fetchPaymentSettings = async (restaurantId: string): Promise<PaymentSettin
   return data;
 };
 
+// Usar userRestaurantId na função fetch
 const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[]> => {
   const { data, error } = await supabase
     .from('payment_methods')
     .select('*')
-    .eq('restaurant_id', restaurantId)
+    .eq('restaurant_id', restaurantId) // Usar restaurantId
     .order('name', { ascending: true });
 
   if (error) throw new Error(error.message);
@@ -129,22 +134,20 @@ const PaymentMethodItem = ({ method, index, control, icon: Icon }: PaymentMethod
 
 const Payments = () => {
   const queryClient = useQueryClient();
+  const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
 
-  const { data: restaurantId, isLoading: isLoadingRestaurantId } = useQuery<string>({
-    queryKey: ['restaurantId'],
-    queryFn: fetchRestaurantId,
-  });
-
+  // Usar userRestaurantId no queryKey e na função fetch
   const { data: settings, isLoading: isLoadingSettings } = useQuery<PaymentSettings | null>({
-    queryKey: ['paymentSettings', restaurantId],
-    queryFn: () => fetchPaymentSettings(restaurantId!),
-    enabled: !!restaurantId,
+    queryKey: ['paymentSettings', userRestaurantId],
+    queryFn: () => fetchPaymentSettings(userRestaurantId!), // Usar userRestaurantId
+    enabled: !!userRestaurantId, // Só busca se userRestaurantId estiver disponível
   });
 
+  // Usar userRestaurantId no queryKey e na função fetch
   const { data: methods, isLoading: isLoadingMethods, refetch: refetchMethods } = useQuery<PaymentMethod[]>({
-    queryKey: ['paymentMethods', restaurantId],
-    queryFn: () => fetchPaymentMethods(restaurantId!),
-    enabled: !!restaurantId,
+    queryKey: ['paymentMethods', userRestaurantId],
+    queryFn: () => fetchPaymentMethods(userRestaurantId!), // Usar userRestaurantId
+    enabled: !!userRestaurantId, // Só busca se userRestaurantId estiver disponível
   });
 
   const { data: credentialsStatus, isLoading: isLoadingStatus } = useQuery<{ configured: boolean }>({
@@ -172,11 +175,11 @@ const Payments = () => {
 
   const credentialsMutation = useMutation({
     mutationFn: async (data: CredentialsFormValues) => {
-      if (!restaurantId) throw new Error('ID do restaurante não disponível.');
+      if (!userRestaurantId) throw new Error('ID do restaurante não disponível.'); // Usar userRestaurantId
       
       const response = await supabase.functions.invoke('save-mp-credentials', {
         body: JSON.stringify({
-          restaurant_id: restaurantId,
+          restaurant_id: userRestaurantId, // Usar userRestaurantId
           public_key: data.mercado_pago_public_key,
           access_token: data.mercado_pago_access_token,
         }),
@@ -195,7 +198,7 @@ const Payments = () => {
           duration: 15000,
         });
       }
-      queryClient.invalidateQueries({ queryKey: ['paymentSettings'] });
+      queryClient.invalidateQueries({ queryKey: ['paymentSettings', userRestaurantId] }); // Usar userRestaurantId
       queryClient.invalidateQueries({ queryKey: ['credentialsStatus'] });
     },
     onError: (err) => {
@@ -208,14 +211,14 @@ const Payments = () => {
   };
 
   const ensureDefaultMethods = useMutation({
-    mutationFn: async (restaurantId: string) => {
-      const existingMethods = await fetchPaymentMethods(restaurantId);
+    mutationFn: async (restaurantId: string) => { // Usar restaurantId como parâmetro
+      const existingMethods = await fetchPaymentMethods(restaurantId); // Usar restaurantId
       const existingNames = new Set(existingMethods.map(m => m.name));
       
       const methodsToInsert: TablesInsert<'payment_methods'>[] = DEFAULT_METHODS
         .filter(defaultMethod => !existingNames.has(defaultMethod.name))
         .map(defaultMethod => ({
-          restaurant_id: restaurantId,
+          restaurant_id: restaurantId, // Usar restaurantId
           name: defaultMethod.name,
           description: defaultMethod.description,
           icon: defaultMethod.icon.displayName,
@@ -234,10 +237,10 @@ const Payments = () => {
   });
 
   useEffect(() => {
-    if (restaurantId && methods && methods.length === 0 && !isLoadingMethods) {
-      ensureDefaultMethods.mutate(restaurantId);
+    if (userRestaurantId && methods && methods.length === 0 && !isLoadingMethods) { // Usar userRestaurantId
+      ensureDefaultMethods.mutate(userRestaurantId); // Usar userRestaurantId
     }
-  }, [restaurantId, methods, isLoadingMethods, ensureDefaultMethods]);
+  }, [userRestaurantId, methods, isLoadingMethods, ensureDefaultMethods]); // Usar userRestaurantId
 
   const methodsForm = useForm<MethodsFormValues>({
     resolver: zodResolver(methodsSchema),
@@ -268,7 +271,7 @@ const Payments = () => {
     },
     onSuccess: () => {
       toast.success('Configurações de métodos de pagamento salvas!');
-      queryClient.invalidateQueries({ queryKey: ['paymentMethods'] });
+      queryClient.invalidateQueries({ queryKey: ['paymentMethods', userRestaurantId] }); // Usar userRestaurantId
     },
     onError: (err) => {
       toast.error(`Erro ao salvar métodos: ${err.message}`);
@@ -279,24 +282,18 @@ const Payments = () => {
     updateMethodsMutation.mutate(data);
   };
 
-  if (isLoadingRestaurantId) {
-    return <div className="flex h-screen items-center justify-center">Carregando...</div>;
-  }
-  
-  if (!restaurantId) {
+  // Se não tiver userRestaurantId, mostra um erro ou carregando
+  if (!userRestaurantId) {
     return (
       <main className="flex-1 p-4 sm:p-6 md:p-8">
         <Card className="max-w-md text-center mx-auto">
           <CardHeader>
-            <CardTitle>Restaurante Não Encontrado</CardTitle>
+            <CardTitle>Erro de Configuração</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">
-              Não foi possível carregar o ID do restaurante. Por favor, verifique se o seu restaurante está configurado corretamente na página de Configurações.
+              ID do restaurante não encontrado. Por favor, recarregue a página.
             </p>
-            <Link to="/settings">
-              <Button className="mt-4">Ir para Configurações</Button>
-            </Link>
           </CardContent>
         </Card>
       </main>
@@ -396,7 +393,7 @@ const Payments = () => {
                   <Button 
                     type="submit" 
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg mt-6"
-                    disabled={credentialsMutation.isPending}
+                    disabled={credentialsMutation.isPending || !userRestaurantId} // Usar userRestaurantId
                   >
                     {credentialsMutation.isPending ? 'Salvando...' : 'Salvar Chave Pública e Verificar Token'}
                   </Button>
@@ -451,7 +448,7 @@ const Payments = () => {
                   <Button 
                     type="submit" 
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg mt-6"
-                    disabled={updateMethodsMutation.isPending}
+                    disabled={updateMethodsMutation.isPending || !userRestaurantId} // Usar userRestaurantId
                   >
                     {updateMethodsMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
                   </Button>

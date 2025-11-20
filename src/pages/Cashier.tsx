@@ -13,7 +13,7 @@ import { DollarSign, TrendingUp, Calendar, Terminal } from 'lucide-react';
 import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useOutletContext } from 'react-router-dom';
-import { DashboardContextType } from '@/layouts/DashboardLayout';
+import { DashboardContextType } from '@/layouts/DashboardLayout'; // Importar o tipo do contexto
 
 type CashRegister = Tables<'cash_register'>;
 
@@ -36,6 +36,7 @@ const closeCashierSchema = z.object({
 
 type CloseCashierFormValues = z.infer<typeof closeCashierSchema>;
 
+// Usar userRestaurantId na função fetch
 const fetchCurrentCashier = async (restaurantId: string): Promise<CashRegister | null> => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Usuário não autenticado');
@@ -43,7 +44,7 @@ const fetchCurrentCashier = async (restaurantId: string): Promise<CashRegister |
   const { data, error } = await supabase
     .from('cash_register')
     .select('*')
-    .eq('restaurant_id', restaurantId)
+    .eq('restaurant_id', restaurantId) // Usar restaurantId
     .is('closed_at', null)
     .order('opened_at', { ascending: false })
     .limit(1)
@@ -81,13 +82,14 @@ const StatCard = ({ title, value, icon: Icon }: StatCardProps) => (
 );
 
 const Cashier = () => {
-  const { restaurant } = useOutletContext<DashboardContextType>();
+  const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
   const queryClient = useQueryClient();
 
+  // Usar userRestaurantId no queryKey e na função fetch
   const { data: currentCashier, isLoading: isLoadingCashier, isError: isErrorCashier, error: errorCashier } = useQuery<CashRegister | null>({
-    queryKey: ['currentCashier', restaurant.id],
-    queryFn: () => fetchCurrentCashier(restaurant.id),
-    enabled: !!restaurant.id,
+    queryKey: ['currentCashier', userRestaurantId],
+    queryFn: () => fetchCurrentCashier(userRestaurantId!), // Usar userRestaurantId
+    enabled: !!userRestaurantId, // Só busca se userRestaurantId estiver disponível
   });
 
   const { data: salesToday = 0 } = useQuery<number>({
@@ -119,10 +121,10 @@ const Cashier = () => {
   const openMutation = useMutation({
     mutationFn: async (data: OpenCashierFormValues) => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!restaurant.id || !user) throw new Error('Dados de usuário ou restaurante indisponíveis.');
+      if (!userRestaurantId || !user) throw new Error('Dados de usuário ou restaurante indisponíveis.'); // Usar userRestaurantId
       
       const insertData: TablesInsert<'cash_register'> = {
-        restaurant_id: restaurant.id,
+        restaurant_id: userRestaurantId, // Usar userRestaurantId
         opening_balance: data.opening_balance,
         opened_by: user.id,
       };
@@ -132,7 +134,7 @@ const Cashier = () => {
     },
     onSuccess: () => {
       toast.success('Caixa aberto com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['currentCashier'] });
+      queryClient.invalidateQueries({ queryKey: ['currentCashier', userRestaurantId] }); // Usar userRestaurantId
       openForm.reset({ opening_balance: 0 });
     },
     onError: (err) => {
@@ -161,7 +163,7 @@ const Cashier = () => {
     },
     onSuccess: () => {
       toast.success('Caixa fechado com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['currentCashier'] });
+      queryClient.invalidateQueries({ queryKey: ['currentCashier', userRestaurantId] }); // Usar userRestaurantId
       closeForm.reset();
     },
     onError: (err) => {
@@ -169,7 +171,7 @@ const Cashier = () => {
     },
   });
 
-  const isDataLoading = isLoadingCashier || !restaurant.id;
+  const isDataLoading = isLoadingCashier || !userRestaurantId; // Usar userRestaurantId
 
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
@@ -254,7 +256,7 @@ const Cashier = () => {
               <Button
                 type="submit"
                 className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground h-12 text-lg"
-                disabled={closeMutation.isPending}
+                disabled={closeMutation.isPending || !userRestaurantId} // Usar userRestaurantId
               >
                 {closeMutation.isPending ? 'Fechando...' : 'Fechar Caixa'}
               </Button>
@@ -277,7 +279,7 @@ const Cashier = () => {
               <Button
                 type="submit"
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg"
-                disabled={openMutation.isPending}
+                disabled={openMutation.isPending || !userRestaurantId} // Usar userRestaurantId
               >
                 {openMutation.isPending ? 'Abrindo...' : 'Abrir Caixa'}
               </Button>

@@ -21,9 +21,11 @@ type SoundStatus = 'disabled' | 'enabled' | 'error';
 type AudioReadyState = 'loading' | 'ready' | 'error';
 type OrderStatus = Enums<'order_status'>;
 type AppRole = Enums<'app_role'>;
+type UserRole = Tables<'user_roles'>;
 
 export type DashboardContextType = {
   restaurant: Restaurant;
+  userRestaurantId: string; // Novo: ID do restaurante do usuário logado
 };
 
 const navItems = [
@@ -42,21 +44,26 @@ const getPageTitle = (pathname: string) => {
   return page ? page.label : "Dashboard";
 };
 
-// Função para verificar a role do usuário
-const checkUserRole = async (userId: string): Promise<AppRole | null> => {
+// Função para verificar a role do usuário e o restaurant_id associado
+const checkUserRoleAndRestaurant = async (userId: string): Promise<{ role: AppRole | null, restaurantId: string | null }> => {
   const { data, error } = await supabase
     .from('user_roles')
-    .select('role')
+    .select('role, restaurant_id')
     .eq('user_id', userId)
     .in('role', ['admin', 'moderator'])
     .limit(1)
     .single();
 
   if (error && error.code !== 'PGRST116') {
-    console.error("Error checking role:", error);
-    return null;
+    console.error("Error checking role and restaurant:", error);
+    return { role: null, restaurantId: null };
   }
-  return data?.role || null;
+  
+  if (!data) {
+      return { role: null, restaurantId: null };
+  }
+  
+  return { role: data.role, restaurantId: data.restaurant_id };
 };
 
 
@@ -66,6 +73,7 @@ const DashboardLayoutComponent = () => {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userRole, setUserRole] = useState<AppRole | null | undefined>(undefined); // undefined = loading
+  const [userRestaurantId, setUserRestaurantId] = useState<string | null>(null); // Novo estado
   const audioRef = useRef<HTMLAudioElement>(null);
   const [audioReadyState, setAudioReadyState] = useState<AudioReadyState>('loading');
   const [isEnableSoundModalOpen, setIsEnableSoundModalOpen] = useState(false);
@@ -82,14 +90,17 @@ const DashboardLayoutComponent = () => {
     localStorage.setItem('soundNotificationStatus', soundStatus);
   }, [soundStatus]);
 
-  const { data: restaurant, isLoading: isRestaurantLoading } = useQuery<Restaurant>({
-    queryKey: ['dashboardRestaurant'],
+  // Novo: Query para buscar os dados do restaurante baseado no userRestaurantId
+  const { data: restaurant, isLoading: isRestaurantLoading, isError: isRestaurantError, error: restaurantError } = useQuery<Restaurant>({
+    queryKey: ['dashboardRestaurant', userRestaurantId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('restaurants').select('*').limit(1).single();
+      if (!userRestaurantId) throw new Error('Restaurant ID not found for user.');
+      
+      const { data, error } = await supabase.from('restaurants').select('*').eq('id', userRestaurantId).single();
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: !!user && (userRole === 'admin' || userRole === 'moderator'), // Só busca se for admin/moderator
+    enabled: !!user && (userRole === 'admin' || userRole === 'moderator') && !!userRestaurantId,
     staleTime: Infinity, // Restaurant data is stable, fetch once
   });
 
@@ -99,13 +110,15 @@ const DashboardLayoutComponent = () => {
       if (!session?.user) {
         setUser(null);
         setUserRole(null);
+        setUserRestaurantId(null);
         navigate("/admin-auth", { replace: true });
         return;
       }
       
-      const role = await checkUserRole(session.user.id);
+      const { role, restaurantId } = await checkUserRoleAndRestaurant(session.user.id);
       setUser(session.user);
       setUserRole(role);
+      setUserRestaurantId(restaurantId); // Armazena o restaurant_id do usuário
 
       if (role !== 'admin' && role !== 'moderator') {
         toast.error("Acesso restrito.", {
@@ -115,12 +128,23 @@ const DashboardLayoutComponent = () => {
         // Redireciona para o login de admin, que pode forçar o logout se necessário
         navigate("/admin-auth", { replace: true });
       }
+      
+      // Se o usuário tem role, mas não tem restaurant_id, algo está errado
+      if ((role === 'admin' || role === 'moderator') && !restaurantId) {
+          toast.error("Erro de configuração.", {
+            description: "Sua conta não está vinculada a um restaurante. Entre em contato com o suporte.",
+            duration: 5000,
+          });
+          await supabase.auth.signOut();
+          navigate("/admin-auth", { replace: true });
+      }
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setUserRole(null);
+        setUserRestaurantId(null);
         navigate("/admin-auth", { replace: true });
       } else {
         checkAuthAndRole(session);
@@ -179,8 +203,8 @@ const DashboardLayoutComponent = () => {
   }, [soundStatus, audioReadyState, loopingOrderId]);
 
   useEffect(() => {
-    // Só se inscreve se o usuário for admin/moderator
-    if (userRole !== 'admin' && userRole !== 'moderator') return;
+    // Só se inscreve se o usuário for admin/moderator e tiver um restaurant_id
+    if ((userRole !== 'admin' && userRole !== 'moderator') || !userRestaurantId) return;
     
     const channel = supabase.channel('new-orders-toast')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
@@ -188,7 +212,8 @@ const DashboardLayoutComponent = () => {
         const newOrder = payload.new as Tables<'orders'>;
         
         // Toca o som APENAS se o status for 'pending' (pagamento na entrega ou online aprovado)
-        if (newOrder.status === 'pending' && newOrder.id) {
+        // E se o pedido for do restaurante do usuário logado
+        if (newOrder.status === 'pending' && newOrder.id && newOrder.restaurant_id === userRestaurantId) {
           toast.info("🔔 Novo pedido recebido!", { 
             description: `Pedido #${newOrder.id.slice(-4)} está aguardando confirmação.`,
             duration: 15000,
@@ -207,7 +232,8 @@ const DashboardLayoutComponent = () => {
         
         // Exibe toast para confirmação de pagamento online, mas sem tocar o som
         // O status agora muda de 'pending_payment' para 'pending' (não 'confirmed')
-        if (updatedOrder.status === 'pending' && updatedOrder.id && payload.old.status === 'pending_payment') {
+        // E se o pedido for do restaurante do usuário logado
+        if (updatedOrder.status === 'pending' && updatedOrder.id && payload.old.status === 'pending_payment' && updatedOrder.restaurant_id === userRestaurantId) {
           toast.success("✅ Pagamento Confirmado!", { 
             description: `Pedido #${updatedOrder.id.slice(-4)} foi pago e está pronto para preparo.`,
             duration: 5000,
@@ -217,7 +243,7 @@ const DashboardLayoutComponent = () => {
       .subscribe();
       
     return () => { supabase.removeChannel(channel); };
-  }, [queryClient, startSoundLoop, stopSoundLoop, loopingOrderId, userRole]);
+  }, [queryClient, startSoundLoop, stopSoundLoop, loopingOrderId, userRole, userRestaurantId]);
 
   const playSound = useCallback(() => {
     if (soundStatus === 'enabled' && audioRef.current && audioReadyState === 'ready') {
@@ -301,8 +327,8 @@ const DashboardLayoutComponent = () => {
 
   const handleSignOut = async () => { await supabase.auth.signOut(); };
 
-  // Se estiver carregando a role ou os dados do restaurante, mostra o spinner
-  if (userRole === undefined || isRestaurantLoading) {
+  // Se estiver carregando a role, o restaurant_id ou os dados do restaurante, mostra o spinner
+  if (userRole === undefined || isRestaurantLoading || !userRestaurantId) {
     return <LoadingSpinner />;
   }
   
@@ -313,20 +339,39 @@ const DashboardLayoutComponent = () => {
   if (userRole !== 'admin' && userRole !== 'moderator') {
     return <LoadingSpinner />;
   }
+  
+  // Se o usuário é admin/moderator, mas não tem restaurant_id, mostra erro
+  if (!userRestaurantId) {
+      return (
+        <div className="flex h-screen items-center justify-center">
+          <Alert variant="destructive" className="max-w-md">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Erro de Configuração</AlertTitle>
+            <AlertDescription>
+              Sua conta de administrador não está vinculada a nenhum restaurante. Entre em contato com o suporte.
+            </AlertDescription>
+          </Alert>
+        </div>
+      );
+  }
 
   // Se o restaurante não for encontrado (e não estiver carregando), algo está errado
-  if (!restaurant) {
+  if (isRestaurantError) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Alert variant="destructive" className="max-w-md">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Erro Crítico</AlertTitle>
+          <AlertTitle>Erro ao Carregar Restaurante</AlertTitle>
           <AlertDescription>
-            Não foi possível carregar os dados do restaurante. Verifique as configurações ou entre em contato com o suporte.
+            {restaurantError instanceof Error ? restaurantError.message : "Não foi possível carregar os dados do seu restaurante."}
           </AlertDescription>
         </Alert>
       </div>
     );
+  }
+  
+  if (!restaurant) {
+      return <LoadingSpinner />;
   }
 
   const isSoundControlDisabled = audioReadyState !== 'ready';
@@ -413,7 +458,8 @@ const DashboardLayoutComponent = () => {
               </div>
             </div>
           </header>
-          <Outlet context={{ restaurant }} />
+          {/* Passando userRestaurantId no contexto */}
+          <Outlet context={{ restaurant, userRestaurantId }} />
         </div>
         {restaurant?.notification_sound_url && (
           <audio

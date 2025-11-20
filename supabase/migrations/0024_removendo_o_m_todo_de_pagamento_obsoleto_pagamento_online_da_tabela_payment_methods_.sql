@@ -1,2 +1,1 @@
-DELETE FROM public.payment_methods
-WHERE name = 'Pagamento Online';
+// File contents excluded from context

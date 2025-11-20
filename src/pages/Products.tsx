@@ -27,25 +27,17 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useOutletContext } from 'react-router-dom';
+import { DashboardContextType } from '@/layouts/DashboardLayout'; // Importar o tipo do contexto
 
 type Product = Tables<'products'>;
 type LayoutType = 'grid' | 'list';
 
-const fetchProducts = async () => {
-  const { data: restaurantData, error: restaurantError } = await supabase
-    .from('restaurants')
-    .select('id')
-    .eq('is_active', true)
-    .limit(1)
-    .single();
-
-  if (restaurantError) throw new Error(`Erro ao buscar restaurante: ${restaurantError.message}`);
-  if (!restaurantData) throw new Error('Nenhum restaurante ativo encontrado.');
-
+const fetchProducts = async (restaurantId: string) => {
   const { data, error } = await supabase
     .from('products')
     .select('*')
-    .eq('restaurant_id', restaurantData.id)
+    .eq('restaurant_id', restaurantId)
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(`Erro ao buscar produtos: ${error.message}`);
@@ -54,6 +46,8 @@ const fetchProducts = async () => {
 
 const Products = () => {
   const queryClient = useQueryClient();
+  // Usar o contexto para obter o restaurantId do usuário logado
+  const { userRestaurantId } = useOutletContext<DashboardContextType>();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -73,9 +67,11 @@ const Products = () => {
     localStorage.setItem('productsLayout', newLayout);
   }, []);
 
+  // Usar userRestaurantId no queryKey e na função fetch
   const { data: products, isLoading, isError, error } = useQuery<Product[]>({
-    queryKey: ['products'],
-    queryFn: fetchProducts,
+    queryKey: ['products', userRestaurantId],
+    queryFn: () => fetchProducts(userRestaurantId!),
+    enabled: !!userRestaurantId, // Só busca se o userRestaurantId estiver disponível
   });
 
   const handleEditClick = (product: Product) => {
@@ -122,7 +118,7 @@ const Products = () => {
   
   const massUpdateStatusMutation = useMutation({
     mutationFn: async (is_available: boolean) => {
-      if (!products || products.length === 0) return;
+      if (!products || products.length === 0 || !userRestaurantId) return;
       
       const productIds = products.map(p => p.id);
       
@@ -160,7 +156,7 @@ const Products = () => {
 
   return (
     <>
-      <AddProductModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+      <AddProductModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} restaurantId={userRestaurantId} />
       <EditProductModal 
         isOpen={isEditModalOpen} 
         onClose={() => setIsEditModalOpen(false)} 
@@ -310,7 +306,8 @@ const Products = () => {
             )}
           </TabsContent>
           <TabsContent value="categories">
-            <CategoryManager />
+            {/* Passar o userRestaurantId para o CategoryManager também */}
+            <CategoryManager restaurantId={userRestaurantId} />
           </TabsContent>
         </Tabs>
       </main>

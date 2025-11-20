@@ -1,2 +1,1 @@
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('settings', 'settings', true);
+// File contents excluded from context

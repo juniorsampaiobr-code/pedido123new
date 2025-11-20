@@ -585,20 +585,31 @@ export type Database = {
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
+          restaurant_id: string | null // Adicionado
         }
         Insert: {
           created_at?: string | null
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
+          restaurant_id: string | null // Adicionado
         }
         Update: {
           created_at?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+          restaurant_id?: string | null // Adicionado
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_restaurant_id_fkey" // Adicionado
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
