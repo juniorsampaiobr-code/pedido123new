@@ -139,9 +139,10 @@ serve(async (req) => {
 
   } catch (error) {
     console.error("[ensure-admin-access] General Error:", error);
+    
+    // Tenta retornar a mensagem de erro detalhada no corpo, mesmo em caso de 500
     const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
     
-    // Retorna o erro 500 com a mensagem de erro detalhada no corpo
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: corsHeaders,
       status: 500,
