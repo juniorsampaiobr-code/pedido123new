@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShoppingCart, Terminal, RefreshCw, Check, X, DollarSign, Trash2, ListChecks, Loader2 } from 'lucide-react';
+import { ShoppingCart, Terminal, RefreshCw, Check, X, DollarSign, Trash2, Loader2, Package, Truck, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { OrderDetailsModal } from "@/components/OrderDetailsModal";
@@ -39,12 +39,12 @@ import {
 type Order = Tables<'orders'> & { customer: Tables<'customers'> | null };
 
 const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: React.ElementType, color: string }> = {
-  pending: { label: 'Pendente', icon: ShoppingCart, color: 'bg-yellow-500 hover:bg-yellow-600' },
-  preparing: { label: 'Em Preparação', icon: Check, color: 'bg-orange-500 hover:bg-orange-600' },
-  ready: { label: 'Pronto', icon: Check, color: 'bg-green-500 hover:bg-green-600' },
-  delivering: { label: 'Em Entrega', icon: Check, color: 'bg-indigo-500 hover:bg-indigo-600' },
+  pending: { label: 'Pendente', icon: Clock, color: 'bg-yellow-500 hover:bg-yellow-600' },
+  preparing: { label: 'Em Preparação', icon: Package, color: 'bg-orange-500 hover:bg-orange-600' },
+  ready: { label: 'Pronto', icon: CheckCircle, color: 'bg-green-500 hover:bg-green-600' },
+  delivering: { label: 'Em Entrega', icon: Truck, color: 'bg-indigo-500 hover:bg-indigo-600' },
   delivered: { label: 'Entregue', icon: Check, color: 'bg-primary hover:bg-primary/90' },
-  cancelled: { label: 'Cancelado', icon: X, color: 'bg-destructive hover:bg-destructive/90' },
+  cancelled: { label: 'Cancelado', icon: XCircle, color: 'bg-destructive hover:bg-destructive/90' },
   pending_payment: { label: 'Aguardando Pag.', icon: DollarSign, color: 'bg-gray-500 hover:bg-gray-600' },
 };
 
@@ -415,7 +415,7 @@ const Orders = () => {
           {/* Barra de Ações em Massa */}
           {selectedOrders.length > 0 && (
             <div className="flex items-center gap-2 p-2 border rounded-lg bg-card shadow-lg animate-fade-in">
-              <ListChecks className="h-5 w-5 text-primary mr-2" />
+              <ShoppingCart className="h-5 w-5 text-primary mr-2" />
               <span className="text-sm font-medium mr-4">{selectedOrders.length} selecionado(s)</span>
               
               <Select value={massAction} onValueChange={(value) => setMassAction(value as Enums<'order_status'> | 'delete')}>

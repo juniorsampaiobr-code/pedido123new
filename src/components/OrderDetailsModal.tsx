@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, User, Phone, MapPin, CreditCard, Truck, Clock, Calendar, Euro, Package } from 'lucide-react';
+import { Terminal, User, Phone, MapPin, CreditCard, Truck, Clock, Calendar, Euro, Package, CheckCircle, XCircle, Check } from 'lucide-react';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -25,15 +25,10 @@ const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: Rea
   preparing: { label: 'Em Preparação', icon: Package, color: 'bg-orange-500' },
   ready: { label: 'Pronto', icon: CheckCircle, color: 'bg-green-500' },
   delivering: { label: 'Em Entrega', icon: Truck, color: 'bg-blue-500' },
-  delivered: { label: 'Entregue', icon: CheckCheck, color: 'bg-purple-500' },
+  delivered: { label: 'Entregue', icon: Check, color: 'bg-purple-500' }, // Usando Check em vez de CheckCheck
   cancelled: { label: 'Cancelado', icon: XCircle, color: 'bg-destructive' },
   pending_payment: { label: 'Aguardando Pagamento', icon: Euro, color: 'bg-gray-500' },
 };
-
-// Ícones auxiliares (definidos localmente para evitar importações)
-const CheckCircle = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>;
-const CheckCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg>;
-const XCircle = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>;
 
 const fetchOrderItems = async (orderId: string): Promise<OrderItem[]> => {
   const { data, error } = await supabase
