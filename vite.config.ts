@@ -38,3 +38,4 @@ export default defineConfig(({ mode }) => ({
     exclude: ['@mercadopago/sdk-react', '@mercadopago/sdk-js'],
   }
 }));
+// Forçando sincronização com o GitHub.
