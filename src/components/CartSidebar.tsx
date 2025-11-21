@@ -7,6 +7,7 @@ import { ShoppingCart, ArrowRight, X } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { CartItem } from './CartItem';
 import { MobileOrderSummary } from './MobileOrderSummary';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'; // Importando Card
 
 interface CartSidebarProps {
   isOpen?: boolean;
@@ -17,14 +18,15 @@ interface CartSidebarProps {
 const CartSidebarComponent = ({ isOpen = true, onClose }: CartSidebarProps) => {
   const { items, totalAmount, totalItems } = useCart();
 
-  const content = (
+  const CartContent = (
     <div className="flex flex-col h-full">
-      <SheetHeader className="p-4 border-b">
-        <SheetTitle className="flex items-center gap-2">
+      {/* Header: Usamos elementos simples para o título para evitar dependência de contexto Dialog/Sheet */}
+      <div className="p-4 border-b">
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
           <ShoppingCart className="h-5 w-5 text-primary" />
           Seu Pedido ({totalItems})
-        </SheetTitle>
-      </SheetHeader>
+        </h2>
+      </div>
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center flex-grow p-8 text-center">
@@ -58,16 +60,20 @@ const CartSidebarComponent = ({ isOpen = true, onClose }: CartSidebarProps) => {
     </div>
   );
 
-  // Se for usado como sidebar de desktop (isOpen=true por padrão)
+  // Se for usado como sidebar de desktop (isOpen=true por padrão e sem onClose)
   if (isOpen === true && !onClose) {
-    return <div className="bg-card border rounded-lg shadow-lg h-[calc(100vh-5rem)]">{content}</div>;
+    return (
+      <Card className="shadow-lg h-[calc(100vh-5rem)] flex flex-col">
+        {CartContent}
+      </Card>
+    );
   }
 
   // Se for usado como Sheet de mobile
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="right" className="w-full sm:max-w-sm p-0">
-        {content}
+        {CartContent}
         {/* Adiciona o resumo flutuante para mobile dentro do Sheet, mas apenas se estiver aberto */}
         {isOpen && totalItems > 0 && (
           <MobileOrderSummary totalAmount={totalAmount} totalItems={totalItems} />
