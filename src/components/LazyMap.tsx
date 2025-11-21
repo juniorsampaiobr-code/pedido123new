@@ -11,14 +11,11 @@ interface MapComponentProps {
 }
 
 // Carregamento dinâmico do componente MapComponent
-const MapComponent = lazy(() => import('./MapComponent'));
+// Ajuste para lidar com a exportação default
+const MapComponent = lazy(() => import('./MapComponent').then(module => ({ default: module.default })));
 
 // Componente auxiliar que encapsula o carregamento dinâmico
 const LazyMap = (props: MapComponentProps) => {
-  // Se o MapComponent não existir, criamos um placeholder para ele.
-  // No entanto, como o MapComponent não está no contexto, vamos assumir que ele existe
-  // e que a importação dinâmica é o suficiente para resolver o problema de exportação.
-  
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <MapComponent {...props} />
