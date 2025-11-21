@@ -1,0 +1,1 @@
+import{j as m}from"./tanstack-B7K8dk_R.js";import{a as o}from"./index-DjoPPGK7.js";function a({className:e,...t}){return m.jsx("div",{className:o("animate-pulse rounded-md bg-muted",e),...t})}export{a as S};
