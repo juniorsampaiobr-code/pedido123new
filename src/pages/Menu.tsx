@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, ShoppingCart, Clock, MapPin } from 'lucide-react';
+import { Terminal, ShoppingCart, Clock, MapPin, Copy } from 'lucide-react';
 import { BusinessStatus } from '@/components/BusinessStatus';
 import { StoreClosedWarning } from '@/components/StoreClosedWarning';
 import { getBusinessStatus } from '@/utils/time';
@@ -13,6 +13,8 @@ import { FloatingCartButton } from '@/components/FloatingCartButton';
 import { CartSidebar } from '@/components/CartSidebar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCart } from '@/hooks/use-cart';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 type Restaurant = Tables<'restaurants'>;
 type Category = Tables<'categories'>;
@@ -100,6 +102,14 @@ const Menu = () => {
     return { isOpen: true, todayHours: 'Horário não configurado' };
   }, [menuData?.hours]);
 
+  const copyMenuLink = () => {
+    if (menuData?.restaurant) {
+      const menuLink = `${window.location.origin}${window.location.pathname}#/menu`;
+      navigator.clipboard.writeText(menuLink);
+      toast.success("Link do cardápio copiado!");
+    }
+  };
+
   if (isLoading) {
     return <LoadingSpinner />;
   }
@@ -137,8 +147,19 @@ const Menu = () => {
               <FloatingCartButton onClick={() => setIsCartOpen(true)} totalItems={totalItems} />
             )}
           </div>
-          <div className="mt-3">
+          
+          {/* Restaurant Menu Link */}
+          <div className="mt-3 flex items-center justify-between">
             <BusinessStatus restaurant={restaurant} hours={menuData.hours} />
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={copyMenuLink}
+              className="hidden sm:flex items-center gap-2"
+            >
+              <Copy className="h-4 w-4" />
+              Copiar Link
+            </Button>
           </div>
         </div>
       </header>
@@ -178,6 +199,16 @@ const Menu = () => {
       {isMobile && (
         <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
       )}
+      
+      {/* Floating action button for mobile */}
+      <div className="fixed bottom-20 right-4 sm:hidden">
+        <Button 
+          onClick={copyMenuLink}
+          className="rounded-full h-12 w-12 shadow-lg"
+        >
+          <Copy className="h-5 w-5" />
+        </Button>
+      </div>
     </div>
   );
 };

@@ -13,7 +13,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useOutletContext } from 'react-router-dom';
 import { DashboardContextType } from '@/layouts/DashboardLayout';
-import { useDashboardStats } from "@/hooks/use-dashboard-stats"; // Importando o novo hook
+import { useDashboardStats } from "@/hooks/use-dashboard-stats";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const DashboardStatCard = ({ icon: Icon, title, value, description, isLoading }: { icon: React.ElementType, title: string, value: string, description: string, isLoading: boolean }) => (
@@ -34,37 +34,16 @@ const DashboardStatCard = ({ icon: Icon, title, value, description, isLoading }:
 );
 
 const Dashboard = () => {
-  const { userRestaurantId } = useOutletContext<DashboardContextType>();
+  const { restaurant } = useOutletContext<DashboardContextType>();
   const menuLink = `${window.location.origin}${window.location.pathname}#/menu`;
 
-  // Usando o novo hook para buscar estatísticas
-  const { data: stats, isLoading: isLoadingStats } = useDashboardStats(userRestaurantId);
+  const { data: stats, isLoading: isLoadingStats } = useDashboardStats(restaurant.id);
 
   const copyLink = () => {
     navigator.clipboard.writeText(menuLink);
     toast.success("Link copiado para a área de transferência!");
   };
 
-  // Se não tiver userRestaurantId, mostra um erro ou carregando
-  if (!userRestaurantId) {
-    return (
-      <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
-        <div className="max-w-3xl mx-auto">
-          <Card>
-            <CardHeader>
-              <CardTitle>Erro de Configuração</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                ID do restaurante não encontrado. Por favor, recarregue a página.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    );
-  }
-  
   const formatCurrency = (amount: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount);
 
@@ -155,6 +134,9 @@ const Dashboard = () => {
                 </Button>
               </a>
             </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Este é o link exclusivo do seu restaurante: <span className="font-semibold">{restaurant.name}</span>
+            </p>
           </CardContent>
         </Card>
       </div>
