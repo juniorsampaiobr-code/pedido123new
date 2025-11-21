@@ -26,6 +26,7 @@ import { PhoneInput } from '@/components/PhoneInput';
 import { CustomerProfileModal } from '@/components/CustomerProfileModal';
 import { MercadoPagoPayment } from '@/components/MercadoPagoPayment';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
+import { cn } from '@/lib/utils'; // IMPORT FALTANTE
 
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
@@ -713,7 +714,7 @@ const Checkout = () => {
                 {!isDeliveryAreaValid && !isGeocoding && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Fora da Área de Entrega</AlertTitle> {/* CORRIGIDO AQUI */}
+                    <AlertTitle>Fora da Área de Entrega</AlertTitle>
                     <AlertDescription>Seu endereço está fora da área de cobertura do restaurante.</AlertDescription>
                   </Alert>
                 )}
