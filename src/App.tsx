@@ -6,13 +6,13 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import CartProvider from "./hooks/use-cart"; // Importação corrigida
 import { TooltipProvider } from "./components/ui/tooltip";
 import { LoadingSpinner } from "./components/LoadingSpinner";
+import Menu from "./pages/Menu"; // Importação direta
 
 // Lazy load all page components
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AdminAuth = lazy(() => import("./pages/AdminAuth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-const Menu = lazy(() => import("./pages/Menu"));
 const Products = lazy(() => import("./pages/Products"));
 const Orders = lazy(() => import("./pages/Orders"));
 const Settings = lazy(() => import("./pages/Settings"));
