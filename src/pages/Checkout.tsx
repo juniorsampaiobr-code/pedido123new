@@ -294,8 +294,8 @@ const Checkout = () => {
     } else {
       // Se não houver zonas configuradas, mas a entrega estiver habilitada, assume 0 ou erro
       setDeliveryFee(0);
-      setIsDeliveryAreaValid(true);
       setDeliveryTime(null);
+      setIsDeliveryAreaValid(true);
     }
   }, [deliveryOption, addressFields, restaurant, restaurantCoords, deliveryZones]);
 
@@ -713,7 +713,7 @@ const Checkout = () => {
                 {!isDeliveryAreaValid && !isGeocoding && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Fora da Área de Entrega</Alertagem>
+                    <AlertTitle>Fora da Área de Entrega</AlertTitle> {/* CORRIGIDO AQUI */}
                     <AlertDescription>Seu endereço está fora da área de cobertura do restaurante.</AlertDescription>
                   </Alert>
                 )}
