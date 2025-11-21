@@ -545,7 +545,7 @@ const Checkout = () => {
   }
   
   const isFormSubmitting = createCustomerMutation.isPending || createOrderMutation.isPending;
-  const isCheckoutDisabled = isFormSubmitting || isGeocoding || !isDeliveryAreaValid;
+  const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isDeliveryAreaValid);
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-8">
@@ -701,7 +701,7 @@ const Checkout = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="city">Cidade</Label>
-                  <Input id="city" {...form.register('city')} disabled />
+                  <Input id="city" {...form.register('city')} />
                 </div>
                 
                 {isGeocoding && (
