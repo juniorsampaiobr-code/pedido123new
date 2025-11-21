@@ -1,0 +1,1 @@
+import{r as o}from"./vendor-nYMJN4lg.js";import"./tanstack-E1juXnZE.js";var n=o.createContext(void 0);function c(t){const r=o.useContext(n);return t||r||"ltr"}function s(t,[r,e]){return Math.min(e,Math.max(r,t))}export{s as c,c as u};
