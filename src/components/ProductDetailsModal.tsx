@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Minus, ShoppingCart, DollarSign, Scale } from 'lucide-react';
+import { Plus, Minus, ShoppingCart, DollarSign, Scale, X } from 'lucide-react';
 import { Tables } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 
