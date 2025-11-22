@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, ShoppingCart, Clock, MapPin, Copy, RefreshCw } from 'lucide-react';
+import { Terminal, ShoppingCart, Clock, MapPin, Copy, RefreshCw, LogOut } from 'lucide-react';
 import { BusinessStatus } from '@/components/BusinessStatus';
 import { StoreClosedWarning } from '@/components/StoreClosedWarning';
 import { getBusinessStatus } from '@/utils/time';
@@ -16,6 +16,7 @@ import { useCart } from '@/hooks/use-cart';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useParams } from 'react-router-dom'; // Importando useParams
+import { useAuthStatus } from '@/hooks/use-auth-status'; // Importando useAuthStatus
 
 type Restaurant = Tables<'restaurants'>;
 type Category = Tables<'categories'>;
@@ -90,6 +91,7 @@ const Menu = () => {
   const isMobile = useIsMobile();
   const { totalItems } = useCart();
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const { data: user } = useAuthStatus(); // Obtém o status de autenticação
 
   const { data: menuData, isLoading, isError, error, refetch } = useQuery<MenuData>({
     queryKey: ['menuData', restaurantId], // Adiciona restaurantId na chave
@@ -115,6 +117,13 @@ const Menu = () => {
       navigator.clipboard.writeText(menuLink);
       toast.success("Link do cardápio copiado!");
     }
+  };
+  
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast.success("Você saiu da sua conta.");
+    // Redireciona para a página de autenticação do cliente
+    window.location.reload(); // Força o recarregamento para limpar o estado do cliente
   };
 
   if (!restaurantId) {
@@ -164,13 +173,20 @@ const Menu = () => {
               <ShoppingCart className="h-6 w-6 text-primary" />
               <h1 className="text-xl font-bold">{restaurant.name}</h1>
             </div>
-            {isMobile && totalItems > 0 && (
-              <FloatingCartButton 
-                onClick={() => setIsCartOpen(true)} 
-                totalItems={totalItems} 
-                isCheckoutBlocked={isCheckoutBlocked} // Passando a prop
-              />
-            )}
+            <div className="flex items-center gap-2">
+              {user && (
+                <Button variant="outline" size="sm" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4 mr-2" /> Sair
+                </Button>
+              )}
+              {isMobile && totalItems > 0 && (
+                <FloatingCartButton 
+                  onClick={() => setIsCartOpen(true)} 
+                  totalItems={totalItems} 
+                  isCheckoutBlocked={isCheckoutBlocked}
+                />
+              )}
+            </div>
           </div>
           
           {/* Restaurant Menu Link */}

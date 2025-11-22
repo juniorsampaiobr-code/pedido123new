@@ -20,7 +20,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { MapPin, Phone, Mail, CreditCard, DollarSign, Truck, Loader2, User, RefreshCw, AlertCircle } from 'lucide-react';
+import { MapPin, Phone, Mail, CreditCard, DollarSign, Truck, Loader2, User, RefreshCw, AlertCircle, LogOut } from 'lucide-react';
 import { ZipCodeInput } from '@/components/ZipCodeInput';
 import { PhoneInput } from '@/components/PhoneInput';
 import { CustomerProfileModal } from '@/components/CustomerProfileModal';
@@ -514,6 +514,13 @@ const Checkout = () => {
       // O usuário pode tentar novamente ou o admin pode cancelar.
     }
   };
+  
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast.success("Você saiu da sua conta.");
+    // Redireciona para a página de autenticação do cliente
+    navigate('/auth', { replace: true });
+  };
 
   // --- Renderização ---
 
@@ -583,9 +590,14 @@ const Checkout = () => {
                   {user ? `Logado como ${user.email}` : 'Você está fazendo um pedido anônimo.'}
                 </p>
                 {user && (
-                  <Button variant="link" size="sm" onClick={() => setIsProfileModalOpen(true)}>
-                    Editar Perfil
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="link" size="sm" onClick={() => setIsProfileModalOpen(true)}>
+                      Editar Perfil
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleLogout}>
+                      <LogOut className="h-4 w-4 mr-1" /> Sair
+                    </Button>
+                  </div>
                 )}
               </div>
               <form onSubmit={form.handleSubmit(onSubmit)} id="checkout-form">
