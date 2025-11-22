@@ -6,7 +6,7 @@ import { Tables, Enums, TablesInsert, TablesUpdate } from '@/integrations/supaba
 import { useCart } from '@/hooks/use-cart';
 import { useMercadoPagoPublicKey } from '@/hooks/use-mercado-pago-settings';
 import { geocodeAddress, calculateDeliveryFee } from '@/utils/location';
-import { useAuthStatus } from '@/hooks/use-auth-status'; // Assumindo que este hook existe ou será criado
+import { useAuthStatus } from '@/hooks/use-auth-status';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -20,7 +20,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { MapPin, Phone, Mail, CreditCard, DollarSign, Truck, Loader2, User, RefreshCw, AlertCircle, LogOut } from 'lucide-react';
+import { MapPin, Phone, Mail, CreditCard, DollarSign, Truck, Loader2, User, RefreshCw, AlertCircle, LogOut, User as UserIcon } from 'lucide-react';
 import { ZipCodeInput } from '@/components/ZipCodeInput';
 import { PhoneInput } from '@/components/PhoneInput';
 import { CustomerProfileModal } from '@/components/CustomerProfileModal';
@@ -263,8 +263,10 @@ const Checkout = () => {
     }
 
     setIsGeocoding(true);
+    const loadingToast = toast.loading("Calculando taxa de entrega...");
     const coords = await geocodeAddress(fullAddress);
     setIsGeocoding(false);
+    toast.dismiss(loadingToast);
 
     if (!coords) {
       setDeliveryFee(0);
@@ -309,7 +311,7 @@ const Checkout = () => {
   // 3. Lógica de Troco
   const changeFor = form.watch('change_for');
   useEffect(() => {
-    if (isCashPayment && changeFor !== null && changeFor < totalAmount) {
+    if (isCashPayment && changeFor !== null && changeFor !== undefined && changeFor < totalAmount) {
       form.setError('change_for', { message: 'O valor do troco deve ser maior ou igual ao total do pedido.' });
     } else {
       form.clearErrors('change_for');
@@ -573,322 +575,333 @@ const Checkout = () => {
         />
       )}
 
-      <div className="max-w-5xl mx-auto grid lg:grid-cols-3 gap-8">
-        {/* Coluna 1 & 2: Formulário de Checkout */}
-        <div className="lg:col-span-2 space-y-6">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-foreground">Finalizar Pedido</h1>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <User className="h-5 w-5 text-primary" />
-                Seus Dados
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center mb-4">
-                <p className="text-sm text-muted-foreground">
-                  {user ? `Logado como ${user.email}` : 'Você está fazendo um pedido anônimo.'}
-                </p>
-                {user && (
-                  <div className="flex gap-2">
-                    <Button variant="link" size="sm" onClick={() => setIsProfileModalOpen(true)}>
-                      Editar Perfil
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleLogout}>
-                      <LogOut className="h-4 w-4 mr-1" /> Sair
-                    </Button>
-                  </div>
-                )}
-              </div>
-              <form onSubmit={form.handleSubmit(onSubmit)} id="checkout-form">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome Completo *</Label>
-                    <Input id="name" {...form.register('name')} />
-                    {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Telefone *</Label>
-                    <Controller
-                      name="phone"
-                      control={form.control}
-                      render={({ field }) => <PhoneInput id="phone" {...field} />}
-                    />
-                    {form.formState.errors.phone && <p className="text-destructive text-sm">{form.formState.errors.phone.message}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email (Opcional)</Label>
-                    <Input id="email" type="email" {...form.register('email')} />
-                    {form.formState.errors.email && <p className="text-destructive text-sm">{form.formState.errors.email.message}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cpf_cnpj">CPF/CNPJ (Opcional)</Label>
-                    <Controller
-                      name="cpf_cnpj"
-                      control={form.control}
-                      render={({ field }) => <CpfCnpjInput id="cpf_cnpj" {...field} />}
-                    />
-                    {form.formState.errors.cpf_cnpj && <p className="text-destructive text-sm">{form.formState.errors.cpf_cnpj.message}</p>}
-                  </div>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-          
-          {/* Opção de Entrega */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Truck className="h-5 w-5 text-primary" />
-                Opção de Entrega
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Controller
-                name="delivery_option"
-                control={form.control}
-                render={({ field }) => (
-                  <RadioGroup onValueChange={field.onChange} value={field.value} className="grid grid-cols-2 gap-4">
-                    <Label htmlFor="delivery" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer">
-                      <RadioGroupItem value="delivery" id="delivery" className="sr-only" />
-                      <Truck className="mb-3 h-6 w-6" />
-                      Entrega
-                    </Label>
-                    <Label htmlFor="pickup" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer">
-                      <RadioGroupItem value="pickup" id="pickup" className="sr-only" />
-                      <MapPin className="mb-3 h-6 w-6" />
-                      Retirada no Local
-                    </Label>
-                  </RadioGroup>
-                )}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Endereço de Entrega (se delivery_option for 'delivery') */}
-          {deliveryOption === 'delivery' && (
+          {user && (
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => setIsProfileModalOpen(true)}
+                aria-label="Meu Perfil"
+              >
+                <UserIcon className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-1" /> Sair
+              </Button>
+            </div>
+          )}
+        </div>
+        
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Coluna 1 & 2: Formulário de Checkout */}
+          <div className="lg:col-span-2 space-y-6">
+            
             <Card>
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-primary" />
-                  Endereço de Entrega
+                  <User className="h-5 w-5 text-primary" />
+                  Seus Dados
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {!restaurant.delivery_enabled && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Entrega Desativada</AlertTitle>
-                    <AlertDescription>O restaurante não está aceitando pedidos para entrega no momento.</AlertDescription>
-                  </Alert>
-                )}
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2 md:col-span-1">
-                    <Label htmlFor="zip_code">CEP *</Label>
-                    <Controller
-                      name="zip_code"
-                      control={form.control}
-                      render={({ field }) => <ZipCodeInput id="zip_code" {...field} onBlur={calculateFee} />}
-                    />
-                    {form.formState.errors.zip_code && <p className="text-destructive text-sm">{form.formState.errors.zip_code.message}</p>}
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="street">Rua *</Label>
-                    <Input id="street" {...form.register('street')} onBlur={calculateFee} />
-                    {form.formState.errors.street && <p className="text-destructive text-sm">{form.formState.errors.street.message}</p>}
-                  </div>
+              <CardContent>
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-sm text-muted-foreground">
+                    {user ? `Logado como ${user.email}` : 'Você está fazendo um pedido anônimo.'}
+                  </p>
+                  {/* Removendo botões daqui, movidos para o cabeçalho */}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="number">Número *</Label>
-                    <Input id="number" {...form.register('number')} onBlur={calculateFee} />
-                    {form.formState.errors.number && <p className="text-destructive text-sm">{form.formState.errors.number.message}</p>}
+                <form onSubmit={form.handleSubmit(onSubmit)} id="checkout-form">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nome Completo *</Label>
+                      <Input id="name" {...form.register('name')} />
+                      {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Telefone *</Label>
+                      <Controller
+                        name="phone"
+                        control={form.control}
+                        render={({ field }) => <PhoneInput id="phone" {...field} />}
+                      />
+                      {form.formState.errors.phone && <p className="text-destructive text-sm">{form.formState.errors.phone.message}</p>}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email (Opcional)</Label>
+                      <Input id="email" type="email" {...form.register('email')} />
+                      {form.formState.errors.email && <p className="text-destructive text-sm">{form.formState.errors.email.message}</p>}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cpf_cnpj">CPF/CNPJ (Opcional)</Label>
+                      <Controller
+                        name="cpf_cnpj"
+                        control={form.control}
+                        render={({ field }) => <CpfCnpjInput id="cpf_cnpj" {...field} />}
+                      />
+                      {form.formState.errors.cpf_cnpj && <p className="text-destructive text-sm">{form.formState.errors.cpf_cnpj.message}</p>}
+                    </div>
                   </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="neighborhood">Bairro *</Label>
-                    <Input id="neighborhood" {...form.register('neighborhood')} onBlur={calculateFee} />
-                    {form.formState.errors.neighborhood && <p className="text-destructive text-sm">{form.formState.errors.neighborhood.message}</p>}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="city">Cidade</Label>
-                  <Input id="city" {...form.register('city')} />
-                </div>
-                
-                {isGeocoding && (
-                  <Alert className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <AlertTitle>Calculando Taxa de Entrega...</AlertTitle>
-                  </Alert>
-                )}
-                
-                {!isDeliveryAreaValid && !isGeocoding && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Fora da Área de Entrega</AlertTitle>
-                    <AlertDescription>Seu endereço está fora da área de cobertura do restaurante.</AlertDescription>
-                  </Alert>
-                )}
-                
-                {deliveryTime && isDeliveryAreaValid && !isGeocoding && (
-                  <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 text-green-700">
-                    <Truck className="h-4 w-4" />
-                    <AlertTitle>Entrega Disponível</AlertTitle>
-                    <AlertDescription>
-                      Taxa de entrega: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}. 
-                      Tempo estimado: {deliveryTime[0]} - {deliveryTime[1]} minutos.
-                    </AlertDescription>
-                  </Alert>
-                )}
+                </form>
               </CardContent>
             </Card>
-          )}
-
-          {/* Método de Pagamento */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-primary" />
-                Método de Pagamento *
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Controller
-                name="payment_method_id"
-                control={form.control}
-                render={({ field }) => (
-                  <RadioGroup onValueChange={field.onChange} value={field.value} className="space-y-3">
-                    {paymentMethods?.map(method => {
-                      const isMpOnline = method.name?.includes('online') && !mpPublicKey;
-                      
-                      return (
-                        <Label 
-                          key={method.id} 
-                          htmlFor={method.id} 
-                          className={cn(
-                            "flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer",
-                            isMpOnline && "opacity-50 cursor-not-allowed"
-                          )}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <RadioGroupItem value={method.id} id={method.id} disabled={isMpOnline} />
-                            <div>
-                              <p className="font-medium">{method.name}</p>
-                              <p className="text-xs text-muted-foreground">{method.description}</p>
-                              {isMpOnline && (
-                                <p className="text-xs text-destructive mt-1">Pagamento online indisponível (Chave Pública não configurada).</p>
-                              )}
-                            </div>
-                          </div>
-                        </Label>
-                      );
-                    })}
-                  </RadioGroup>
-                )}
-              />
-              {form.formState.errors.payment_method_id && <p className="text-destructive text-sm mt-2">{form.formState.errors.payment_method_id.message}</p>}
-            </CardContent>
-          </Card>
-          
-          {/* Troco (se for dinheiro) */}
-          {isCashPayment && (
+            
+            {/* Opção de Entrega */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-primary" />
-                  Troco
+                  <Truck className="h-5 w-5 text-primary" />
+                  Opção de Entrega
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Controller
+                  name="delivery_option"
+                  control={form.control}
+                  render={({ field }) => (
+                    <RadioGroup onValueChange={field.onChange} value={field.value} className="grid grid-cols-2 gap-4">
+                      <Label htmlFor="delivery" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer">
+                        <RadioGroupItem value="delivery" id="delivery" className="sr-only" />
+                        <Truck className="mb-3 h-6 w-6" />
+                        Entrega
+                      </Label>
+                      <Label htmlFor="pickup" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer">
+                        <RadioGroupItem value="pickup" id="pickup" className="sr-only" />
+                        <MapPin className="mb-3 h-6 w-6" />
+                        Retirada no Local
+                      </Label>
+                    </RadioGroup>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Endereço de Entrega (se delivery_option for 'delivery') */}
+            {deliveryOption === 'delivery' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xl flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-primary" />
+                    Endereço de Entrega
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!restaurant.delivery_enabled && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Entrega Desativada</AlertTitle>
+                      <AlertDescription>O restaurante não está aceitando pedidos para entrega no momento.</AlertDescription>
+                    </Alert>
+                  )}
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2 md:col-span-1">
+                      <Label htmlFor="zip_code">CEP *</Label>
+                      <Controller
+                        name="zip_code"
+                        control={form.control}
+                        render={({ field }) => <ZipCodeInput id="zip_code" {...field} onBlur={calculateFee} />}
+                      />
+                      {form.formState.errors.zip_code && <p className="text-destructive text-sm">{form.formState.errors.zip_code.message}</p>}
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="street">Rua *</Label>
+                      <Input id="street" {...form.register('street')} onBlur={calculateFee} />
+                      {form.formState.errors.street && <p className="text-destructive text-sm">{form.formState.errors.street.message}</p>}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="number">Número *</Label>
+                      <Input id="number" {...form.register('number')} onBlur={calculateFee} />
+                      {form.formState.errors.number && <p className="text-destructive text-sm">{form.formState.errors.number.message}</p>}
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="neighborhood">Bairro *</Label>
+                      <Input id="neighborhood" {...form.register('neighborhood')} onBlur={calculateFee} />
+                      {form.formState.errors.neighborhood && <p className="text-destructive text-sm">{form.formState.errors.neighborhood.message}</p>}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="city">Cidade</Label>
+                    <Input id="city" {...form.register('city')} />
+                  </div>
+                  
+                  {isGeocoding && (
+                    <Alert className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <AlertTitle>Calculando Taxa de Entrega...</AlertTitle>
+                    </Alert>
+                  )}
+                  
+                  {!isDeliveryAreaValid && !isGeocoding && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Fora da Área de Entrega</AlertTitle>
+                      <AlertDescription>Seu endereço está fora da área de cobertura do restaurante.</AlertDescription>
+                    </Alert>
+                  )}
+                  
+                  {deliveryTime && isDeliveryAreaValid && !isGeocoding && (
+                    <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 text-green-700">
+                      <Truck className="h-4 w-4" />
+                      <AlertTitle>Entrega Disponível</AlertTitle>
+                      <AlertDescription>
+                        Taxa de entrega: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}. 
+                        Tempo estimado: {deliveryTime[0]} - {deliveryTime[1]} minutos.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Método de Pagamento */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  Método de Pagamento *
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Controller
+                  name="payment_method_id"
+                  control={form.control}
+                  render={({ field }) => (
+                    <RadioGroup onValueChange={field.onChange} value={field.value} className="space-y-3">
+                      {paymentMethods?.map(method => {
+                        const isMpOnline = method.name?.includes('online') && !mpPublicKey;
+                        
+                        return (
+                          <Label 
+                            key={method.id} 
+                            htmlFor={method.id} 
+                            className={cn(
+                              "flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer",
+                              isMpOnline && "opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <RadioGroupItem value={method.id} id={method.id} disabled={isMpOnline} />
+                              <div>
+                                <p className="font-medium">{method.name}</p>
+                                <p className="text-xs text-muted-foreground">{method.description}</p>
+                                {isMpOnline && (
+                                  <p className="text-xs text-destructive mt-1">Pagamento online indisponível (Chave Pública não configurada).</p>
+                                )}
+                              </div>
+                            </div>
+                          </Label>
+                        );
+                      })}
+                    </RadioGroup>
+                  )}
+                />
+                {form.formState.errors.payment_method_id && <p className="text-destructive text-sm mt-2">{form.formState.errors.payment_method_id.message}</p>}
+              </CardContent>
+            </Card>
+            
+            {/* Troco (se for dinheiro) */}
+            {isCashPayment && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xl flex items-center gap-2">
+                    <DollarSign className="h-5 w-5 text-primary" />
+                    Troco
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <Label htmlFor="change_for">Precisa de troco para quanto? (Opcional)</Label>
+                    <Input 
+                      id="change_for" 
+                      type="number" 
+                      step="0.01" 
+                      placeholder={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}
+                      {...form.register('change_for', { valueAsNumber: true })}
+                    />
+                    {form.formState.errors.change_for && <p className="text-destructive text-sm">{form.formState.errors.change_for.message}</p>}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Observações */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <Mail className="h-5 w-5 text-primary" />
+                  Observações
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <Label htmlFor="change_for">Precisa de troco para quanto? (Opcional)</Label>
-                  <Input 
-                    id="change_for" 
-                    type="number" 
-                    step="0.01" 
-                    placeholder={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}
-                    {...form.register('change_for', { valueAsNumber: true })}
-                  />
-                  {form.formState.errors.change_for && <p className="text-destructive text-sm">{form.formState.errors.change_for.message}</p>}
+                  <Label htmlFor="notes">Notas para o restaurante (Opcional)</Label>
+                  <Textarea id="notes" {...form.register('notes')} rows={3} placeholder="Ex: Entregar na portaria, sem pimenta, etc." />
                 </div>
               </CardContent>
             </Card>
-          )}
+          </div>
 
-          {/* Observações */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Mail className="h-5 w-5 text-primary" />
-                Observações
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notas para o restaurante (Opcional)</Label>
-                <Textarea id="notes" {...form.register('notes')} rows={3} placeholder="Ex: Entregar na portaria, sem pimenta, etc." />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Coluna 3: Resumo do Pedido */}
-        <div className="lg:col-span-1 space-y-6 sticky top-4 self-start">
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-2xl">Resumo</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                {items.map((item) => (
-                  <div key={item.product.id} className="flex justify-between text-sm">
-                    <span className="truncate max-w-[70%]">{item.quantity}x {item.product.name}</span>
-                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.subtotal)}</span>
+          {/* Coluna 3: Resumo do Pedido */}
+          <div className="lg:col-span-1 space-y-6 sticky top-4 self-start">
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-2xl">Resumo</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                  {items.map((item) => (
+                    <div key={item.product.id} className="flex justify-between text-sm">
+                      <span className="truncate max-w-[70%]">{item.quantity}x {item.product.name}</span>
+                      <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.subtotal)}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                <Separator />
+                
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Subtotal</span>
+                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cartSubtotal)}</span>
                   </div>
-                ))}
-              </div>
-              
-              <Separator />
-              
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Subtotal</span>
-                  <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cartSubtotal)}</span>
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Taxa de Entrega</span>
+                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Taxa de Entrega</span>
-                  <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}</span>
+                
+                <Separator />
+                
+                <div className="flex justify-between font-bold text-xl">
+                  <span>Total</span>
+                  <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}</span>
                 </div>
-              </div>
-              
-              <Separator />
-              
-              <div className="flex justify-between font-bold text-xl">
-                <span>Total</span>
-                <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}</span>
-              </div>
-              
-              <Button 
-                type="submit" 
-                form="checkout-form"
-                className="w-full h-12 text-lg"
-                disabled={isCheckoutDisabled}
-              >
-                {isCheckoutDisabled ? (
-                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                ) : (
-                  isOnlinePayment ? 'Pagar e Finalizar' : 'Confirmar Pedido'
-                )}
-              </Button>
-              
-              {/* CORREÇÃO AQUI: Usando o ID do restaurante para o link do menu */}
-              <Link to={`/menu/${restaurant.id}`} className="block text-center text-sm text-muted-foreground hover:underline mt-2">
-                Voltar ao Cardápio
-              </Link>
-            </CardContent>
-          </Card>
+                
+                <Button 
+                  type="submit" 
+                  form="checkout-form"
+                  className="w-full h-12 text-lg"
+                  disabled={isCheckoutDisabled}
+                >
+                  {isCheckoutDisabled ? (
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  ) : (
+                    isOnlinePayment ? 'Pagar e Finalizar' : 'Confirmar Pedido'
+                  )}
+                </Button>
+                
+                {/* CORREÇÃO AQUI: Usando o ID do restaurante para o link do menu */}
+                <Link to={`/menu/${restaurant.id}`} className="block text-center text-sm text-muted-foreground hover:underline mt-2">
+                  Voltar ao Cardápio
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
