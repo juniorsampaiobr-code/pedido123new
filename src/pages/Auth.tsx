@@ -274,11 +274,11 @@ const Auth = () => {
               </Button>
             </div>
             
-            <Separator className="my-4" />
-            
+            {/* Removendo o link de acesso ao painel de administração */}
+            {/* <Separator className="my-4" />
             <div className="text-center text-sm text-muted-foreground">
               É o dono de uma loja? <Link to="/admin-auth" className="text-primary hover:underline">Acesse o painel de administração</Link>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
       </div>
