@@ -137,7 +137,8 @@ const Hours = () => {
     },
     onSuccess: () => {
       toast.success('Horários de funcionamento salvos com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['businessHours', userRestaurantId] }); // Usar userRestaurantId
+      queryClient.invalidateQueries({ queryKey: ['businessHours', userRestaurantId] }); // Invalida a query de horários
+      queryClient.invalidateQueries({ queryKey: ['menuData'] }); // NOVO: Invalida a query do menu para atualizar o status
     },
     onError: (err) => {
       toast.error(`Erro ao salvar horários: ${err.message}`);

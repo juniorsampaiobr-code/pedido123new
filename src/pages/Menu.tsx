@@ -97,7 +97,7 @@ const Menu = () => {
     queryKey: ['menuData', restaurantId], // Adiciona restaurantId na chave
     queryFn: () => fetchMenuData(restaurantId!),
     enabled: !!restaurantId, // Só executa se tiver o ID
-    staleTime: 1000 * 60 * 5, // 5 minutos
+    staleTime: 1000 * 60 * 1, // Reduzido para 1 minuto (60 segundos)
   });
 
   const { isOpen, todayHours } = useMemo(() => {
