@@ -8,9 +8,10 @@ interface MobileOrderSummaryProps {
   totalAmount: number;
   totalItems: number;
   isCheckoutBlocked: boolean; // Nova prop
+  restaurantId?: string; // NOVO: ID do restaurante atual
 }
 
-const MobileOrderSummaryComponent = ({ totalAmount, totalItems, isCheckoutBlocked }: MobileOrderSummaryProps) => {
+const MobileOrderSummaryComponent = ({ totalAmount, totalItems, isCheckoutBlocked, restaurantId }: MobileOrderSummaryProps) => {
   if (totalItems === 0) return null;
 
   return (
@@ -24,8 +25,9 @@ const MobileOrderSummaryComponent = ({ totalAmount, totalItems, isCheckoutBlocke
           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}
         </span>
       </div>
-      <Link to="/pre-checkout">
-        <Button className="w-full h-12 text-lg" disabled={isCheckoutBlocked}>
+      {/* ATUALIZADO: Passando restaurantId como query param */}
+      <Link to={`/pre-checkout?restaurantId=${restaurantId}`}>
+        <Button className="w-full h-12 text-lg" disabled={isCheckoutBlocked || !restaurantId}>
           Finalizar Pedido <ArrowRight className="ml-2 h-5 w-5" />
         </Button>
       </Link>

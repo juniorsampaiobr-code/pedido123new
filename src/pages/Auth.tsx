@@ -42,16 +42,21 @@ const Auth = () => {
   const [phone, setPhone] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [activeRestaurantId, setActiveRestaurantId] = useState<string | null>(null);
-  const [isRestaurantIdLoading, setIsRestaurantIdLoading] = useState(true);
+  
+  // Usamos o ID do restaurante do estado de navegação, se disponível, ou o ID ativo padrão
+  const restaurantIdFromState = location.state?.restaurantId as string | undefined;
+  const [activeRestaurantId, setActiveRestaurantId] = useState<string | null>(restaurantIdFromState || null);
+  const [isRestaurantIdLoading, setIsRestaurantIdLoading] = useState(!restaurantIdFromState);
 
-  // Efeito para buscar o ID do restaurante ativo
+  // Efeito para buscar o ID do restaurante ativo (apenas se não veio do estado)
   useEffect(() => {
-    fetchActiveRestaurantId().then(id => {
-      setActiveRestaurantId(id);
-      setIsRestaurantIdLoading(false);
-    });
-  }, []);
+    if (!restaurantIdFromState) {
+      fetchActiveRestaurantId().then(id => {
+        setActiveRestaurantId(id);
+        setIsRestaurantIdLoading(false);
+      });
+    }
+  }, [restaurantIdFromState]);
 
   // Função para obter a URL base correta do menu
   const getMenuUrl = (id: string) => {
@@ -75,7 +80,7 @@ const Auth = () => {
             console.log("Redirecting customer to checkout after login.");
             navigate('/checkout', { replace: true });
           } else {
-            // Redireciona para o menu após o login/cadastro
+            // Redireciona para o menu após o login/cadastro, usando o ID do restaurante
             const menuUrl = getMenuUrl(activeRestaurantId);
             console.log("Redirecting customer to menu:", menuUrl);
             window.location.href = menuUrl; // Usar window.location.href para garantir navegação externa
@@ -105,7 +110,7 @@ const Auth = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, activeRestaurantId, location.state]); // Adicionado location.state
+  }, [navigate, activeRestaurantId, location.state]); // activeRestaurantId agora é o ID correto
 
   const validateSignUp = () => {
     if (!fullName.trim()) {
