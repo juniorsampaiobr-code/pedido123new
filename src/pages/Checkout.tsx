@@ -93,6 +93,7 @@ const fetchRestaurantData = async (): Promise<Restaurant> => {
     .from('restaurants')
     .select('id, name, address, phone, email, street, number, neighborhood, city, zip_code, latitude, longitude, delivery_enabled')
     .eq('is_active', true)
+    .order('created_at', { ascending: false }) // Busca o mais recente ativo
     .limit(1)
     .single();
 
@@ -882,7 +883,8 @@ const Checkout = () => {
                 )}
               </Button>
               
-              <Link to="/menu" className="block text-center text-sm text-muted-foreground hover:underline mt-2">
+              {/* CORREÇÃO AQUI: Usando o ID do restaurante para o link do menu */}
+              <Link to={`/menu/${restaurant.id}`} className="block text-center text-sm text-muted-foreground hover:underline mt-2">
                 Voltar ao Cardápio
               </Link>
             </CardContent>
