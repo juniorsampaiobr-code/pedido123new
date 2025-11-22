@@ -11,9 +11,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { PhoneInput } from "@/components/PhoneInput";
 import { Loader2 } from "lucide-react";
-import { useActiveRestaurantId } from "@/hooks/use-active-restaurant-id"; // Importando o hook
+import { useActiveRestaurantId } from "@/hooks/use-active-restaurant-id";
+import { CpfCnpjInput } from "@/components/CpfCnpjInput"; // Importando CpfCnpjInput
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
+const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -24,10 +26,11 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [cpfCnpj, setCpfCnpj] = useState(""); // Novo estado para CPF/CNPJ
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   
-  const { data: activeRestaurantId, isLoading: isLoadingRestaurantId } = useActiveRestaurantId(); // Usando o hook
+  const { data: activeRestaurantId, isLoading: isLoadingRestaurantId } = useActiveRestaurantId();
   
   const restaurantIdFromState = location.state?.restaurantId as string | undefined;
 
@@ -50,7 +53,7 @@ const Auth = () => {
   };
 
   useEffect(() => {
-    if (isLoadingRestaurantId) return; // Espera o ID do restaurante ativo carregar
+    if (isLoadingRestaurantId) return;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -85,6 +88,13 @@ const Auth = () => {
       toast.error("O Telefone deve conter 11 dígitos (DDD + 9 dígitos).");
       return false;
     }
+    
+    const cleanedCpfCnpj = cleanCpfCnpj(cpfCnpj);
+    if (cleanedCpfCnpj.length !== 11) {
+      toast.error("O CPF é obrigatório e deve conter 11 dígitos.");
+      return false;
+    }
+    
     if (!email.trim()) {
       toast.error("O Email é obrigatório.");
       return false;
@@ -114,6 +124,7 @@ const Auth = () => {
         }
         
         const cleanedPhone = cleanPhoneNumber(phone);
+        const cleanedCpfCnpj = cleanCpfCnpj(cpfCnpj);
 
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -122,6 +133,8 @@ const Auth = () => {
             data: {
               full_name: fullName,
               phone: cleanedPhone,
+              // Salvamos o CPF/CNPJ no user_metadata para ser usado no checkout
+              cpf_cnpj: cleanedCpfCnpj, 
             },
           }
         });
@@ -201,6 +214,18 @@ const Auth = () => {
                       className="h-12"
                     />
                     <p className="text-xs text-muted-foreground">Formato: (99) 99999-9999</p>
+                  </div>
+                  {/* NOVO CAMPO CPF/CNPJ */}
+                  <div className="space-y-2">
+                    <Label htmlFor="cpfCnpj">CPF *</Label>
+                    <CpfCnpjInput
+                      id="cpfCnpj"
+                      value={cpfCnpj}
+                      onChange={(e) => setCpfCnpj(e.target.value)}
+                      required
+                      className="h-12"
+                    />
+                    <p className="text-xs text-muted-foreground">Apenas CPF (11 dígitos) é obrigatório no cadastro.</p>
                   </div>
                 </>
               )}
