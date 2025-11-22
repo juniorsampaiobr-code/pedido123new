@@ -47,7 +47,6 @@ const Auth = () => {
   const restaurantIdFromState = location.state?.restaurantId as string | undefined;
   
   // Não precisamos mais buscar o activeRestaurantId aqui, pois só o usamos para o fluxo de checkout
-  // Se o usuário não veio do checkout, ele será redirecionado para a raiz.
   const [isRestaurantIdLoading, setIsRestaurantIdLoading] = useState(false);
 
 
@@ -59,12 +58,17 @@ const Auth = () => {
         
         if (session?.user) {
           const from = location.state?.from;
+          const restaurantId = location.state?.restaurantId;
           
           if (from === '/checkout') {
             console.log("Redirecting customer to checkout after login.");
             navigate('/checkout', { replace: true });
+          } else if (restaurantId) {
+            // Se não veio do checkout, mas tem um restaurantId, volta para o menu específico
+            console.log("Redirecting customer to specific menu after login.");
+            navigate(`/menu/${restaurantId}`, { replace: true });
           } else {
-            // Se não veio do checkout, redireciona para a página inicial (Index)
+            // Se não veio do checkout e não tem restaurantId, redireciona para a raiz
             console.log("Redirecting customer to index after login.");
             navigate('/', { replace: true });
           }
@@ -78,10 +82,14 @@ const Auth = () => {
       
       if (session?.user) {
         const from = location.state?.from;
+        const restaurantId = location.state?.restaurantId;
         
         if (from === '/checkout') {
           console.log("User already logged in, redirecting to checkout:", from);
           navigate('/checkout', { replace: true });
+        } else if (restaurantId) {
+          console.log("User already logged in, redirecting to specific menu:", restaurantId);
+          navigate(`/menu/${restaurantId}`, { replace: true });
         } else {
           // Redireciona para a página inicial se já estiver logado e não veio do checkout
           console.log("User already logged in, redirecting to index.");

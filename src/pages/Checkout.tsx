@@ -218,17 +218,45 @@ const Checkout = () => {
   // 1. Preencher formulário com dados do cliente logado
   useEffect(() => {
     if (customer) {
+      // Tenta desmembrar o endereço salvo (Rua, Número, Bairro, Cidade, CEP)
+      let street = '';
+      let number = '';
+      let neighborhood = '';
+      let city = '';
+      let zip_code = '';
+
+      if (customer.address) {
+        const parts = customer.address.split(', ').map(p => p.trim());
+        
+        // Tentativa de parsear o formato: Rua, Número, Bairro, Cidade, CEP
+        if (parts.length >= 5) {
+          street = parts[0];
+          number = parts[1];
+          neighborhood = parts[2];
+          city = parts[3];
+          zip_code = parts[4];
+        } else if (parts.length >= 4) {
+          // Formato sem número: Rua, Bairro, Cidade, CEP
+          street = parts[0];
+          neighborhood = parts[1];
+          city = parts[2];
+          zip_code = parts[3];
+        }
+      }
+
       form.reset({
         ...form.getValues(), // Mantém valores atuais (como delivery_option)
         name: customer.name || '',
         phone: customer.phone || '',
         email: customer.email || '',
         cpf_cnpj: customer.cpf_cnpj || '',
-        street: customer.address?.split(', ')[0] || '', // Simplificação
-        number: '', // Não armazenamos número no customer, apenas no address
-        neighborhood: '',
-        city: '',
-        zip_code: '',
+        
+        // Preenchimento do endereço
+        street: street,
+        number: number,
+        neighborhood: neighborhood,
+        city: city,
+        zip_code: zip_code,
       });
     } else if (user && !isLoadingCustomer) {
       // Se o usuário está logado mas não tem customer profile, tenta preencher com dados do auth
