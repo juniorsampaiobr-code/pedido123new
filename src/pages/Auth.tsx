@@ -43,28 +43,13 @@ const Auth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   
-  // Usamos o ID do restaurante do estado de navegação, se disponível, ou o ID ativo padrão
+  // O ID do restaurante do estado de navegação é usado apenas para o fluxo de checkout
   const restaurantIdFromState = location.state?.restaurantId as string | undefined;
-  const [activeRestaurantId, setActiveRestaurantId] = useState<string | null>(restaurantIdFromState || null);
-  const [isRestaurantIdLoading, setIsRestaurantIdLoading] = useState(!restaurantIdFromState);
+  
+  // Não precisamos mais buscar o activeRestaurantId aqui, pois só o usamos para o fluxo de checkout
+  // Se o usuário não veio do checkout, ele será redirecionado para a raiz.
+  const [isRestaurantIdLoading, setIsRestaurantIdLoading] = useState(false);
 
-  // Efeito para buscar o ID do restaurante ativo (apenas se não veio do estado)
-  useEffect(() => {
-    if (!restaurantIdFromState) {
-      fetchActiveRestaurantId().then(id => {
-        setActiveRestaurantId(id);
-        setIsRestaurantIdLoading(false);
-      });
-    }
-  }, [restaurantIdFromState]);
-
-  // Função para obter a URL base correta do menu
-  const getMenuUrl = (id: string) => {
-    const origin = window.location.origin;
-    const pathname = window.location.pathname;
-    // Redireciona para a nova rota com o ID
-    return `${origin}${pathname}#/menu/${id}`;
-  };
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -72,18 +57,16 @@ const Auth = () => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        if (session?.user && activeRestaurantId) {
-          // Verifica se há um estado 'from' (ex: /checkout)
+        if (session?.user) {
           const from = location.state?.from;
           
           if (from === '/checkout') {
             console.log("Redirecting customer to checkout after login.");
             navigate('/checkout', { replace: true });
           } else {
-            // Redireciona para o menu após o login/cadastro, usando o ID do restaurante
-            const menuUrl = getMenuUrl(activeRestaurantId);
-            console.log("Redirecting customer to menu:", menuUrl);
-            window.location.href = menuUrl; // Usar window.location.href para garantir navegação externa
+            // Se não veio do checkout, redireciona para a página inicial (Index)
+            console.log("Redirecting customer to index after login.");
+            navigate('/', { replace: true });
           }
         }
       }
@@ -93,24 +76,22 @@ const Auth = () => {
       setSession(session);
       setUser(session?.user ?? null);
       
-      if (session?.user && activeRestaurantId) {
-        // Verifica se há um estado 'from' (ex: /checkout)
+      if (session?.user) {
         const from = location.state?.from;
         
         if (from === '/checkout') {
           console.log("User already logged in, redirecting to checkout:", from);
           navigate('/checkout', { replace: true });
         } else {
-          // Redireciona para o menu se já estiver logado
-          const menuUrl = getMenuUrl(activeRestaurantId);
-          console.log("User already logged in, redirecting to menu:", menuUrl);
-          window.location.href = menuUrl;
+          // Redireciona para a página inicial se já estiver logado e não veio do checkout
+          console.log("User already logged in, redirecting to index.");
+          navigate('/', { replace: true });
         }
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, activeRestaurantId, location.state]); // activeRestaurantId agora é o ID correto
+  }, [navigate, location.state]);
 
   const validateSignUp = () => {
     if (!fullName.trim()) {
@@ -137,8 +118,10 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    if (!activeRestaurantId) {
-        toast.error("Nenhum restaurante ativo encontrado para redirecionamento.");
+    // Se o usuário veio do checkout, garantimos que o restaurantId está no estado para o PreCheckout
+    if (location.state?.from === '/checkout' && !restaurantIdFromState) {
+        // Isso não deve acontecer se o PreCheckout estiver correto, mas é um fallback
+        toast.error("Erro: ID do restaurante de origem não encontrado.");
         setIsLoading(false);
         return;
     }
