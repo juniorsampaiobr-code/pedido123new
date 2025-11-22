@@ -220,13 +220,13 @@ const Menu = () => {
 
         {/* Sidebar do Carrinho (Desktop) */}
         <div className="hidden lg:block lg:w-96 lg:ml-8 flex-shrink-0 sticky top-20 self-start">
-          <CartSidebar isCheckoutBlocked={isCheckoutBlocked} /> {/* Passando a prop */}
+          <CartSidebar isCheckoutBlocked={isCheckoutBlocked} />
         </div>
       </main>
       
       {/* Sidebar do Carrinho (Mobile) */}
       {isMobile && (
-        <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} isCheckoutBlocked={isCheckoutBlocked} /> {/* Passando a prop */}
+        <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} isCheckoutBlocked={isCheckoutBlocked} />
       )}
       
       {/* Floating action button for mobile */}
