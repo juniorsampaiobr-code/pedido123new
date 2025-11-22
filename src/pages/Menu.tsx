@@ -28,10 +28,12 @@ interface MenuData {
 }
 
 const fetchMenuData = async (): Promise<MenuData> => {
+  // Busca o restaurante mais recentemente criado e ativo
   const { data: restaurantData, error: restaurantError } = await supabase
     .from('restaurants')
     .select('*')
     .eq('is_active', true)
+    .order('created_at', { ascending: false }) // Ordena pelo mais novo
     .limit(1)
     .single();
 
