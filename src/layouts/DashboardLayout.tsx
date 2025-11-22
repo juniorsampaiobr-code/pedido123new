@@ -37,7 +37,7 @@ const navItems = [
   { href: "/hours", label: "Horários" },
   { href: "/payments", label: "Pagamentos" },
   { href: "/delivery", label: "Taxa de Entrega" },
-  { href: "/settings", label: "Configurações" },
+  { href: "/settings", label: "Configurações", icon: User },
 ];
 
 const getPageTitle = (pathname: string) => {
@@ -51,8 +51,7 @@ const checkUserRoleAndRestaurant = async (userId: string): Promise<{ role: AppRo
     .from('user_roles')
     .select('role, restaurant_id')
     .eq('user_id', userId)
-    .in('role', ['admin', 'moderator'])
-    .limit(1)
+    .limit(1) // Limita a 1, pois só precisamos da role principal
     .single();
 
   if (error && error.code !== 'PGRST116') {
@@ -121,7 +120,21 @@ const DashboardLayoutComponent = () => {
       setUserRole(role);
       setUserRestaurantId(restaurantId); // Armazena o restaurant_id do usuário
 
+      // Se a role for 'user' (cliente), força o logout do fluxo admin e redireciona para o menu
+      if (role === 'user') {
+        toast.error("Acesso restrito.", {
+          description: "Esta conta é de cliente e não tem permissão para acessar o painel.",
+          duration: 5000,
+        });
+        await supabase.auth.signOut();
+        // Redireciona para a página inicial ou menu público
+        const menuUrl = `${window.location.origin}${window.location.pathname}#/`;
+        window.location.href = menuUrl;
+        return;
+      }
+
       if (role !== 'admin' && role !== 'moderator') {
+        // Se a role for null ou outra coisa (e não 'user', que já foi tratado)
         toast.error("Acesso restrito.", {
           description: "Você não tem permissão para acessar o painel. Redirecionando para o login de administrador.",
           duration: 5000,
@@ -130,9 +143,8 @@ const DashboardLayoutComponent = () => {
         navigate("/admin-auth", { replace: true });
       }
       
-      // Se o usuário tem role, mas não tem restaurant_id, algo está errado
+      // Se o usuário tem role admin/moderator, mas não tem restaurant_id, mostra erro no layout
       if ((role === 'admin' || role === 'moderator') && !restaurantId) {
-          // Não desloga aqui, apenas mostra o erro no layout, pois o AdminAuth tentará corrigir
           console.error("Admin logged in but missing restaurant ID.");
       }
     };
@@ -261,7 +273,7 @@ const DashboardLayoutComponent = () => {
             console.error("Erro ao tocar som de teste:", error);
             setSoundStatus('error'); // Define como erro se a reprodução falhar
             toast.error("Não foi possível tocar o som de teste.", {
-              description: "Seu navegador pode ter bloqueado a reprodução. Interaja com a página e tente novamente.",
+              description: "Interaja com a página para permitir a reprodução de som.",
             });
           });
       }
@@ -331,6 +343,8 @@ const DashboardLayoutComponent = () => {
   
   // Se o usuário não for admin/moderator, ele já foi redirecionado no useEffect.
   if (userRole !== 'admin' && userRole !== 'moderator') {
+    // Se chegarmos aqui, significa que o useEffect falhou ou o redirecionamento está pendente.
+    // Retornamos o spinner para evitar renderizar o painel.
     return <LoadingSpinner />;
   }
   
