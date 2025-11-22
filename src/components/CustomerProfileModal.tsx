@@ -73,12 +73,24 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
         email: customer.email || '',
         cpf_cnpj: customer.cpf_cnpj || '',
       });
+    } else if (isOpen) {
+        // Se o modal abrir e o cliente for nulo (e.g., recém-logado), limpa o formulário
+        form.reset({
+            name: '',
+            phone: '',
+            email: '',
+            cpf_cnpj: '',
+        });
     }
-  }, [customer, form]);
+  }, [customer, form, isOpen]);
 
   const mutation = useMutation({
     mutationFn: async (data: ProfileFormValues) => {
-      if (!customer?.id) throw new Error('ID do cliente não encontrado.');
+      // Se o cliente for nulo, precisamos do user_id para criar um novo registro
+      const user = await supabase.auth.getUser();
+      const userId = user.data.user?.id;
+      
+      if (!customer?.id && !userId) throw new Error('ID do cliente ou usuário não encontrado.');
       
       const updateData: TablesUpdate<'customers'> = {
         name: data.name,
@@ -87,16 +99,30 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
         cpf_cnpj: data.cpf_cnpj || null,
       };
 
-      const { error } = await supabase
-        .from('customers')
-        .update(updateData)
-        .eq('id', customer.id);
+      if (customer?.id) {
+        // Atualiza cliente existente
+        const { error } = await supabase
+          .from('customers')
+          .update(updateData)
+          .eq('id', customer.id);
 
-      if (error) throw new Error(error.message);
+        if (error) throw new Error(error.message);
+      } else if (userId) {
+        // Cria novo cliente se não existir (usando upsert para garantir)
+        const insertData = { ...updateData, user_id: userId, id: undefined };
+        const { error } = await supabase
+          .from('customers')
+          .insert(insertData as TablesInsert<'customers'>);
+          
+        if (error) throw new Error(error.message);
+      } else {
+        throw new Error('Não foi possível identificar o cliente para salvar.');
+      }
     },
     onSuccess: () => {
       toast.success('Perfil atualizado com sucesso!');
-      // Invalida a query do cliente no checkout para forçar a atualização
+      // Invalida a query do cliente no menu/checkout para forçar a atualização
+      queryClient.invalidateQueries({ queryKey: ['menuCustomerData'] });
       queryClient.invalidateQueries({ queryKey: ['checkoutCustomerData'] });
       onClose();
     },
@@ -109,7 +135,8 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
     mutation.mutate(data);
   };
 
-  if (!customer) return null;
+  // Removemos a verificação 'if (!customer) return null;'
+  // O modal agora abre, mas os campos podem estar vazios se o cliente for novo.
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
