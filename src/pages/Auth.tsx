@@ -68,10 +68,18 @@ const Auth = () => {
         setUser(session?.user ?? null);
         
         if (session?.user && activeRestaurantId) {
-          // Redireciona para o menu após o login/cadastro
-          const menuUrl = getMenuUrl(activeRestaurantId);
-          console.log("Redirecting customer to menu:", menuUrl);
-          window.location.href = menuUrl; // Usar window.location.href para garantir navegação externa
+          // Verifica se há um estado 'from' (ex: /checkout)
+          const from = location.state?.from;
+          
+          if (from === '/checkout') {
+            console.log("Redirecting customer to checkout after login.");
+            navigate('/checkout', { replace: true });
+          } else {
+            // Redireciona para o menu após o login/cadastro
+            const menuUrl = getMenuUrl(activeRestaurantId);
+            console.log("Redirecting customer to menu:", menuUrl);
+            window.location.href = menuUrl; // Usar window.location.href para garantir navegação externa
+          }
         }
       }
     );
@@ -81,15 +89,23 @@ const Auth = () => {
       setUser(session?.user ?? null);
       
       if (session?.user && activeRestaurantId) {
-        // Redireciona para o menu se já estiver logado
-        const menuUrl = getMenuUrl(activeRestaurantId);
-        console.log("User already logged in, redirecting to menu:", menuUrl);
-        window.location.href = menuUrl;
+        // Verifica se há um estado 'from' (ex: /checkout)
+        const from = location.state?.from;
+        
+        if (from === '/checkout') {
+          console.log("User already logged in, redirecting to checkout:", from);
+          navigate('/checkout', { replace: true });
+        } else {
+          // Redireciona para o menu se já estiver logado
+          const menuUrl = getMenuUrl(activeRestaurantId);
+          console.log("User already logged in, redirecting to menu:", menuUrl);
+          window.location.href = menuUrl;
+        }
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, activeRestaurantId]);
+  }, [navigate, activeRestaurantId, location.state]); // Adicionado location.state
 
   const validateSignUp = () => {
     if (!fullName.trim()) {

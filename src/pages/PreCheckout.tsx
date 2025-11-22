@@ -67,9 +67,8 @@ const PreCheckout = () => {
         // Usuário logado, prossegue para o checkout
         navigate('/checkout', { replace: true });
       } else {
-        // Usuário não logado, redireciona para autenticação
-        // O Auth.tsx precisa saber para onde voltar, mas o Auth.tsx já lida com o redirecionamento para o menu.
-        navigate('/auth', { replace: true });
+        // Usuário não logado, redireciona para autenticação, passando o estado de onde veio
+        navigate('/auth', { state: { from: '/checkout' }, replace: true });
       }
     }
   }, [totalItems, user, isLoadingAuth, isLoadingRestaurantId, navigate, restaurantId]);
