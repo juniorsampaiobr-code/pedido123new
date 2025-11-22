@@ -1,0 +1,1 @@
+import{r as t}from"./vendor-DjsPZZVP.js";const e=t.createContext(void 0),n=()=>{const o=t.useContext(e);if(o===void 0)throw new Error("useSound must be used within a SoundProvider");return o};export{e as S,n as u};
