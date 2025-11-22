@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useParams } from 'react-router-dom'; // Importando useParams
 import { useAuthStatus } from '@/hooks/use-auth-status'; // Importando useAuthStatus
+import { useBusinessHoursRealtime } from '@/hooks/use-business-hours-realtime'; // NOVO IMPORT
 
 type Restaurant = Tables<'restaurants'>;
 type Category = Tables<'categories'>;
@@ -26,7 +27,6 @@ type BusinessHour = Tables<'business_hours'>;
 interface MenuData {
   restaurant: Restaurant;
   categories: (Category & { products: Product[] })[];
-  hours: BusinessHour[];
 }
 
 const fetchMenuData = async (restaurantId: string): Promise<MenuData> => {
@@ -42,7 +42,8 @@ const fetchMenuData = async (restaurantId: string): Promise<MenuData> => {
   if (restaurantError && restaurantError.code !== 'PGRST116') throw new Error(`Erro ao buscar restaurante: ${restaurantError.message}`);
   if (!restaurantData) throw new Error('Restaurante não encontrado ou inativo.');
 
-  const [categoriesResult, productsResult, hoursResult] = await Promise.all([
+  // 2. Busca categorias e produtos (Horários serão buscados via Realtime Hook)
+  const [categoriesResult, productsResult] = await Promise.all([
     supabase
       .from('categories')
       .select('*')
@@ -53,15 +54,10 @@ const fetchMenuData = async (restaurantId: string): Promise<MenuData> => {
       .from('products')
       .select('*')
       .eq('restaurant_id', restaurantData.id),
-    supabase
-      .from('business_hours')
-      .select('*')
-      .eq('restaurant_id', restaurantData.id)
   ]);
 
   if (categoriesResult.error) throw new Error(`Erro ao buscar categorias: ${categoriesResult.error.message}`);
   if (productsResult.error) throw new Error(`Erro ao buscar produtos: ${productsResult.error.message}`);
-  if (hoursResult.error) console.warn("Aviso: Erro ao buscar horários de funcionamento:", hoursResult.error.message);
 
   const productsMap = new Map<string, Product[]>();
   productsResult.data?.forEach(product => {
@@ -82,7 +78,6 @@ const fetchMenuData = async (restaurantId: string): Promise<MenuData> => {
   return {
     restaurant: restaurantData,
     categories: categoriesWithProducts,
-    hours: hoursResult.data || [],
   };
 };
 
@@ -93,21 +88,25 @@ const Menu = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { data: user } = useAuthStatus(); // Obtém o status de autenticação
 
-  const { data: menuData, isLoading, isError, error, refetch } = useQuery<MenuData>({
+  // 1. Busca dados estáticos do menu (restaurante, categorias, produtos)
+  const { data: menuData, isLoading: isLoadingMenu, isError: isErrorMenu, error: errorMenu, refetch } = useQuery<MenuData>({
     queryKey: ['menuData', restaurantId], // Adiciona restaurantId na chave
     queryFn: () => fetchMenuData(restaurantId!),
     enabled: !!restaurantId, // Só executa se tiver o ID
-    staleTime: 1000 * 60 * 1, // Reduzido para 1 minuto (60 segundos)
+    staleTime: 1000 * 60 * 1, // 1 minuto
   });
+  
+  // 2. Busca horários em tempo real
+  const { hours: realtimeHours, isLoading: isLoadingHours, isError: isErrorHours } = useBusinessHoursRealtime(restaurantId);
 
   const { isOpen, todayHours } = useMemo(() => {
-    if (menuData?.hours) {
-      return getBusinessStatus(menuData.hours);
+    if (realtimeHours) {
+      return getBusinessStatus(realtimeHours);
     }
     return { isOpen: true, todayHours: 'Horário não configurado' };
-  }, [menuData?.hours]);
+  }, [realtimeHours]);
   
-  // Novo: Determina se o checkout deve ser bloqueado
+  // Determina se o checkout deve ser bloqueado
   const isCheckoutBlocked = !isOpen;
 
   const copyMenuLink = () => {
@@ -140,23 +139,25 @@ const Menu = () => {
     );
   }
 
-  if (isLoading) {
+  if (isLoadingMenu || isLoadingHours) {
     return <LoadingSpinner />;
   }
 
-  if (isError || !menuData) {
+  if (isErrorMenu || !menuData) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <Alert variant="destructive" className="max-w-lg">
-          <Terminal className="h-4 w-4" />
-          <AlertTitle>Erro ao carregar cardápio</AlertTitle>
-          <AlertDescription>
-            {error instanceof Error ? error.message : "Ocorreu um erro desconhecido ao buscar os dados do restaurante."}
-          </AlertDescription>
-          <Button onClick={() => refetch()} className="mt-3" variant="secondary" size="sm">
-            <RefreshCw className="h-4 w-4 mr-2" /> Tentar Novamente
-          </Button>
-        </Alert>
+        <Card className="max-w-lg w-full text-center">
+          <Alert variant="destructive">
+            <Terminal className="h-4 w-4" />
+            <AlertTitle>Erro ao carregar cardápio</AlertTitle>
+            <AlertDescription>
+              {errorMenu instanceof Error ? errorMenu.message : "Ocorreu um erro desconhecido ao buscar os dados do restaurante."}
+            </AlertDescription>
+            <Button onClick={() => refetch()} className="mt-3" variant="secondary" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" /> Tentar Novamente
+            </Button>
+          </Alert>
+        </Card>
       </div>
     );
   }
@@ -191,7 +192,7 @@ const Menu = () => {
           
           {/* Restaurant Menu Link */}
           <div className="mt-3 flex items-center justify-between">
-            <BusinessStatus restaurant={restaurant} hours={menuData.hours} />
+            <BusinessStatus restaurant={restaurant} hours={realtimeHours} />
             <Button 
               variant="outline" 
               size="sm" 
