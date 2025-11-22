@@ -21,7 +21,6 @@ const checkUserRoleAndRestaurant = async (userId: string): Promise<{ role: Enums
     .from('user_roles')
     .select('role, restaurant_id')
     .eq('user_id', userId)
-    .in('role', ['admin', 'moderator'])
     .limit(1)
     .single();
 
@@ -37,42 +36,52 @@ const checkUserRoleAndRestaurant = async (userId: string): Promise<{ role: Enums
   return { role: data.role, restaurantId: data.restaurant_id };
 };
 
-// Novo: Função para configurar a loja inicial e promover o usuário a admin, se for o primeiro
+// NOVO: Função para configurar a loja inicial e promover o usuário a admin.
+// Esta função SÓ DEVE SER CHAMADA se o usuário estiver no fluxo de ADMIN.
 const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role'> | null, restaurantId: string | null }> => {
   // 1. Check current role and restaurant link
   let { role, restaurantId } = await checkUserRoleAndRestaurant(user.id);
 
-  // 2. If user is not admin/moderator OR is admin/moderator but missing restaurantId, run setup
-  if (role !== 'admin' && role !== 'moderator' || !restaurantId) {
-    console.log(`[AdminAuth] Running setup for user ${user.id}. Current role: ${role}, Restaurant ID: ${restaurantId}`);
+  // Se o usuário já tem uma role de admin/moderator e um restaurante, não faz nada.
+  if ((role === 'admin' || role === 'moderator') && restaurantId) {
+      return { role, restaurantId };
+  }
+  
+  // Se o usuário tem a role 'user' (cliente), ele não deve prosseguir com o setup de admin.
+  // Isso impede que clientes criem restaurantes acidentalmente.
+  if (role === 'user') {
+      console.log(`[AdminAuth] User ${user.id} is a customer ('user' role). Blocking admin setup.`);
+      return { role: 'user', restaurantId: null };
+  }
+
+  // 2. Se não for admin/moderator, ou se for, mas sem restaurantId, chama a Edge Function para garantir o acesso admin.
+  console.log(`[AdminAuth] Running setup for user ${user.id}. Current role: ${role}, Restaurant ID: ${restaurantId}`);
+  
+  const fullName = user.user_metadata.full_name || 'Novo Usuário';
+  
+  const { error: setupError, data: setupData } = await supabase.functions.invoke('ensure-admin-access', {
+    body: { userId: user.id, fullName: fullName },
+  });
+  
+  if (setupError) {
+    console.error("Error setting up admin access:", setupError);
     
-    const fullName = user.user_metadata.full_name || 'Novo Usuário';
-    
-    const { error: setupError, data: setupData } = await supabase.functions.invoke('ensure-admin-access', {
-      body: { userId: user.id, fullName: fullName },
-    });
-    
-    if (setupError) {
-      console.error("Error setting up admin access:", setupError);
-      
-      // Tenta extrair a mensagem de erro detalhada do corpo da resposta da Edge Function
-      let errorMessage = "Falha ao configurar acesso de administrador.";
-      if (setupData && typeof setupData === 'object' && 'error' in setupData) {
-          errorMessage = setupData.error as string;
-      } else if (setupError.message.includes("non-2xx status code")) {
-          errorMessage = `Erro interno do servidor (500). Verifique os logs do Supabase.`;
-      } else {
-          errorMessage = setupError.message;
-      }
-      
-      throw new Error(errorMessage);
+    let errorMessage = "Falha ao configurar acesso de administrador.";
+    if (setupData && typeof setupData === 'object' && 'error' in setupData) {
+        errorMessage = setupData.error as string;
+    } else if (setupError.message.includes("non-2xx status code")) {
+        errorMessage = `Erro interno do servidor (500). Verifique os logs do Supabase.`;
+    } else {
+        errorMessage = setupError.message;
     }
     
-    // Se a Edge Function rodou com sucesso, refetch a role e o restaurantId
-    const updatedData = await checkUserRoleAndRestaurant(user.id);
-    role = updatedData.role;
-    restaurantId = updatedData.restaurantId;
+    throw new Error(errorMessage);
   }
+  
+  // Se a Edge Function rodou com sucesso, refetch a role e o restaurantId
+  const updatedData = await checkUserRoleAndRestaurant(user.id);
+  role = updatedData.role;
+  restaurantId = updatedData.restaurantId;
   
   return { role, restaurantId };
 };
@@ -104,16 +113,15 @@ const AdminAuth = () => {
             throw new Error("Sua conta de administrador não está vinculada a um restaurante. Tente novamente ou contate o suporte.");
         }
       } else {
-        // Se a role não for admin/moderator após o setup
+        // Se a role for 'user' (cliente) ou null após o setup (o que não deve acontecer se o setup for bem-sucedido)
         toast.error("Acesso negado.", {
           description: "Esta conta não possui permissão de administrador/moderador. Redirecionando para o menu.",
           duration: 5000,
         });
         // Desloga o usuário para evitar confusão
         await supabase.auth.signOut();
-        // Redireciona para o menu público
-        const menuUrl = `${window.location.origin}${window.location.pathname}#/menu`;
-        window.location.href = menuUrl;
+        // Redireciona para a página inicial
+        navigate("/", { replace: true });
       }
     } catch (error) {
       console.error("Error during admin setup/redirect:", error);
@@ -191,6 +199,8 @@ const AdminAuth = () => {
       if (isSignUp) {
         const cleanedPhone = cleanPhoneNumber(phone);
         
+        // Ao se cadastrar pelo fluxo AdminAuth, garantimos que a Edge Function
+        // será chamada para criar o restaurante e a role 'admin' se necessário.
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
