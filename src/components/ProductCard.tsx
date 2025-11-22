@@ -7,23 +7,33 @@ import { useCart } from '@/hooks/use-cart';
 import { LazyImage } from './LazyImage';
 import { ProductDetailsModal } from './ProductDetailsModal';
 import { WeightProductModal } from './WeightProductModal';
+import { toast } from 'sonner'; // Importando toast
 
 type Product = Tables<'products'>;
 
 interface ProductCardProps {
   product: Product;
+  isCheckoutBlocked: boolean; // Nova prop
 }
 
-const ProductCardComponent = ({ product }: ProductCardProps) => {
+const ProductCardComponent = ({ product, isCheckoutBlocked }: ProductCardProps) => {
   const { addItem } = useCart();
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
 
   const handleAddToCart = (quantity: number = 1, notes: string = '') => {
+    if (isCheckoutBlocked) {
+      toast.error("A loja está fechada.", { description: "Não é possível adicionar itens ao carrinho ou finalizar o pedido no momento." });
+      return;
+    }
     addItem(product, quantity, notes);
   };
 
   const handleQuickAdd = () => {
+    if (isCheckoutBlocked) {
+      toast.error("A loja está fechada.", { description: "Não é possível adicionar itens ao carrinho ou finalizar o pedido no momento." });
+      return;
+    }
     if (product.is_price_by_weight) {
       setIsWeightModalOpen(true);
     } else {
@@ -41,12 +51,14 @@ const ProductCardComponent = ({ product }: ProductCardProps) => {
         onClose={() => setIsDetailsModalOpen(false)}
         product={product}
         onAddToCart={handleAddToCart}
+        isCheckoutBlocked={isCheckoutBlocked} // Passando a prop
       />
       <WeightProductModal
         isOpen={isWeightModalOpen}
         onClose={() => setIsWeightModalOpen(false)}
         product={product}
         onAddToCart={handleAddToCart}
+        isCheckoutBlocked={isCheckoutBlocked} // Passando a prop
       />
       
       <Card className="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col">
@@ -73,7 +85,7 @@ const ProductCardComponent = ({ product }: ProductCardProps) => {
               {formatPrice(product.price)}
               {product.is_price_by_weight && <span className="text-sm font-normal text-muted-foreground">/kg</span>}
             </p>
-            <Button size="icon" onClick={handleQuickAdd}>
+            <Button size="icon" onClick={handleQuickAdd} disabled={isCheckoutBlocked}>
               <Plus className="h-5 w-5" />
             </Button>
           </div>

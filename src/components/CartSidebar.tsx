@@ -12,10 +12,11 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 interface CartSidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
+  isCheckoutBlocked?: boolean; // Nova prop
 }
 
 // Componente principal do carrinho
-const CartSidebarComponent = ({ isOpen = true, onClose }: CartSidebarProps) => {
+const CartSidebarComponent = ({ isOpen = true, onClose, isCheckoutBlocked = false }: CartSidebarProps) => {
   const { items, totalAmount, totalItems } = useCart();
 
   const CartContent = (
@@ -50,7 +51,7 @@ const CartSidebarComponent = ({ isOpen = true, onClose }: CartSidebarProps) => {
               <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}</span>
             </div>
             <Link to="/pre-checkout" onClick={onClose}>
-              <Button className="w-full h-12 text-lg">
+              <Button className="w-full h-12 text-lg" disabled={isCheckoutBlocked}>
                 Finalizar Pedido <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
@@ -76,7 +77,7 @@ const CartSidebarComponent = ({ isOpen = true, onClose }: CartSidebarProps) => {
         {CartContent}
         {/* Adiciona o resumo flutuante para mobile dentro do Sheet, mas apenas se estiver aberto */}
         {isOpen && totalItems > 0 && (
-          <MobileOrderSummary totalAmount={totalAmount} totalItems={totalItems} />
+          <MobileOrderSummary totalAmount={totalAmount} totalItems={totalItems} isCheckoutBlocked={isCheckoutBlocked} />
         )}
       </SheetContent>
     </Sheet>

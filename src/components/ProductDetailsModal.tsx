@@ -21,9 +21,10 @@ interface ProductDetailsModalProps {
   onClose: () => void;
   product: Product;
   onAddToCart: (quantity: number, notes: string) => void;
+  isCheckoutBlocked: boolean; // Nova prop
 }
 
-const ProductDetailsModalComponent = ({ isOpen, onClose, product, onAddToCart }: ProductDetailsModalProps) => {
+const ProductDetailsModalComponent = ({ isOpen, onClose, product, onAddToCart, isCheckoutBlocked }: ProductDetailsModalProps) => {
   const [quantity, setQuantity] = useState(product.is_price_by_weight ? 0.5 : 1);
   const [notes, setNotes] = useState('');
 
@@ -95,7 +96,7 @@ const ProductDetailsModalComponent = ({ isOpen, onClose, product, onAddToCart }:
                 size="icon" 
                 className="h-10 w-10"
                 onClick={() => handleQuantityChange(product.is_price_by_weight ? -0.1 : -1)}
-                disabled={quantity <= (product.is_price_by_weight ? 0.1 : 1)}
+                disabled={quantity <= (product.is_price_by_weight ? 0.1 : 1) || isCheckoutBlocked}
               >
                 <Minus className="h-5 w-5" />
               </Button>
@@ -111,12 +112,14 @@ const ProductDetailsModalComponent = ({ isOpen, onClose, product, onAddToCart }:
                 }}
                 className="w-16 h-10 text-center border-y-0 rounded-none p-0 focus-visible:ring-0"
                 readOnly={!product.is_price_by_weight}
+                disabled={isCheckoutBlocked}
               />
               <Button 
                 variant="ghost" 
                 size="icon" 
                 className="h-10 w-10"
                 onClick={() => handleQuantityChange(product.is_price_by_weight ? 0.1 : 1)}
+                disabled={isCheckoutBlocked}
               >
                 <Plus className="h-5 w-5" />
               </Button>
@@ -131,6 +134,7 @@ const ProductDetailsModalComponent = ({ isOpen, onClose, product, onAddToCart }:
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
+              disabled={isCheckoutBlocked}
             />
           </div>
           
@@ -139,7 +143,7 @@ const ProductDetailsModalComponent = ({ isOpen, onClose, product, onAddToCart }:
               type="button" 
               className="w-full h-12 text-lg flex items-center justify-between px-6"
               onClick={handleConfirm}
-              disabled={quantity <= 0}
+              disabled={quantity <= 0 || isCheckoutBlocked}
             >
               <span className="flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5" />

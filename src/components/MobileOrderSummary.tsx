@@ -7,9 +7,10 @@ import { cn } from '@/lib/utils';
 interface MobileOrderSummaryProps {
   totalAmount: number;
   totalItems: number;
+  isCheckoutBlocked: boolean; // Nova prop
 }
 
-const MobileOrderSummaryComponent = ({ totalAmount, totalItems }: MobileOrderSummaryProps) => {
+const MobileOrderSummaryComponent = ({ totalAmount, totalItems, isCheckoutBlocked }: MobileOrderSummaryProps) => {
   if (totalItems === 0) return null;
 
   return (
@@ -24,7 +25,7 @@ const MobileOrderSummaryComponent = ({ totalAmount, totalItems }: MobileOrderSum
         </span>
       </div>
       <Link to="/pre-checkout">
-        <Button className="w-full h-12 text-lg">
+        <Button className="w-full h-12 text-lg" disabled={isCheckoutBlocked}>
           Finalizar Pedido <ArrowRight className="ml-2 h-5 w-5" />
         </Button>
       </Link>

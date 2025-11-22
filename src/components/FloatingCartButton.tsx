@@ -5,9 +5,10 @@ import { cn } from '@/lib/utils';
 interface FloatingCartButtonProps {
   totalItems: number;
   onClick: () => void;
+  isCheckoutBlocked: boolean; // Nova prop
 }
 
-const FloatingCartButtonComponent = ({ totalItems, onClick }: FloatingCartButtonProps) => {
+const FloatingCartButtonComponent = ({ totalItems, onClick, isCheckoutBlocked }: FloatingCartButtonProps) => {
   return (
     <Button
       onClick={onClick}
@@ -16,6 +17,7 @@ const FloatingCartButtonComponent = ({ totalItems, onClick }: FloatingCartButton
         totalItems > 0 ? "scale-100" : "scale-0 pointer-events-none"
       )}
       aria-label={`Ver carrinho com ${totalItems} itens`}
+      disabled={isCheckoutBlocked} // Desabilita se o checkout estiver bloqueado
     >
       <ShoppingCart className="h-6 w-6" />
       {totalItems > 0 && (

@@ -45,17 +45,17 @@ const fetchMenuData = async (restaurantId: string): Promise<MenuData> => {
     supabase
       .from('categories')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('restaurant_id', restaurantData.id)
       .eq('is_active', true)
       .order('display_order', { ascending: true }),
     supabase
       .from('products')
       .select('*')
-      .eq('restaurant_id', restaurantId),
+      .eq('restaurant_id', restaurantData.id),
     supabase
       .from('business_hours')
       .select('*')
-      .eq('restaurant_id', restaurantId)
+      .eq('restaurant_id', restaurantData.id)
   ]);
 
   if (categoriesResult.error) throw new Error(`Erro ao buscar categorias: ${categoriesResult.error.message}`);
@@ -104,6 +104,9 @@ const Menu = () => {
     }
     return { isOpen: true, todayHours: 'Horário não configurado' };
   }, [menuData?.hours]);
+  
+  // Novo: Determina se o checkout deve ser bloqueado
+  const isCheckoutBlocked = !isOpen;
 
   const copyMenuLink = () => {
     if (menuData?.restaurant) {
@@ -162,7 +165,11 @@ const Menu = () => {
               <h1 className="text-xl font-bold">{restaurant.name}</h1>
             </div>
             {isMobile && totalItems > 0 && (
-              <FloatingCartButton onClick={() => setIsCartOpen(true)} totalItems={totalItems} />
+              <FloatingCartButton 
+                onClick={() => setIsCartOpen(true)} 
+                totalItems={totalItems} 
+                isCheckoutBlocked={isCheckoutBlocked} // Passando a prop
+              />
             )}
           </div>
           
@@ -196,7 +203,11 @@ const Menu = () => {
                   {category.products
                     .filter(p => p.is_available)
                     .map(product => (
-                      <ProductCard key={product.id} product={product} />
+                      <ProductCard 
+                        key={product.id} 
+                        product={product} 
+                        isCheckoutBlocked={isCheckoutBlocked} // Passando a prop
+                      />
                     ))}
                 </div>
                 {category.products.filter(p => p.is_available).length === 0 && (
@@ -209,13 +220,13 @@ const Menu = () => {
 
         {/* Sidebar do Carrinho (Desktop) */}
         <div className="hidden lg:block lg:w-96 lg:ml-8 flex-shrink-0 sticky top-20 self-start">
-          <CartSidebar />
+          <CartSidebar isCheckoutBlocked={isCheckoutBlocked} /> {/* Passando a prop */}
         </div>
       </main>
       
       {/* Sidebar do Carrinho (Mobile) */}
       {isMobile && (
-        <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
+        <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} isCheckoutBlocked={isCheckoutBlocked} /> {/* Passando a prop */}
       )}
       
       {/* Floating action button for mobile */}
