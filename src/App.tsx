@@ -42,7 +42,8 @@ function App() {
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/admin-auth" element={<AdminAuth />} />
-                  <Route path="/menu" element={<Menu />} />
+                  {/* Rota do Menu agora requer o ID do restaurante */}
+                  <Route path="/menu/:restaurantId" element={<Menu />} />
                   <Route path="/pre-checkout" element={<PreCheckout />} />
                   <Route path="/checkout" element={<Checkout />} />
                   <Route path="/order-success/:orderId" element={<OrderSuccess />} />

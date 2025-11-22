@@ -35,7 +35,8 @@ const DashboardStatCard = ({ icon: Icon, title, value, description, isLoading }:
 
 const Dashboard = () => {
   const { restaurant } = useOutletContext<DashboardContextType>();
-  const menuLink = `${window.location.origin}${window.location.pathname}#/menu`;
+  // Gerando o link com o ID do restaurante
+  const menuLink = `${window.location.origin}${window.location.pathname}#/menu/${restaurant.id}`;
 
   const { data: stats, isLoading: isLoadingStats } = useDashboardStats(restaurant.id);
 
@@ -108,7 +109,7 @@ const Dashboard = () => {
             <div className="flex items-start gap-4">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold flex-shrink-0">3</div>
               <div>
-                <h3 className="font-semibold">Compartilhe seu link</h3>
+                <h3 className="semibold">Compartilhe seu link</h3>
                 <p className="text-sm text-muted-foreground">Envie o link da sua loja para seus clientes começarem a fazer pedidos</p>
               </div>
             </div>

@@ -14,6 +14,23 @@ import { Loader2 } from "lucide-react";
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 
+// Função para buscar o ID do restaurante ativo (o mais recente)
+const fetchActiveRestaurantId = async (): Promise<string | null> => {
+  const { data, error } = await supabase
+    .from('restaurants')
+    .select('id')
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (error && error.code !== 'PGRST116') {
+    console.error("Error fetching active restaurant ID:", error);
+    return null;
+  }
+  return data?.id || null;
+};
+
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation(); // Para obter parâmetros de redirecionamento
@@ -25,17 +42,23 @@ const Auth = () => {
   const [phone, setPhone] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [activeRestaurantId, setActiveRestaurantId] = useState<string | null>(null);
+  const [isRestaurantIdLoading, setIsRestaurantIdLoading] = useState(true);
+
+  // Efeito para buscar o ID do restaurante ativo
+  useEffect(() => {
+    fetchActiveRestaurantId().then(id => {
+      setActiveRestaurantId(id);
+      setIsRestaurantIdLoading(false);
+    });
+  }, []);
 
   // Função para obter a URL base correta do menu
-  const getMenuUrl = () => {
+  const getMenuUrl = (id: string) => {
     const origin = window.location.origin;
     const pathname = window.location.pathname;
-    const firstPathSegment = pathname.split('/')[1];
-    
-    if (firstPathSegment) {
-        return `${origin}/${firstPathSegment}/#/menu`;
-    }
-    return `${origin}/#/menu`;
+    // Redireciona para a nova rota com o ID
+    return `${origin}${pathname}#/menu/${id}`;
   };
 
   useEffect(() => {
@@ -44,9 +67,9 @@ const Auth = () => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        if (session?.user) {
+        if (session?.user && activeRestaurantId) {
           // Redireciona para o menu após o login/cadastro
-          const menuUrl = getMenuUrl();
+          const menuUrl = getMenuUrl(activeRestaurantId);
           console.log("Redirecting customer to menu:", menuUrl);
           window.location.href = menuUrl; // Usar window.location.href para garantir navegação externa
         }
@@ -57,16 +80,16 @@ const Auth = () => {
       setSession(session);
       setUser(session?.user ?? null);
       
-      if (session?.user) {
+      if (session?.user && activeRestaurantId) {
         // Redireciona para o menu se já estiver logado
-        const menuUrl = getMenuUrl();
+        const menuUrl = getMenuUrl(activeRestaurantId);
         console.log("User already logged in, redirecting to menu:", menuUrl);
         window.location.href = menuUrl;
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, activeRestaurantId]);
 
   const validateSignUp = () => {
     if (!fullName.trim()) {
@@ -93,6 +116,12 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
 
+    if (!activeRestaurantId) {
+        toast.error("Nenhum restaurante ativo encontrado para redirecionamento.");
+        setIsLoading(false);
+        return;
+    }
+
     try {
       if (isSignUp) {
         if (!validateSignUp()) {
@@ -115,17 +144,13 @@ const Auth = () => {
         
         if (error) throw error;
 
-        // Se a confirmação de email estiver desativada, o usuário já estará logado.
-        // O onAuthStateChange cuidará do redirecionamento para /menu.
         if (data.session) {
           toast.success("Conta criada e login efetuado com sucesso!");
         } else {
-          // Fallback caso a confirmação ainda esteja ativa por algum motivo
           toast.success("Conta criada! Verifique seu email para confirmar.");
         }
 
       } else {
-        // Login validation (Email and Password are handled by required attribute on Input)
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -134,7 +159,6 @@ const Auth = () => {
         if (error) throw error;
         
         toast.success("Login realizado com sucesso!");
-        // O onAuthStateChange cuidará do redirecionamento para /menu.
       }
     } catch (error: any) {
       if (error.message.includes("Email not confirmed")) {
@@ -220,9 +244,9 @@ const Auth = () => {
                 type="submit"
                 className="w-full"
                 size="lg"
-                disabled={isLoading}
+                disabled={isLoading || isRestaurantIdLoading}
               >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : isSignUp ? "Criar conta" : "Entrar"}
+                {isLoading || isRestaurantIdLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : isSignUp ? "Criar conta" : "Entrar"}
               </Button>
             </form>
 
@@ -237,14 +261,11 @@ const Auth = () => {
               </Button>
             </div>
             
-            {/* Removendo a seção do link de administração */}
-            {/*
             <Separator className="my-4" />
             
             <div className="text-center text-sm text-muted-foreground">
-              É o dono de uma loja? <a href="/#/admin-auth" className="text-primary hover:underline">Acesse o painel de administração</a>
+              É o dono de uma loja? <Link to="/admin-auth" className="text-primary hover:underline">Acesse o painel de administração</Link>
             </div>
-            */}
           </CardContent>
         </Card>
       </div>

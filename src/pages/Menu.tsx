@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, ShoppingCart, Clock, MapPin, Copy } from 'lucide-react';
+import { Terminal, ShoppingCart, Clock, MapPin, Copy, RefreshCw } from 'lucide-react';
 import { BusinessStatus } from '@/components/BusinessStatus';
 import { StoreClosedWarning } from '@/components/StoreClosedWarning';
 import { getBusinessStatus } from '@/utils/time';
@@ -15,6 +15,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useCart } from '@/hooks/use-cart';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { useParams } from 'react-router-dom'; // Importando useParams
 
 type Restaurant = Tables<'restaurants'>;
 type Category = Tables<'categories'>;
@@ -27,20 +28,18 @@ interface MenuData {
   hours: BusinessHour[];
 }
 
-const fetchMenuData = async (): Promise<MenuData> => {
-  // Busca o restaurante mais recentemente criado e ativo
+const fetchMenuData = async (restaurantId: string): Promise<MenuData> => {
+  // 1. Busca o restaurante específico
   const { data: restaurantData, error: restaurantError } = await supabase
     .from('restaurants')
     .select('*')
+    .eq('id', restaurantId)
     .eq('is_active', true)
-    .order('created_at', { ascending: false }) // Ordena pelo mais novo
     .limit(1)
     .single();
 
-  if (restaurantError) throw new Error(`Erro ao buscar restaurante: ${restaurantError.message}`);
-  if (!restaurantData) throw new Error('Nenhum restaurante ativo encontrado.');
-
-  const restaurantId = restaurantData.id;
+  if (restaurantError && restaurantError.code !== 'PGRST116') throw new Error(`Erro ao buscar restaurante: ${restaurantError.message}`);
+  if (!restaurantData) throw new Error('Restaurante não encontrado ou inativo.');
 
   const [categoriesResult, productsResult, hoursResult] = await Promise.all([
     supabase
@@ -87,13 +86,15 @@ const fetchMenuData = async (): Promise<MenuData> => {
 };
 
 const Menu = () => {
+  const { restaurantId } = useParams<{ restaurantId: string }>(); // Obtém o ID da URL
   const isMobile = useIsMobile();
   const { totalItems } = useCart();
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   const { data: menuData, isLoading, isError, error, refetch } = useQuery<MenuData>({
-    queryKey: ['menuData'],
-    queryFn: fetchMenuData,
+    queryKey: ['menuData', restaurantId], // Adiciona restaurantId na chave
+    queryFn: () => fetchMenuData(restaurantId!),
+    enabled: !!restaurantId, // Só executa se tiver o ID
     staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
@@ -106,11 +107,26 @@ const Menu = () => {
 
   const copyMenuLink = () => {
     if (menuData?.restaurant) {
-      const menuLink = `${window.location.origin}${window.location.pathname}#/menu`;
+      // O link agora inclui o ID do restaurante
+      const menuLink = `${window.location.origin}${window.location.pathname}#/menu/${restaurantId}`;
       navigator.clipboard.writeText(menuLink);
       toast.success("Link do cardápio copiado!");
     }
   };
+
+  if (!restaurantId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Alert variant="destructive" className="max-w-lg">
+          <Terminal className="h-4 w-4" />
+          <AlertTitle>Erro de Acesso</AlertTitle>
+          <AlertDescription>
+            O link do cardápio está incompleto. Por favor, use o link fornecido no painel de administração.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return <LoadingSpinner />;

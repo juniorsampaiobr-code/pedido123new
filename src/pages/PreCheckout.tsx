@@ -20,38 +20,66 @@ const useAuthStatus = () => {
   });
 };
 
+// Novo hook para buscar o ID do restaurante ativo (o mais recente)
+const useActiveRestaurantId = () => {
+  return useQuery<string | null>({
+    queryKey: ['activeRestaurantId'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .select('id')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error("Error fetching active restaurant ID:", error);
+        return null;
+      }
+      return data?.id || null;
+    },
+    staleTime: Infinity,
+  });
+};
+
 const PreCheckout = () => {
   const navigate = useNavigate();
-  const { data: user, isLoading } = useAuthStatus();
+  const { data: user, isLoading: isLoadingAuth } = useAuthStatus();
+  const { data: restaurantId, isLoading: isLoadingRestaurantId } = useActiveRestaurantId();
   const { totalItems } = useCart();
 
   // Centralize toda a lógica de navegação no useEffect
   useEffect(() => {
     if (totalItems === 0) {
-      // Carrinho vazio, volta para o menu
-      navigate('/menu', { replace: true });
+      // Carrinho vazio, volta para o menu (usando o ID encontrado)
+      if (restaurantId) {
+        navigate(`/menu/${restaurantId}`, { replace: true });
+      } else if (!isLoadingRestaurantId) {
+        // Se não encontrar ID, volta para a raiz
+        navigate('/', { replace: true });
+      }
       return;
     }
     
-    if (!isLoading) {
+    if (!isLoadingAuth && !isLoadingRestaurantId) {
       if (user) {
         // Usuário logado, prossegue para o checkout
         navigate('/checkout', { replace: true });
       } else {
         // Usuário não logado, redireciona para autenticação
+        // O Auth.tsx precisa saber para onde voltar, mas o Auth.tsx já lida com o redirecionamento para o menu.
         navigate('/auth', { replace: true });
       }
     }
-  }, [totalItems, user, isLoading, navigate]);
+  }, [totalItems, user, isLoadingAuth, isLoadingRestaurantId, navigate, restaurantId]);
 
   // Renderização de fallback enquanto a navegação está pendente
-  // Retorna um spinner se estiver carregando ou se o carrinho estiver vazio (aguardando o useEffect)
-  if (isLoading || totalItems === 0) {
+  if (isLoadingAuth || isLoadingRestaurantId || totalItems === 0) {
     return <LoadingSpinner />;
   }
 
   // Se chegarmos aqui, significa que !isLoading e !user, e estamos aguardando o useEffect redirecionar para /auth.
-  // Retornamos o spinner para evitar piscar o conteúdo, pois o redirecionamento é iminente.
   return <LoadingSpinner />;
 };
 
