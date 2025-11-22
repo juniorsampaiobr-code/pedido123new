@@ -20,7 +20,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { MapPin, Phone, Mail, CreditCard, DollarSign, Truck, Loader2, User, RefreshCw, AlertCircle, LogOut, User as UserIcon } from 'lucide-react';
+import { MapPin, Phone, Mail, CreditCard, DollarSign, Truck, Loader2, User, RefreshCw, AlertCircle, LogOut, User as UserIcon, Save } from 'lucide-react';
 import { ZipCodeInput } from '@/components/ZipCodeInput';
 import { PhoneInput } from '@/components/PhoneInput';
 import { CustomerProfileModal } from '@/components/CustomerProfileModal';
@@ -41,6 +41,18 @@ type CartItem = {
 };
 
 // --- Schemas ---
+const addressSchema = z.object({
+  zip_code: z.string().min(1, 'CEP é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length === 8, {
+    message: 'CEP deve ter 8 dígitos.',
+  }),
+  street: z.string().min(1, 'Rua é obrigatória.'),
+  number: z.string().min(1, 'Número é obrigatório.'),
+  neighborhood: z.string().min(1, 'Bairro é obrigatório.'),
+  city: z.string().min(1, 'Cidade é obrigatória.'),
+});
+
+type AddressFormValues = z.infer<typeof addressSchema>;
+
 const checkoutSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório.'),
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length >= 10, {
@@ -51,37 +63,12 @@ const checkoutSchema = z.object({
     message: 'CPF deve ter 11 dígitos ou CNPJ 14 dígitos.',
   }),
   delivery_option: z.enum(['delivery', 'pickup'], { required_error: 'Selecione uma opção de entrega.' }),
-  zip_code: z.string().optional(),
-  street: z.string().optional(),
-  number: z.string().optional(),
-  neighborhood: z.string().optional(),
-  city: z.string().optional(),
   notes: z.string().optional(),
   payment_method_id: z.string().min(1, 'Selecione um método de pagamento.'),
   change_for: z.preprocess(
     (val) => String(val).replace(',', '.'),
     z.coerce.number().optional().nullable()
   ),
-}).superRefine((data, ctx) => {
-  // Validação condicional para entrega
-  if (data.delivery_option === 'delivery') {
-    if (!data.zip_code || data.zip_code.replace(/\D/g, '').length !== 8) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'CEP é obrigatório para entrega.',
-        path: ['zip_code'],
-      });
-    }
-    if (!data.street) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Rua é obrigatória para entrega.', path: ['street'] });
-    }
-    if (!data.number) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Número é obrigatório para entrega.', path: ['number'] });
-    }
-    if (!data.neighborhood) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Bairro é obrigatório para entrega.', path: ['neighborhood'] });
-    }
-  }
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -156,6 +143,9 @@ const Checkout = () => {
   const [isMercadoPagoOpen, setIsMercadoPagoOpen] = useState(false);
   const [mpPreferenceId, setMpPreferenceId] = useState<string | null>(null);
   const [mpInitPoint, setMpInitPoint] = useState<string | null>(null);
+  
+  // NOVO ESTADO: Rastreia se o endereço foi salvo/validado
+  const [isAddressSaved, setIsAddressSaved] = useState(false);
 
   // Fetch de dados essenciais
   const { data: restaurant, isLoading: isLoadingRestaurant, isError: isErrorRestaurant, error: errorRestaurant, refetch: refetchRestaurant } = useQuery<Restaurant>({
@@ -194,26 +184,48 @@ const Checkout = () => {
       email: '',
       cpf_cnpj: '',
       delivery_option: 'delivery',
-      zip_code: '',
-      street: '',
-      number: '',
-      neighborhood: '',
-      city: '',
       notes: '',
       payment_method_id: '',
       change_for: null,
     },
     mode: 'onBlur',
   });
-
+  
+  const addressForm = useForm<AddressFormValues>({
+    resolver: zodResolver(addressSchema),
+    defaultValues: {
+      zip_code: '',
+      street: '',
+      number: '',
+      neighborhood: '',
+      city: '',
+    },
+    mode: 'onBlur',
+  });
+  
+  // Watchers
   const deliveryOption = form.watch('delivery_option');
   const selectedPaymentMethodId = form.watch('payment_method_id');
   const selectedPaymentMethod = paymentMethods?.find(m => m.id === selectedPaymentMethodId);
   const isOnlinePayment = selectedPaymentMethod?.name?.includes('online');
   const isCashPayment = selectedPaymentMethod?.name?.includes('Dinheiro');
   const totalAmount = cartSubtotal + deliveryFee;
+  
+  // Watchers para o formulário de endereço
+  const addressFields = addressForm.watch(['zip_code', 'street', 'number', 'city', 'neighborhood']);
+  
+  // Se a opção de entrega mudar para 'pickup', o endereço é considerado salvo
+  useEffect(() => {
+    if (deliveryOption === 'pickup') {
+      setDeliveryFee(0);
+      setIsDeliveryAreaValid(true);
+      setIsAddressSaved(true);
+    } else {
+      // Se mudar para 'delivery', o endereço precisa ser salvo novamente
+      setIsAddressSaved(false);
+    }
+  }, [deliveryOption]);
 
-  // --- Efeitos e Lógica de Dados ---
 
   // 1. Preencher formulário com dados do cliente logado ou do user_metadata
   useEffect(() => {
@@ -228,6 +240,7 @@ const Checkout = () => {
       if (customer.address) {
         const parts = customer.address.split(', ').map(p => p.trim());
         
+        // Tentativa de parsear o endereço salvo (Rua, Número, Bairro, Cidade, CEP)
         if (parts.length >= 5) {
           street = parts[0];
           number = parts[1];
@@ -235,6 +248,7 @@ const Checkout = () => {
           city = parts[3];
           zip_code = parts[4];
         } else if (parts.length >= 4) {
+          // Fallback para formatos mais simples
           street = parts[0];
           neighborhood = parts[1];
           city = parts[2];
@@ -248,15 +262,25 @@ const Checkout = () => {
         phone: customer.phone || '',
         email: customer.email || '',
         cpf_cnpj: customer.cpf_cnpj || '',
+      });
+      
+      addressForm.reset({
+        zip_code: zip_code,
         street: street,
         number: number,
         neighborhood: neighborhood,
         city: city,
-        zip_code: zip_code,
       });
+      
+      // Se o cliente tem um endereço salvo, consideramos ele validado inicialmente
+      if (customer.address && customer.latitude && customer.longitude) {
+          setIsAddressSaved(true);
+          // Tenta calcular a taxa de entrega imediatamente se o endereço for válido
+          calculateFee(zip_code, street, number, city, customer.latitude, customer.longitude);
+      }
+
     } else if (user && !isLoadingCustomer) {
       // Caso 2: Usuário logado, mas sem registro na tabela 'customers'.
-      // Preenche com dados do user_metadata (do cadastro)
       const userMetadata = user.user_metadata;
       
       form.reset({
@@ -264,13 +288,12 @@ const Checkout = () => {
         name: (userMetadata.full_name as string) || '',
         phone: (userMetadata.phone as string) || '',
         email: user.email || '',
-        cpf_cnpj: (userMetadata.cpf_cnpj as string) || '', // Usando cpf_cnpj do metadata
+        cpf_cnpj: (userMetadata.cpf_cnpj as string) || '',
       });
     }
-  }, [customer, form, user, isLoadingCustomer]);
+  }, [customer, form, user, isLoadingCustomer, addressForm]);
 
   // 2. Lógica de Geocodificação e Cálculo de Taxa de Entrega
-  const addressFields = form.watch(['zip_code', 'street', 'number', 'city']);
   const restaurantCoords: [number, number] | null = useMemo(() => {
     if (restaurant?.latitude && restaurant?.longitude) {
       return [restaurant.latitude, restaurant.longitude];
@@ -278,35 +301,33 @@ const Checkout = () => {
     return null;
   }, [restaurant]);
 
-  const calculateFee = useCallback(async () => {
-    if (deliveryOption === 'pickup' || !restaurant || !restaurantCoords || !restaurant.delivery_enabled) {
+  const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, lat?: number | null, lng?: number | null) => {
+    if (!restaurant || !restaurantCoords || !restaurant.delivery_enabled) {
       setDeliveryFee(0);
       setIsDeliveryAreaValid(true);
       setDeliveryTime(null);
-      return;
+      return { coords: null, fee: 0, time: null, isValid: true };
     }
 
-    const [zip_code, street, number, city] = addressFields;
     const fullAddress = `${street}, ${number}, ${city}, ${zip_code}`;
-
-    if (!zip_code || zip_code.replace(/\D/g, '').length !== 8 || !street || !number || !city) {
-      setDeliveryFee(0);
-      setIsDeliveryAreaValid(true);
-      return;
+    let coords: { lat: number, lng: number } | null = null;
+    
+    if (lat && lng) {
+        coords = { lat, lng };
+    } else {
+        setIsGeocoding(true);
+        const loadingToast = toast.loading("Calculando taxa de entrega...");
+        coords = await geocodeAddress(fullAddress);
+        setIsGeocoding(false);
+        toast.dismiss(loadingToast);
     }
-
-    setIsGeocoding(true);
-    const loadingToast = toast.loading("Calculando taxa de entrega...");
-    const coords = await geocodeAddress(fullAddress);
-    setIsGeocoding(false);
-    toast.dismiss(loadingToast);
 
     if (!coords) {
       setDeliveryFee(0);
-      setIsDeliveryAreaValid(false);
       setDeliveryTime(null);
+      setIsDeliveryAreaValid(false);
       toast.error("Não foi possível encontrar o endereço. Verifique o CEP e o número.");
-      return;
+      return { coords: null, fee: 0, time: null, isValid: false };
     }
 
     setCustomerCoords([coords.lat, coords.lng]);
@@ -322,22 +343,21 @@ const Checkout = () => {
         setDeliveryFee(feeResult.fee);
         setDeliveryTime([feeResult.minTime, feeResult.maxTime]);
         setIsDeliveryAreaValid(true);
+        return { coords, fee: feeResult.fee, time: [feeResult.minTime, feeResult.maxTime], isValid: true };
       } else {
         setDeliveryFee(0);
         setDeliveryTime(null);
         setIsDeliveryAreaValid(false);
         toast.error("Endereço fora da área de entrega.");
+        return { coords, fee: 0, time: null, isValid: false };
       }
     } else {
       setDeliveryFee(0);
       setDeliveryTime(null);
       setIsDeliveryAreaValid(true);
+      return { coords, fee: 0, time: null, isValid: true };
     }
-  }, [deliveryOption, addressFields, restaurant, restaurantCoords, deliveryZones]);
-
-  useEffect(() => {
-    calculateFee();
-  }, [calculateFee]);
+  }, [restaurant, restaurantCoords, deliveryZones]);
 
   // 3. Lógica de Troco
   const changeFor = form.watch('change_for');
@@ -348,8 +368,108 @@ const Checkout = () => {
       form.clearErrors('change_for');
     }
   }, [isCashPayment, changeFor, totalAmount, form]);
+  
+  // 4. Mutação para salvar APENAS o endereço (chamada pelo botão Salvar Endereço)
+  const saveAddressMutation = useMutation({
+    mutationFn: async (data: AddressFormValues & { lat: number, lng: number, fee: number, time: [number, number] | null }): Promise<Customer> => {
+      const userAuth = await supabase.auth.getUser();
+      const userId = userAuth.data.user?.id;
+      
+      if (!customer?.id && !userId) throw new Error('ID do cliente ou usuário não encontrado.');
+      
+      const fullAddress = `${data.street}, ${data.number}, ${data.neighborhood}, ${data.city}, ${data.zip_code}`;
+      
+      const addressPayload: TablesInsert<'customers'> = {
+        user_id: userId || null,
+        name: form.getValues('name'), // Usa o nome atual do formulário principal
+        phone: form.getValues('phone'), // Usa o telefone atual do formulário principal
+        email: form.getValues('email') || null,
+        cpf_cnpj: form.getValues('cpf_cnpj') || null,
+        address: fullAddress,
+        latitude: data.lat,
+        longitude: data.lng,
+      };
 
-  // --- Mutações ---
+      if (customer?.id) {
+        // Atualiza cliente existente
+        const { data: updatedCustomer, error: updateError } = await supabase
+          .from('customers')
+          .update(addressPayload as TablesUpdate<'customers'>)
+          .eq('id', customer.id)
+          .select()
+          .single();
+        if (updateError) throw updateError;
+        return updatedCustomer;
+      } else if (userId) {
+        // Cria novo cliente vinculado ao user_id
+        const { data: newCustomer, error: insertError } = await supabase
+          .from('customers')
+          .insert(addressPayload)
+          .select()
+          .single();
+        if (insertError) throw insertError;
+        return newCustomer;
+      } else {
+        // Cliente anônimo: não salvamos o endereço no DB, apenas validamos
+        // Retorna um objeto Customer mockado para prosseguir
+        return { id: 'anonymous', user_id: null, name: addressPayload.name, phone: addressPayload.phone, email: addressPayload.email, address: fullAddress, created_at: '', updated_at: '', latitude: data.lat, longitude: data.lng, cpf_cnpj: addressPayload.cpf_cnpj };
+      }
+    },
+    onSuccess: (newCustomer, variables) => {
+      // Se for anônimo, não invalida o cache, mas atualiza o estado local
+      if (newCustomer.id !== 'anonymous') {
+        queryClient.invalidateQueries({ queryKey: ['checkoutCustomerData'] });
+      }
+      
+      setDeliveryFee(variables.fee);
+      setDeliveryTime(variables.time);
+      setIsDeliveryAreaValid(variables.isValid);
+      setIsAddressSaved(true);
+      toast.success('Endereço salvo e taxa de entrega calculada!');
+    },
+    onError: (err) => {
+      toast.error(`Erro ao salvar endereço: ${err.message}`);
+      setIsAddressSaved(false);
+    }
+  });
+  
+  const handleSaveAddress = async () => {
+    if (deliveryOption === 'pickup') return;
+    
+    const isValid = await addressForm.trigger();
+    if (!isValid) {
+      toast.error("Preencha todos os campos obrigatórios do endereço.");
+      return;
+    }
+    
+    const data = addressForm.getValues();
+    
+    // 1. Calcula a taxa e obtém as coordenadas
+    const feeResult = await calculateFee(data.zip_code, data.street, data.number, data.city);
+    
+    if (!feeResult.isValid) {
+        setIsAddressSaved(false);
+        return;
+    }
+    
+    if (!feeResult.coords) {
+        toast.error("Não foi possível obter as coordenadas para salvar o endereço.");
+        setIsAddressSaved(false);
+        return;
+    }
+    
+    // 2. Salva o endereço no DB (se logado) ou apenas valida (se anônimo)
+    saveAddressMutation.mutate({ 
+        ...data, 
+        lat: feeResult.coords.lat, 
+        lng: feeResult.coords.lng,
+        fee: feeResult.fee,
+        time: feeResult.time,
+        isValid: feeResult.isValid,
+    });
+  };
+
+  // --- Mutações de Pedido (Inalteradas, mas dependem do customerId) ---
 
   const createCustomerMutation = useMutation({
     mutationFn: async (data: CheckoutFormValues): Promise<Customer> => {
@@ -362,7 +482,8 @@ const Checkout = () => {
         phone: cleanedPhone,
         email: data.email || null,
         cpf_cnpj: cleanedCpfCnpj,
-        address: data.delivery_option === 'delivery' ? `${data.street}, ${data.number}, ${data.neighborhood}, ${data.city}, ${data.zip_code}` : null,
+        // Endereço e coordenadas são obtidos do estado/addressForm se for delivery
+        address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[3]}, ${addressFields[4]}, ${addressFields[0]}` : null,
         latitude: customerCoords ? customerCoords[0] : null,
         longitude: customerCoords ? customerCoords[1] : null,
       };
@@ -418,7 +539,8 @@ const Checkout = () => {
         status: isOnlinePayment ? 'pending_payment' : 'pending',
         total_amount: totalAmount,
         delivery_fee: deliveryFee,
-        delivery_address: data.delivery_option === 'delivery' ? `${data.street}, ${data.number}, ${data.neighborhood}, ${data.city}, ${data.zip_code}` : null,
+        // Usa o endereço salvo/validado
+        delivery_address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[3]}, ${addressFields[4]}, ${addressFields[0]}` : null,
         notes: data.notes,
         payment_method_id: data.payment_method_id,
         change_for: isCashPayment && data.change_for && data.change_for > totalAmount ? data.change_for : null,
@@ -468,14 +590,20 @@ const Checkout = () => {
       return;
     }
     
-    if (deliveryOption === 'delivery' && !isDeliveryAreaValid) {
-      toast.error('O endereço de entrega está fora da área de cobertura.');
-      return;
+    if (deliveryOption === 'delivery') {
+        if (!isAddressSaved) {
+            toast.error('Você deve salvar e validar o endereço de entrega antes de finalizar o pedido.');
+            return;
+        }
+        if (!isDeliveryAreaValid) {
+            toast.error('O endereço de entrega está fora da área de cobertura.');
+            return;
+        }
     }
 
     let customerId: string;
     
-    // 1. Cria/Atualiza o cliente
+    // 1. Cria/Atualiza o cliente (usando os dados pessoais do form principal e o endereço salvo)
     try {
       const newCustomer = await createCustomerMutation.mutateAsync(data);
       customerId = newCustomer.id;
@@ -579,8 +707,10 @@ const Checkout = () => {
     );
   }
   
-  const isFormSubmitting = createCustomerMutation.isPending || createOrderMutation.isPending;
-  const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isDeliveryAreaValid);
+  const isFormSubmitting = createCustomerMutation.isPending || createOrderMutation.isPending || saveAddressMutation.isPending;
+  
+  // Bloqueia o checkout se for delivery e o endereço não foi salvo/validado
+  const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isAddressSaved);
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-8">
@@ -707,12 +837,15 @@ const Checkout = () => {
 
             {/* Endereço de Entrega (se delivery_option for 'delivery') */}
             {deliveryOption === 'delivery' && (
-              <Card>
+              <Card className={cn(!isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
                 <CardHeader>
                   <CardTitle className="text-xl flex items-center gap-2">
                     <MapPin className="h-5 w-5 text-primary" />
                     Endereço de Entrega
+                    {isAddressSaved && <CheckCircle className="h-5 w-5 text-green-500 ml-2" />}
+                    {!isAddressSaved && <AlertCircle className="h-5 w-5 text-destructive ml-2" />}
                   </CardTitle>
+                  <p className="text-sm text-muted-foreground">Preencha e salve o endereço para calcular a taxa de entrega.</p>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {!restaurant.delivery_enabled && (
@@ -723,38 +856,50 @@ const Checkout = () => {
                     </Alert>
                   )}
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2 md:col-span-1">
-                      <Label htmlFor="zip_code">CEP *</Label>
-                      <Controller
-                        name="zip_code"
-                        control={form.control}
-                        render={({ field }) => <ZipCodeInput id="zip_code" {...field} onBlur={calculateFee} />}
-                      />
-                      {form.formState.errors.zip_code && <p className="text-destructive text-sm">{form.formState.errors.zip_code.message}</p>}
+                  <form onSubmit={(e) => { e.preventDefault(); handleSaveAddress(); }} id="address-form" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2 md:col-span-1">
+                        <Label htmlFor="zip_code">CEP *</Label>
+                        <Controller
+                          name="zip_code"
+                          control={addressForm.control}
+                          render={({ field }) => <ZipCodeInput id="zip_code" {...field} />}
+                        />
+                        {addressForm.formState.errors.zip_code && <p className="text-destructive text-sm">{addressForm.formState.errors.zip_code.message}</p>}
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="street">Rua *</Label>
+                        <Input id="street" {...addressForm.register('street')} />
+                        {addressForm.formState.errors.street && <p className="text-destructive text-sm">{addressForm.formState.errors.street.message}</p>}
+                      </div>
                     </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="street">Rua *</Label>
-                      <Input id="street" {...form.register('street')} onBlur={calculateFee} />
-                      {form.formState.errors.street && <p className="text-destructive text-sm">{form.formState.errors.street.message}</p>}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="number">Número *</Label>
+                        <Input id="number" {...addressForm.register('number')} />
+                        {addressForm.formState.errors.number && <p className="text-destructive text-sm">{addressForm.formState.errors.number.message}</p>}
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="neighborhood">Bairro *</Label>
+                        <Input id="neighborhood" {...addressForm.register('neighborhood')} />
+                        {addressForm.formState.errors.neighborhood && <p className="text-destructive text-sm">{addressForm.formState.errors.neighborhood.message}</p>}
+                      </div>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="number">Número *</Label>
-                      <Input id="number" {...form.register('number')} onBlur={calculateFee} />
-                      {form.formState.errors.number && <p className="text-destructive text-sm">{form.formState.errors.number.message}</p>}
+                      <Label htmlFor="city">Cidade *</Label>
+                      <Input id="city" {...addressForm.register('city')} />
+                      {addressForm.formState.errors.city && <p className="text-destructive text-sm">{addressForm.formState.errors.city.message}</p>}
                     </div>
-                    <div className="space-y-2 md:col-span-2">
-                      <Label htmlFor="neighborhood">Bairro *</Label>
-                      <Input id="neighborhood" {...form.register('neighborhood')} onBlur={calculateFee} />
-                      {form.formState.errors.neighborhood && <p className="text-destructive text-sm">{form.formState.errors.neighborhood.message}</p>}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="city">Cidade</Label>
-                    <Input id="city" {...form.register('city')} />
-                  </div>
+                    
+                    <Button 
+                        type="submit" 
+                        className="w-full h-10 text-base mt-4"
+                        disabled={saveAddressMutation.isPending || isGeocoding || !restaurant.delivery_enabled}
+                    >
+                        {saveAddressMutation.isPending || isGeocoding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                        Salvar Endereço e Calcular Taxa
+                    </Button>
+                  </form>
                   
                   {isGeocoding && (
                     <Alert className="flex items-center gap-2">
@@ -763,7 +908,7 @@ const Checkout = () => {
                     </Alert>
                   )}
                   
-                  {!isDeliveryAreaValid && !isGeocoding && (
+                  {!isDeliveryAreaValid && isAddressSaved && !isGeocoding && (
                     <Alert variant="destructive">
                       <AlertCircle className="h-4 w-4" />
                       <AlertTitle>Fora da Área de Entrega</AlertTitle>
@@ -771,7 +916,7 @@ const Checkout = () => {
                     </Alert>
                   )}
                   
-                  {deliveryTime && isDeliveryAreaValid && !isGeocoding && (
+                  {deliveryTime && isDeliveryAreaValid && isAddressSaved && !isGeocoding && (
                     <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 text-green-700">
                       <Truck className="h-4 w-4" />
                       <AlertTitle>Entrega Disponível</AlertTitle>
@@ -921,6 +1066,13 @@ const Checkout = () => {
                     isOnlinePayment ? 'Pagar e Finalizar' : 'Confirmar Pedido'
                   )}
                 </Button>
+                
+                {deliveryOption === 'delivery' && !isAddressSaved && (
+                    <Alert variant="destructive" className="mt-3">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription className="text-xs">Salve o endereço acima para continuar.</AlertDescription>
+                    </Alert>
+                )}
                 
                 {/* CORREÇÃO AQUI: Usando o ID do restaurante para o link do menu */}
                 <Link to={`/menu/${restaurant.id}`} className="block text-center text-sm text-muted-foreground hover:underline mt-2">
