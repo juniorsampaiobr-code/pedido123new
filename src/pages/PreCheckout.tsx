@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useCart } from '@/hooks/use-cart';
+import { useActiveRestaurantId } from '@/hooks/use-active-restaurant-id'; // Importando o novo hook
 
 // Hook para verificar o status de autenticação
 const useAuthStatus = () => {
@@ -15,29 +16,6 @@ const useAuthStatus = () => {
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
       return session?.user || null;
-    },
-    staleTime: Infinity,
-  });
-};
-
-// Novo hook para buscar o ID do restaurante ativo (o mais recente)
-const useActiveRestaurantId = () => {
-  return useQuery<string | null>({
-    queryKey: ['activeRestaurantId'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('restaurants')
-        .select('id')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') {
-        console.error("Error fetching active restaurant ID:", error);
-        return null;
-      }
-      return data?.id || null;
     },
     staleTime: Infinity,
   });

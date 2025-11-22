@@ -9,31 +9,15 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
-import { PhoneInput } from "@/components/PhoneInput"; // Importando PhoneInput
+import { PhoneInput } from "@/components/PhoneInput";
 import { Loader2 } from "lucide-react";
+import { useActiveRestaurantId } from "@/hooks/use-active-restaurant-id"; // Importando o hook
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 
-// Função para buscar o ID do restaurante ativo (o mais recente)
-const fetchActiveRestaurantId = async (): Promise<string | null> => {
-  const { data, error } = await supabase
-    .from('restaurants')
-    .select('id')
-    .eq('is_active', true)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-  
-  if (error && error.code !== 'PGRST116') {
-    console.error("Error fetching active restaurant ID:", error);
-    return null;
-  }
-  return data?.id || null;
-};
-
 const Auth = () => {
   const navigate = useNavigate();
-  const location = useLocation(); // Para obter parâmetros de redirecionamento
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
@@ -43,35 +27,38 @@ const Auth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   
-  // O ID do restaurante do estado de navegação é usado apenas para o fluxo de checkout
-  const restaurantIdFromState = location.state?.restaurantId as string | undefined;
+  const { data: activeRestaurantId, isLoading: isLoadingRestaurantId } = useActiveRestaurantId(); // Usando o hook
   
-  // Não precisamos mais buscar o activeRestaurantId aqui, pois só o usamos para o fluxo de checkout
-  const [isRestaurantIdLoading, setIsRestaurantIdLoading] = useState(false);
+  const restaurantIdFromState = location.state?.restaurantId as string | undefined;
 
+  const handleRedirect = (user: User, restaurantId: string | undefined) => {
+    const from = location.state?.from;
+    const finalRestaurantId = restaurantId || activeRestaurantId;
+
+    if (from === '/checkout') {
+      console.log("User logged in, redirecting to checkout.");
+      navigate('/checkout', { replace: true });
+    } else if (finalRestaurantId) {
+      // Se não veio do checkout, mas temos um ID de restaurante (do estado ou ativo), vai para o menu
+      console.log("User logged in, redirecting to specific menu:", finalRestaurantId);
+      navigate(`/menu/${finalRestaurantId}`, { replace: true });
+    } else {
+      // Último recurso: se não há restaurante ativo, volta para a Index
+      console.log("User logged in, no active restaurant found, redirecting to index.");
+      navigate('/', { replace: true });
+    }
+  };
 
   useEffect(() => {
+    if (isLoadingRestaurantId) return; // Espera o ID do restaurante ativo carregar
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          const from = location.state?.from;
-          const restaurantId = location.state?.restaurantId;
-          
-          if (from === '/checkout') {
-            console.log("Redirecting customer to checkout after login.");
-            navigate('/checkout', { replace: true });
-          } else if (restaurantId) {
-            // Se não veio do checkout, mas tem um restaurantId, volta para o menu específico
-            console.log("Redirecting customer to specific menu after login.");
-            navigate(`/menu/${restaurantId}`, { replace: true });
-          } else {
-            // Se não veio do checkout e não tem restaurantId, redireciona para a raiz
-            console.log("Redirecting customer to index after login.");
-            navigate('/', { replace: true });
-          }
+          handleRedirect(session.user, restaurantIdFromState);
         }
       }
     );
@@ -81,25 +68,12 @@ const Auth = () => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        const from = location.state?.from;
-        const restaurantId = location.state?.restaurantId;
-        
-        if (from === '/checkout') {
-          console.log("User already logged in, redirecting to checkout:", from);
-          navigate('/checkout', { replace: true });
-        } else if (restaurantId) {
-          console.log("User already logged in, redirecting to specific menu:", restaurantId);
-          navigate(`/menu/${restaurantId}`, { replace: true });
-        } else {
-          // Redireciona para a página inicial se já estiver logado e não veio do checkout
-          console.log("User already logged in, redirecting to index.");
-          navigate('/', { replace: true });
-        }
+        handleRedirect(session.user, restaurantIdFromState);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, location.state]);
+  }, [navigate, location.state, isLoadingRestaurantId, activeRestaurantId, restaurantIdFromState]);
 
   const validateSignUp = () => {
     if (!fullName.trim()) {
@@ -126,9 +100,7 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Se o usuário veio do checkout, garantimos que o restaurantId está no estado para o PreCheckout
     if (location.state?.from === '/checkout' && !restaurantIdFromState) {
-        // Isso não deve acontecer se o PreCheckout estiver correto, mas é um fallback
         toast.error("Erro: ID do restaurante de origem não encontrado.");
         setIsLoading(false);
         return;
@@ -149,7 +121,7 @@ const Auth = () => {
           options: {
             data: {
               full_name: fullName,
-              phone: cleanedPhone, // Enviando o número limpo para o Supabase
+              phone: cleanedPhone,
             },
           }
         });
@@ -182,6 +154,10 @@ const Auth = () => {
       setIsLoading(false);
     }
   };
+
+  if (isLoadingRestaurantId) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -256,9 +232,9 @@ const Auth = () => {
                 type="submit"
                 className="w-full"
                 size="lg"
-                disabled={isLoading || isRestaurantIdLoading}
+                disabled={isLoading || isLoadingRestaurantId}
               >
-                {isLoading || isRestaurantIdLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : isSignUp ? "Criar conta" : "Entrar"}
+                {isLoading || isLoadingRestaurantId ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : isSignUp ? "Criar conta" : "Entrar"}
               </Button>
             </form>
 

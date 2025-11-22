@@ -1,12 +1,40 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/Logo";
 import { FeatureCard } from "@/components/FeatureCard";
 import { StatCard } from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { QrCode, Bike, Link2, Printer, Store, User } from "lucide-react";
+import { QrCode, Bike, Link2, Printer, Store, User, Loader2 } from "lucide-react";
+import { useAuthStatus } from "@/hooks/use-auth-status";
+import { useActiveRestaurantId } from "@/hooks/use-active-restaurant-id";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { data: user, isLoading: isLoadingAuth } = useAuthStatus();
+  const { data: restaurantId, isLoading: isLoadingRestaurantId } = useActiveRestaurantId();
+
+  const handleClientAccess = () => {
+    if (isLoadingAuth || isLoadingRestaurantId) return;
+
+    if (user) {
+      // Usuário logado
+      if (restaurantId) {
+        // Redireciona para o menu do restaurante ativo
+        navigate(`/menu/${restaurantId}`);
+      } else {
+        // Se não houver restaurante ativo, redireciona para o login (para que ele possa ver a mensagem de erro ou tentar novamente)
+        navigate("/auth");
+        // Opcional: toast.error("Nenhum restaurante ativo encontrado.");
+      }
+    } else {
+      // Usuário não logado, vai para a página de autenticação
+      navigate("/auth");
+    }
+  };
+  
+  const isProcessing = isLoadingAuth || isLoadingRestaurantId;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -31,12 +59,15 @@ const Index = () => {
                 </p>
                 
                 <div className="space-y-4">
-                  <Link to="/auth">
-                    <Button size="lg" className="w-full flex items-center justify-center gap-2">
-                      <User className="h-5 w-5" />
-                      Sou Cliente - Fazer Pedido
-                    </Button>
-                  </Link>
+                  <Button 
+                    size="lg" 
+                    className="w-full flex items-center justify-center gap-2"
+                    onClick={handleClientAccess}
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <User className="h-5 w-5" />}
+                    Sou Cliente - Fazer Pedido
+                  </Button>
                   
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">
