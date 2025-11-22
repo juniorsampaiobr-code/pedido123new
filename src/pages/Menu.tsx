@@ -18,13 +18,14 @@ import { toast } from 'sonner';
 import { useParams } from 'react-router-dom';
 import { useAuthStatus } from '@/hooks/use-auth-status';
 import { useBusinessHoursRealtime } from '@/hooks/use-business-hours-realtime';
-import { CustomerProfileModal } from '@/components/CustomerProfileModal'; // NOVO IMPORT
+import { CustomerProfileModal } from '@/components/CustomerProfileModal';
+import { Card } from '@/components/ui/card'; // Added missing import
 
 type Restaurant = Tables<'restaurants'>;
 type Category = Tables<'categories'>;
 type Product = Tables<'products'>;
 type BusinessHour = Tables<'business_hours'>;
-type Customer = Tables<'customers'>; // NOVO TIPO
+type Customer = Tables<'customers'>;
 
 interface MenuData {
   restaurant: Restaurant;
@@ -95,7 +96,6 @@ const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
   if (error && error.code !== 'PGRST116') throw new Error(error.message);
   return data || null;
 };
-
 
 const Menu = () => {
   const { restaurantId } = useParams<{ restaurantId: string }>(); // Obtém o ID da URL
