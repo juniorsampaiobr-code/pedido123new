@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, ShoppingCart, Clock, MapPin, Copy, RefreshCw, LogOut } from 'lucide-react';
+import { Terminal, ShoppingCart, Clock, MapPin, Copy, RefreshCw, LogOut, User as UserIcon } from 'lucide-react';
 import { BusinessStatus } from '@/components/BusinessStatus';
 import { StoreClosedWarning } from '@/components/StoreClosedWarning';
 import { getBusinessStatus } from '@/utils/time';
@@ -15,14 +15,16 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useCart } from '@/hooks/use-cart';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import { useParams } from 'react-router-dom'; // Importando useParams
-import { useAuthStatus } from '@/hooks/use-auth-status'; // Importando useAuthStatus
-import { useBusinessHoursRealtime } from '@/hooks/use-business-hours-realtime'; // NOVO IMPORT
+import { useParams } from 'react-router-dom';
+import { useAuthStatus } from '@/hooks/use-auth-status';
+import { useBusinessHoursRealtime } from '@/hooks/use-business-hours-realtime';
+import { CustomerProfileModal } from '@/components/CustomerProfileModal'; // NOVO IMPORT
 
 type Restaurant = Tables<'restaurants'>;
 type Category = Tables<'categories'>;
 type Product = Tables<'products'>;
 type BusinessHour = Tables<'business_hours'>;
+type Customer = Tables<'customers'>; // NOVO TIPO
 
 interface MenuData {
   restaurant: Restaurant;
@@ -81,12 +83,27 @@ const fetchMenuData = async (restaurantId: string): Promise<MenuData> => {
   };
 };
 
+// Função para buscar dados do cliente (reutilizada do Checkout)
+const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
+  const { data, error } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('user_id', userId)
+    .limit(1)
+    .single();
+
+  if (error && error.code !== 'PGRST116') throw new Error(error.message);
+  return data || null;
+};
+
+
 const Menu = () => {
   const { restaurantId } = useParams<{ restaurantId: string }>(); // Obtém o ID da URL
   const isMobile = useIsMobile();
   const { totalItems } = useCart();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { data: user } = useAuthStatus(); // Obtém o status de autenticação
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false); // NOVO ESTADO
 
   // 1. Busca dados estáticos do menu (restaurante, categorias, produtos)
   const { data: menuData, isLoading: isLoadingMenu, isError: isErrorMenu, error: errorMenu, refetch } = useQuery<MenuData>({
@@ -98,6 +115,14 @@ const Menu = () => {
   
   // 2. Busca horários em tempo real
   const { hours: realtimeHours, isLoading: isLoadingHours, isError: isErrorHours } = useBusinessHoursRealtime(restaurantId);
+
+  // 3. Busca dados do cliente logado
+  const { data: customer, isLoading: isLoadingCustomer } = useQuery<Customer | null>({
+    queryKey: ['menuCustomerData', user?.id],
+    queryFn: () => fetchCustomerData(user!.id),
+    enabled: !!user,
+    staleTime: 0,
+  });
 
   const { isOpen, todayHours } = useMemo(() => {
     if (realtimeHours) {
@@ -166,6 +191,13 @@ const Menu = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {/* Modal de Perfil do Cliente */}
+      <CustomerProfileModal 
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        customer={customer}
+      />
+
       {/* Header */}
       <header className="border-b bg-card sticky top-0 z-30 shadow-sm">
         <div className="container mx-auto px-4 py-4">
@@ -176,9 +208,19 @@ const Menu = () => {
             </div>
             <div className="flex items-center gap-2">
               {user && (
-                <Button variant="outline" size="sm" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4 mr-2" /> Sair
-                </Button>
+                <>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={() => setIsProfileModalOpen(true)}
+                    aria-label="Meu Perfil"
+                  >
+                    <UserIcon className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleLogout}>
+                    <LogOut className="h-4 w-4 mr-2" /> Sair
+                  </Button>
+                </>
               )}
               {isMobile && totalItems > 0 && (
                 <FloatingCartButton 
