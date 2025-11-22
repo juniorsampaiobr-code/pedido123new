@@ -398,6 +398,7 @@ export type Database = {
           mercado_pago_public_key: string | null
           restaurant_id: string
           updated_at: string | null
+          mercado_pago_access_token: string | null // NOVO
         }
         Insert: {
           created_at?: string | null
@@ -405,6 +406,7 @@ export type Database = {
           mercado_pago_public_key?: string | null
           restaurant_id: string
           updated_at?: string | null
+          mercado_pago_access_token?: string | null // NOVO
         }
         Update: {
           created_at?: string | null
@@ -412,6 +414,7 @@ export type Database = {
           mercado_pago_public_key?: string | null
           restaurant_id?: string
           updated_at?: string | null
+          mercado_pago_access_token?: string | null // NOVO
         }
         Relationships: [
           {

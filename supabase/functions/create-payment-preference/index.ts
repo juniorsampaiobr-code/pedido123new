@@ -16,22 +16,55 @@ serve(async (req) => {
     const { orderId, items, totalAmount, restaurantName, clientUrl, customerEmail, customerCpfCnpj } = await req.json();
     console.log(`[create-payment-preference] Received request for orderId: ${orderId}, Total: ${totalAmount}`);
 
-    const accessToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
-    
-    if (!accessToken) {
-      console.error("[create-payment-preference] FATAL: MERCADO_PAGO_ACCESS_TOKEN is not configured in Supabase secrets.");
-      return new Response(JSON.stringify({ error: "Mercado Pago access token is not configured." }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      });
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+        console.error("[create-payment-preference] FATAL: Missing Supabase environment variables.");
+        throw new Error("Supabase environment variables are not configured correctly.");
     }
+
+    const supabaseAdmin = createClient(
+      SUPABASE_URL,
+      SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+    
+    // 1. Buscar o restaurant_id do pedido
+    const { data: orderData, error: orderError } = await supabaseAdmin
+        .from('orders')
+        .select('restaurant_id')
+        .eq('id', orderId)
+        .single();
+        
+    if (orderError) throw new Error(`Failed to fetch order restaurant ID: ${orderError.message}`);
+    const restaurantId = orderData.restaurant_id;
+
+    // 2. Buscar o Access Token do restaurante no DB
+    const { data: settingsData, error: settingsError } = await supabaseAdmin
+        .from('payment_settings')
+        .select('mercado_pago_access_token')
+        .eq('restaurant_id', restaurantId)
+        .single();
+        
+    if (settingsError || !settingsData?.mercado_pago_access_token) {
+        console.error(`[create-payment-preference] Access Token not found for restaurant ${restaurantId}.`);
+        throw new Error("Mercado Pago Access Token não configurado para este restaurante.");
+    }
+    
+    const accessToken = settingsData.mercado_pago_access_token;
     
     if (!clientUrl) {
       console.error("[create-payment-preference] FATAL: Client URL is missing from the request body.");
       throw new Error("Client URL is required for payment redirection.");
     }
 
-    // --- 1. Processar Itens e Calcular Subtotal ---
+    // --- 3. Processar Itens e Calcular Subtotal ---
     let calculatedSubtotal = 0;
     
     const preferenceItems = items.map((item: any) => {
@@ -69,7 +102,7 @@ serve(async (req) => {
     const fixedTotalAmount = parseFloat(totalAmount.toFixed(2));
     const fixedSubtotal = parseFloat(calculatedSubtotal.toFixed(2));
 
-    // --- 2. Calcular Taxa de Entrega ---
+    // --- 4. Calcular Taxa de Entrega ---
     let deliveryFee = fixedTotalAmount - fixedSubtotal;
 
     if (deliveryFee < 0.01) { 
@@ -98,7 +131,7 @@ serve(async (req) => {
     console.log(`[create-payment-preference] Final total verified: R$${finalPreferenceTotal.toFixed(2)}`);
 
 
-    // --- 3. Preparar Preferência ---
+    // --- 5. Preparar Preferência ---
     let sanitizedRestaurantName = restaurantName
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
       .replace(/[^a-zA-Z0-9 ]/g, '') 

@@ -29,8 +29,8 @@ type PaymentMethod = Tables<'payment_methods'>;
 type PaymentSettings = Tables<'payment_settings'>;
 
 const credentialsSchema = z.object({
-  mercado_pago_public_key: z.string().optional(),
-  mercado_pago_access_token: z.string().optional(),
+  mercado_pago_public_key: z.string().min(1, 'A Public Key é obrigatória.'),
+  mercado_pago_access_token: z.string().min(1, 'O Access Token é obrigatório.'),
 });
 
 type CredentialsFormValues = z.infer<typeof credentialsSchema>;
@@ -43,13 +43,6 @@ const methodsSchema = z.object({
 });
 
 type MethodsFormValues = z.infer<typeof methodsSchema>;
-
-// Usar userRestaurantId na função fetch
-const fetchRestaurantId = async () => {
-  // Esta função não é mais necessária, pois o restaurantId vem do contexto
-  // Mantida para compatibilidade, mas não deve ser usada.
-  throw new Error("Restaurant ID should be obtained from context, not fetched.");
-};
 
 // Usar userRestaurantId na função fetch
 const fetchPaymentSettings = async (restaurantId: string): Promise<PaymentSettings | null> => {
@@ -76,11 +69,7 @@ const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[
   return data;
 };
 
-const checkCredentialsStatus = async (): Promise<{ configured: boolean }> => {
-  const { data, error } = await supabase.functions.invoke('check-mp-credentials');
-  if (error) throw new Error(error.message);
-  return data;
-};
+// REMOVENDO checkCredentialsStatus, pois o token agora é salvo no DB
 
 const DEFAULT_METHODS = [
   { name: 'Dinheiro', description: 'Pagamento em dinheiro na entrega', icon: DollarSign },
@@ -150,16 +139,13 @@ const Payments = () => {
     enabled: !!userRestaurantId, // Só busca se userRestaurantId estiver disponível
   });
 
-  const { data: credentialsStatus, isLoading: isLoadingStatus } = useQuery<{ configured: boolean }>({
-    queryKey: ['credentialsStatus'],
-    queryFn: checkCredentialsStatus,
-  });
+  // REMOVENDO QUERY DE STATUS DE CREDENCIAIS
 
   const credentialsForm = useForm<CredentialsFormValues>({
     resolver: zodResolver(credentialsSchema),
     defaultValues: {
       mercado_pago_public_key: '',
-      mercado_pago_access_token: 'APP_USR-2065423906870531-102020-7f478dfd0d5a75ff13deb0e5548dc1f3-228392372', // Pre-filling with user's token for verification
+      mercado_pago_access_token: '', // Não preenche mais com o token global
     },
     mode: 'onBlur',
   });
@@ -168,7 +154,8 @@ const Payments = () => {
     if (settings) {
       credentialsForm.reset({
         mercado_pago_public_key: settings.mercado_pago_public_key || '',
-        mercado_pago_access_token: 'APP_USR-2065423906870531-102020-7f478dfd0d5a75ff13deb0e5548dc1f3-228392372', // Keep pre-filled
+        // Preenche o Access Token com o valor salvo no DB
+        mercado_pago_access_token: settings.mercado_pago_access_token || '', 
       });
     }
   }, [settings, credentialsForm]);
@@ -177,6 +164,7 @@ const Payments = () => {
     mutationFn: async (data: CredentialsFormValues) => {
       if (!userRestaurantId) throw new Error('ID do restaurante não disponível.'); // Usar userRestaurantId
       
+      // Chama a Edge Function para salvar ambas as chaves no DB
       const response = await supabase.functions.invoke('save-mp-credentials', {
         body: JSON.stringify({
           restaurant_id: userRestaurantId, // Usar userRestaurantId
@@ -190,16 +178,10 @@ const Payments = () => {
       return response.data as { message: string, token_verified: boolean };
     },
     onSuccess: (result) => {
-      if (result.token_verified) {
-        toast.success('Credenciais do Mercado Pago salvas com sucesso!');
-      } else {
-        toast.warning('Atenção!', {
-          description: result.message,
-          duration: 15000,
-        });
-      }
+      toast.success(result.message);
       queryClient.invalidateQueries({ queryKey: ['paymentSettings', userRestaurantId] }); // Usar userRestaurantId
-      queryClient.invalidateQueries({ queryKey: ['credentialsStatus'] });
+      // Invalida a chave pública do frontend para forçar o recarregamento
+      queryClient.invalidateQueries({ queryKey: ['mercadoPagoPublicKey'] }); 
     },
     onError: (err) => {
       toast.error(`Erro ao salvar credenciais: ${err.message}`);
@@ -301,6 +283,7 @@ const Payments = () => {
   }
 
   const isDataLoading = isLoadingSettings || isLoadingMethods;
+  const isMpConfigured = !!settings?.mercado_pago_public_key && !!settings?.mercado_pago_access_token;
 
   return (
     <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-8">
@@ -329,23 +312,18 @@ const Payments = () => {
             ) : (
               <Form {...credentialsForm}>
                 <form onSubmit={credentialsForm.handleSubmit(handleCredentialsSubmit)} className="space-y-6">
-                  <Alert variant={credentialsStatus?.configured ? "default" : "destructive"}>
-                    {isLoadingStatus ? <Loader2 className="h-4 w-4 animate-spin" /> : credentialsStatus?.configured ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4" />}
+                  <Alert variant={isMpConfigured ? "default" : "destructive"}>
+                    {isMpConfigured ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4" />}
                     <AlertTitle>
-                      {isLoadingStatus ? "Verificando Status do Access Token..." : credentialsStatus?.configured ? "Access Token Configurado Corretamente!" : "Ação Necessária: Access Token Não Encontrado!"}
+                      {isMpConfigured ? "Pagamento Online Configurado!" : "Ação Necessária: Credenciais Incompletas!"}
                     </AlertTitle>
                     <AlertDescription>
-                      {isLoadingStatus ? "Aguarde um momento..." : credentialsStatus?.configured ? "O Access Token foi encontrado nos segredos do seu projeto Supabase. O pagamento online deve funcionar." : "O Access Token não foi encontrado ou está vazio nos segredos do seu projeto Supabase. O pagamento online não funcionará até que você o configure."}
+                      {isMpConfigured ? "As chaves pública e de acesso foram salvas. O pagamento online está ativo." : "Por favor, insira suas chaves de Public Key e Access Token de Produção do Mercado Pago para ativar o pagamento online."}
                       <ol className="list-decimal list-inside mt-2 space-y-1">
                         <li>
                           <a href="https://www.mercadopago.com.br/developers/panel/credentials" target="_blank" rel="noopener noreferrer" className="font-bold underline">
-                            Copie seu Access Token de Produção
+                            Obtenha suas credenciais de Produção
                           </a> no painel do Mercado Pago.
-                        </li>
-                        <li>
-                          <a href="https://supabase.com/dashboard/project/vtskautbkbhqwinuassp/settings/functions" target="_blank" rel="noopener noreferrer" className="font-bold underline">
-                            Clique aqui para ir aos Segredos do Supabase
-                          </a> e salve-o com o nome `MERCADO_PAGO_ACCESS_TOKEN`.
                         </li>
                       </ol>
                     </AlertDescription>
@@ -356,7 +334,7 @@ const Payments = () => {
                     name="mercado_pago_public_key"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Public Key</FormLabel>
+                        <FormLabel>Public Key *</FormLabel>
                         <FormControl>
                           <Input 
                             {...field} 
@@ -364,7 +342,7 @@ const Payments = () => {
                             className="h-12"
                           />
                         </FormControl>
-                        <p className="text-xs text-muted-foreground">Esta chave é pública e pode ser salva aqui.</p>
+                        <p className="text-xs text-muted-foreground">Esta chave é pública e usada no checkout do cliente.</p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -374,17 +352,17 @@ const Payments = () => {
                     name="mercado_pago_access_token"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Verificar Access Token</FormLabel>
+                        <FormLabel>Access Token *</FormLabel>
                         <FormControl>
                           <Input 
                             {...field} 
                             type="password"
-                            placeholder="Cole seu Access Token aqui para verificar" 
+                            placeholder="Cole seu Access Token aqui" 
                             className="h-12"
                           />
                         </FormControl>
-                        <p className="text-xs text-muted-foreground">
-                          Este campo serve apenas para **verificar** se o token que você salvou no Supabase está correto. Ele **não** salva o token aqui.
+                        <p className="text-xs text-destructive font-semibold">
+                          AVISO DE SEGURANÇA: Este token é secreto e será salvo no banco de dados. Garanta que seu RLS esteja ativo.
                         </p>
                         <FormMessage />
                       </FormItem>
@@ -395,7 +373,7 @@ const Payments = () => {
                     className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-12 text-lg mt-6"
                     disabled={credentialsMutation.isPending || !userRestaurantId} // Usar userRestaurantId
                   >
-                    {credentialsMutation.isPending ? 'Salvando...' : 'Salvar Chave Pública e Verificar Token'}
+                    {credentialsMutation.isPending ? 'Salvando...' : 'Salvar Credenciais'}
                   </Button>
                 </form>
               </Form>
