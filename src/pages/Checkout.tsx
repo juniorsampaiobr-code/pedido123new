@@ -215,10 +215,10 @@ const Checkout = () => {
 
   // --- Efeitos e Lógica de Dados ---
 
-  // 1. Preencher formulário com dados do cliente logado
+  // 1. Preencher formulário com dados do cliente logado ou do user_metadata
   useEffect(() => {
     if (customer) {
-      // Tenta desmembrar o endereço salvo (Rua, Número, Bairro, Cidade, CEP)
+      // Caso 1: Cliente já tem um registro na tabela 'customers'
       let street = '';
       let number = '';
       let neighborhood = '';
@@ -228,7 +228,6 @@ const Checkout = () => {
       if (customer.address) {
         const parts = customer.address.split(', ').map(p => p.trim());
         
-        // Tentativa de parsear o formato: Rua, Número, Bairro, Cidade, CEP
         if (parts.length >= 5) {
           street = parts[0];
           number = parts[1];
@@ -236,7 +235,6 @@ const Checkout = () => {
           city = parts[3];
           zip_code = parts[4];
         } else if (parts.length >= 4) {
-          // Formato sem número: Rua, Bairro, Cidade, CEP
           street = parts[0];
           neighborhood = parts[1];
           city = parts[2];
@@ -245,13 +243,11 @@ const Checkout = () => {
       }
 
       form.reset({
-        ...form.getValues(), // Mantém valores atuais (como delivery_option)
+        ...form.getValues(),
         name: customer.name || '',
         phone: customer.phone || '',
         email: customer.email || '',
         cpf_cnpj: customer.cpf_cnpj || '',
-        
-        // Preenchimento do endereço
         street: street,
         number: number,
         neighborhood: neighborhood,
@@ -259,8 +255,17 @@ const Checkout = () => {
         zip_code: zip_code,
       });
     } else if (user && !isLoadingCustomer) {
-      // Se o usuário está logado mas não tem customer profile, tenta preencher com dados do auth
-      form.setValue('email', user.email || '');
+      // Caso 2: Usuário logado, mas sem registro na tabela 'customers'.
+      // Preenche com dados do user_metadata (do cadastro)
+      const userMetadata = user.user_metadata;
+      
+      form.reset({
+        ...form.getValues(),
+        name: (userMetadata.full_name as string) || '',
+        phone: (userMetadata.phone as string) || '',
+        email: user.email || '',
+        cpf_cnpj: (userMetadata.cpf_cnpj as string) || '', // Usando cpf_cnpj do metadata
+      });
     }
   }, [customer, form, user, isLoadingCustomer]);
 
@@ -286,7 +291,7 @@ const Checkout = () => {
 
     if (!zip_code || zip_code.replace(/\D/g, '').length !== 8 || !street || !number || !city) {
       setDeliveryFee(0);
-      setIsDeliveryAreaValid(true); // Assume válido se os campos estiverem incompletos, mas não calcula
+      setIsDeliveryAreaValid(true);
       return;
     }
 
@@ -324,14 +329,12 @@ const Checkout = () => {
         toast.error("Endereço fora da área de entrega.");
       }
     } else {
-      // Se não houver zonas configuradas, mas a entrega estiver habilitada, assume 0 ou erro
       setDeliveryFee(0);
       setDeliveryTime(null);
       setIsDeliveryAreaValid(true);
     }
   }, [deliveryOption, addressFields, restaurant, restaurantCoords, deliveryZones]);
 
-  // Recalcula a taxa sempre que os campos de endereço ou a opção de entrega mudam
   useEffect(() => {
     calculateFee();
   }, [calculateFee]);
@@ -535,28 +538,22 @@ const Checkout = () => {
       setMpPreferenceId(orderId);
       setMpInitPoint(init_point);
       
-      // O MercadoPagoPayment component será renderizado e abrirá o checkout
-      
     } catch (error: any) {
       console.error("Erro ao criar preferência MP:", error);
       toast.error(`Erro no pagamento online: ${error.message}`);
       setIsMercadoPagoOpen(false);
-      // Se falhar, o pedido já foi criado com status 'pending_payment'.
-      // O usuário pode tentar novamente ou o admin pode cancelar.
     }
   };
   
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success("Você saiu da sua conta.");
-    // Redireciona para a página de autenticação do cliente
     navigate('/auth', { replace: true });
   };
 
   // --- Renderização ---
 
   if (items.length === 0) {
-    // Redireciona se o carrinho estiver vazio (embora PreCheckout já faça isso)
     useEffect(() => { navigate('/menu', { replace: true }); }, [navigate]);
     return <LoadingSpinner />;
   }
@@ -637,9 +634,11 @@ const Checkout = () => {
               <CardContent>
                 <div className="flex justify-between items-center mb-4">
                   <p className="text-sm text-muted-foreground">
-                    {user ? `Logado como ${user.email}` : 'Você está fazendo um pedido anônimo.'}
+                    {user 
+                      ? `Logado como ${user.email}. ${customer ? 'Perfil de cliente encontrado.' : 'Preencha os dados para criar seu perfil de cliente.'}` 
+                      : 'Você está fazendo um pedido anônimo.'
+                    }
                   </p>
-                  {/* Removendo botões daqui, movidos para o cabeçalho */}
                 </div>
                 <form onSubmit={form.handleSubmit(onSubmit)} id="checkout-form">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
