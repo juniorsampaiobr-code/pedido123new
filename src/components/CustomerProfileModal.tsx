@@ -24,7 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/PhoneInput';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
-import { Tables, TablesUpdate } from '@/integrations/supabase/types';
+import { Tables, TablesUpdate, TablesInsert } from '@/integrations/supabase/types';
 import { User, Save, Loader2 } from 'lucide-react';
 import { useEffect } from 'react';
 
@@ -66,21 +66,35 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
   });
 
   useEffect(() => {
-    if (customer) {
-      form.reset({
-        name: customer.name || '',
-        phone: customer.phone || '',
-        email: customer.email || '',
-        cpf_cnpj: customer.cpf_cnpj || '',
-      });
-    } else if (isOpen) {
-        // Se o modal abrir e o cliente for nulo (e.g., recém-logado), limpa o formulário
+    const loadData = async () => {
+      if (customer) {
+        // Caso 1: Cliente existe na tabela 'customers'
         form.reset({
-            name: '',
-            phone: '',
-            email: '',
-            cpf_cnpj: '',
+          name: customer.name || '',
+          phone: customer.phone || '',
+          email: customer.email || '',
+          cpf_cnpj: customer.cpf_cnpj || '',
         });
+      } else if (isOpen) {
+        // Caso 2: Cliente não existe, mas o modal está aberto (usuário logado)
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const userMetadata = user.user_metadata;
+          form.reset({
+            name: (userMetadata.full_name as string) || '',
+            phone: (userMetadata.phone as string) || '',
+            email: user.email || '',
+            cpf_cnpj: (userMetadata.cpf_cnpj as string) || '',
+          });
+        } else {
+          // Usuário não logado, limpa o formulário
+          form.reset({ name: '', phone: '', email: '', cpf_cnpj: '' });
+        }
+      }
+    };
+    
+    if (isOpen) {
+        loadData();
     }
   }, [customer, form, isOpen]);
 
@@ -108,11 +122,19 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
 
         if (error) throw new Error(error.message);
       } else if (userId) {
-        // Cria novo cliente se não existir (usando upsert para garantir)
-        const insertData = { ...updateData, user_id: userId, id: undefined };
+        // Cria novo cliente se não existir (usando insert, pois o upsert é mais complexo com RLS)
+        // Nota: O RLS de insert na tabela customers permite a criação se user_id = auth.uid()
+        const insertData: TablesInsert<'customers'> = { 
+            ...updateData, 
+            user_id: userId, 
+            // Campos obrigatórios que não estão no updateData:
+            name: data.name,
+            phone: data.phone,
+        };
+        
         const { error } = await supabase
           .from('customers')
-          .insert(insertData as TablesInsert<'customers'>);
+          .insert(insertData);
           
         if (error) throw new Error(error.message);
       } else {
@@ -134,9 +156,6 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
   const onSubmit = (data: ProfileFormValues) => {
     mutation.mutate(data);
   };
-
-  // Removemos a verificação 'if (!customer) return null;'
-  // O modal agora abre, mas os campos podem estar vazios se o cliente for novo.
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
