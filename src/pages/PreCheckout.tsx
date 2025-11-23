@@ -49,7 +49,13 @@ const PreCheckout = () => {
     if (!isLoadingAuth && !isLoadingRestaurantId) {
       if (user) {
         // Usuário logado, prossegue para o checkout
-        navigate('/checkout', { replace: true });
+        // NOVO: Passa o restaurantId no state para que Checkout.tsx possa usá-lo
+        navigate('/checkout', { 
+          state: { 
+            restaurantId: currentRestaurantId 
+          }, 
+          replace: true 
+        });
       } else {
         // Usuário não logado, redireciona para autenticação, passando o estado de onde veio
         // Incluímos o restaurantId no estado para que Auth.tsx saiba para onde voltar
