@@ -7,13 +7,12 @@ import { Button } from '@/components/ui/button';
 import { toast } from "sonner";
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { Tables, Enums } from '@/integrations/supabase/types';
-import { ShoppingCart, Volume2, VolumeX, AlertCircle, Loader2, User } from 'lucide-react';
+import { ShoppingCart, Loader2, User, AlertCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { EnableSoundModal } from "@/components/EnableSoundModal";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MobileSidebar } from "@/components/MobileSidebar"; 
 import { useIsMobile } from "@/hooks/use-mobile"; 
-import { SoundContext, useSound } from "@/hooks/use-sound";
+import { SoundContext } from "@/hooks/use-sound"; // Mantendo SoundContext para tipagem, mas removendo useSound
 import { AdminProfileModal } from "@/components/AdminProfileModal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -74,19 +73,10 @@ const DashboardLayoutComponent = () => {
   const [userRestaurantId, setUserRestaurantId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [audioReadyState, setAudioReadyState] = useState<AudioReadyState>('loading');
-  const [isEnableSoundModalOpen, setIsEnableSoundModalOpen] = useState(false);
   const [loopingOrderId, setLoopingOrderId] = useState<string | null>(null);
-  const isMobile = useIsMobile();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-  const [soundStatus, setSoundStatus] = useState<SoundStatus>(() => {
-    const savedStatus = localStorage.getItem('soundNotificationStatus');
-    return (savedStatus as SoundStatus) || 'disabled';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('soundNotificationStatus', soundStatus);
-  }, [soundStatus]);
+  // Remove soundStatus state and related localStorage logic
 
   const { data: restaurant, isLoading: isRestaurantLoading, isError: isRestaurantError, error: restaurantError } = useQuery<Restaurant>({
     queryKey: ['dashboardRestaurant', userRestaurantId],
@@ -172,6 +162,7 @@ const DashboardLayoutComponent = () => {
 
   useEffect(() => {
     if (notificationSoundUrl) {
+      // Força o carregamento do áudio
       if (audioRef.current?.src !== `${window.location.origin}${window.location.pathname}${notificationSoundUrl}`) {
         setAudioReadyState('loading');
       }
@@ -181,12 +172,7 @@ const DashboardLayoutComponent = () => {
   }, [notificationSoundUrl]);
 
 
-  useEffect(() => {
-    const hasSeenModal = localStorage.getItem('hasSeenSoundPermissionModal');
-    if (!hasSeenModal && soundStatus !== 'enabled' && audioReadyState === 'ready') {
-      setIsEnableSoundModalOpen(true);
-    }
-  }, [soundStatus, audioReadyState]);
+  // Remove useEffect para modal de permissão de som
 
   const stopSoundLoop = useCallback(() => {
     if (audioRef.current) {
@@ -197,19 +183,18 @@ const DashboardLayoutComponent = () => {
   }, []);
 
   const startSoundLoop = useCallback((orderId: string) => {
-    if (soundStatus === 'enabled' && audioRef.current && audioReadyState === 'ready') {
+    // Tenta tocar o som se estiver pronto
+    if (audioRef.current && audioReadyState === 'ready') {
       if (loopingOrderId) return; 
       setLoopingOrderId(orderId);
       audioRef.current.loop = true;
       audioRef.current.play().catch(error => {
         console.error("Erro na reprodução automática de áudio:", error);
         setLoopingOrderId(null);
-        toast.warning("Não foi possível tocar o som automaticamente.", {
-          description: "Interaja com a página para permitir a reprodução de som.",
-        });
+        // Não mostra toast de aviso, pois o usuário não tem controle sobre isso
       });
     }
-  }, [soundStatus, audioReadyState, loopingOrderId]);
+  }, [audioReadyState, loopingOrderId]);
 
   useEffect(() => {
     if ((userRole !== 'admin' && userRole !== 'moderator') || !userRestaurantId) return;
@@ -247,81 +232,7 @@ const DashboardLayoutComponent = () => {
     return () => { supabase.removeChannel(channel); };
   }, [queryClient, startSoundLoop, stopSoundLoop, loopingOrderId, userRole, userRestaurantId]);
 
-  const playSound = useCallback(() => {
-    if (soundStatus === 'enabled' && audioRef.current && audioReadyState === 'ready') {
-      stopSoundLoop();
-      audioRef.current.loop = false;
-      audioRef.current.currentTime = 0;
-      
-      const playPromise = audioRef.current.play();
-      
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log("Som de teste tocado com sucesso");
-          })
-          .catch((error) => {
-            console.error("Erro ao tocar som de teste:", error);
-            setSoundStatus('error');
-            toast.error("Não foi possível tocar o som de teste.", {
-              description: "Interaja com a página para permitir a reprodução de som.",
-            });
-          });
-      }
-    } else if (audioReadyState === 'ready') {
-        setSoundStatus('enabled');
-        setTimeout(() => playSound(), 100); 
-    } else {
-      toast.error("Som de notificação não está pronto ou configurado.", {
-        description: "Verifique se a URL do som está correta nas Configurações.",
-      });
-      setSoundStatus('error');
-    }
-  }, [soundStatus, audioReadyState, stopSoundLoop]);
-
-  const handleEnableSoundFromModal = async () => {
-    if (audioReadyState !== 'ready' || !audioRef.current) {
-      toast.error("O arquivo de som ainda não está pronto. Tente novamente em um momento.");
-      return;
-    }
-    try {
-      audioRef.current.currentTime = 0;
-      await audioRef.current.play();
-      setSoundStatus('enabled');
-      toast.success('Notificações sonoras ativadas!');
-      localStorage.setItem('hasSeenSoundPermissionModal', 'true');
-    } catch (err) {
-      console.error("Audio activation failed from modal:", err);
-      toast.error("Falha ao ativar o som.", { description: "Seu navegador pode ter bloqueado a reprodução. Por favor, tente ativar manualmente no ícone do cabeçalho." });
-      setSoundStatus('error');
-    } finally {
-      setIsEnableSoundModalOpen(false);
-    }
-  };
-
-  const handleToggleSound = async () => {
-    if (soundStatus === 'enabled') {
-      stopSoundLoop();
-      setSoundStatus('disabled');
-      toast.info('Notificações sonoras desativadas.');
-      return;
-    }
-    if (audioReadyState !== 'ready' || !audioRef.current) {
-      toast.error("Som de notificação não está pronto ou configurado.");
-      setSoundStatus('error');
-      return;
-    }
-    try {
-      audioRef.current.currentTime = 0;
-      await audioRef.current.play();
-      setSoundStatus('enabled');
-      toast.success('Notificações sonoras ativadas!', { description: 'Você ouviu o som de teste.' });
-    } catch (err) {
-      console.error("Audio activation failed:", err);
-      toast.error("Falha ao ativar o som.", { description: "Seu navegador pode ter bloqueado. Clique na página e tente novamente." });
-      setSoundStatus('error');
-    }
-  };
+  // Remove playSound, handleEnableSoundFromModal, handleToggleSound functions
 
   const handleSignOut = async () => { await supabase.auth.signOut(); };
 
@@ -365,14 +276,17 @@ const DashboardLayoutComponent = () => {
       return <LoadingSpinner />;
   }
 
-  const isSoundControlDisabled = audioReadyState !== 'ready';
+  // O SoundContext.Provider é mantido, mas com valores mockados, para evitar que outros componentes que usam useSound quebrem.
+  const soundContextValue = useMemo(() => ({
+    playSound: () => { /* no-op */ },
+    stopSoundLoop,
+    soundStatus: audioReadyState === 'ready' ? 'enabled' as SoundStatus : 'disabled' as SoundStatus,
+    loopingOrderId,
+  }), [stopSoundLoop, audioReadyState, loopingOrderId]);
 
   return (
-    <SoundContext.Provider value={{ playSound, stopSoundLoop, soundStatus, loopingOrderId }}>
-      <EnableSoundModal 
-        isOpen={isEnableSoundModalOpen} 
-        onEnable={handleEnableSoundFromModal} 
-      />
+    <SoundContext.Provider value={soundContextValue}>
+      {/* Remove EnableSoundModal */}
       <AdminProfileModal 
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
@@ -408,46 +322,15 @@ const DashboardLayoutComponent = () => {
                   <TooltipContent>Meu Perfil</TooltipContent>
                 </Tooltip>
                 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" onClick={playSound} disabled={isSoundControlDisabled}>
-                      Testar Som
-                    </Button>
-                  </TooltipTrigger>
-                  {isSoundControlDisabled && (
-                    <TooltipContent>
-                      {audioReadyState === 'loading' ? 'Carregando som...' : 'Som não disponível'}
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
-                      onClick={handleToggleSound} 
-                      disabled={isSoundControlDisabled}
-                      aria-label={soundStatus === 'enabled' ? "Desativar som" : "Ativar som"}
-                    >
-                      {audioReadyState === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
-                      {audioReadyState === 'ready' && soundStatus === 'enabled' && <Volume2 className="h-4 w-4 text-green-500" />}
-                      {audioReadyState === 'ready' && soundStatus === 'disabled' && <VolumeX className="h-4 w-4" />}
-                      {audioReadyState === 'error' && <AlertCircle className="h-4 w-4 text-destructive" />}
-                    </Button>
-                  </TooltipTrigger>
-                  {isSoundControlDisabled && (
-                    <TooltipContent>
-                      {audioReadyState === 'loading' ? 'Carregando som...' : 'Som não disponível'}
-                    </TooltipContent>
-                  )}
-                </Tooltip>
+                {/* Botões de controle de som removidos daqui */}
+                
                 <Button variant="outline" onClick={handleSignOut}>Sair</Button>
               </div>
             </div>
           </header>
           <Outlet context={{ restaurant, userRestaurantId }} />
         </div>
-        {/* Garantindo que a URL seja resolvida corretamente */}
+        {/* Mantém a tag de áudio para reprodução automática de novos pedidos */}
         {notificationSoundUrl && (
           <audio
             ref={audioRef}
@@ -462,7 +345,6 @@ const DashboardLayoutComponent = () => {
                 description: "Verifique o arquivo em Configurações." 
               });
               setAudioReadyState('error');
-              setSoundStatus('error');
             }}
             className="hidden"
           />
