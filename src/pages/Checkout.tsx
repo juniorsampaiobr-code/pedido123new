@@ -151,6 +151,11 @@ const Checkout = () => {
   // NOVO ESTADO: Rastreia se o endereço foi salvo/validado
   const [isAddressSaved, setIsAddressSaved] = useState(false);
 
+  // DEBUG: Loga o status do usuário
+  useEffect(() => {
+      console.log("LOG: Checkout - User Status:", user ? `Logged in as ${user.email}` : 'Anonymous');
+  }, [user]);
+
   // Fetch de dados essenciais
   const { data: restaurant, isLoading: isLoadingRestaurant, isError: isErrorRestaurant, error: errorRestaurant, refetch: refetchRestaurant } = useQuery<Restaurant>({
     queryKey: ['checkoutRestaurantData'],
@@ -295,7 +300,7 @@ const Checkout = () => {
         cpf_cnpj: (userMetadata.cpf_cnpj as string) || '',
       });
     }
-  }, [customer, form, user, isLoadingCustomer, addressForm]);
+  }, [customer, form, user, isLoadingCustomer, addressForm, calculateFee]);
 
   // 2. Lógica de Geocodificação e Cálculo de Taxa de Entrega
   const restaurantCoords: [number, number] | null = useMemo(() => {
@@ -478,6 +483,9 @@ const Checkout = () => {
 
   const createCustomerMutation = useMutation({
     mutationFn: async (data: CheckoutFormValues): Promise<Customer> => {
+      const userAuth = await supabase.auth.getUser();
+      const userId = userAuth.data.user?.id;
+      
       const cleanedPhone = data.phone.replace(/\D/g, '');
       const cleanedCpfCnpj = data.cpf_cnpj?.replace(/\D/g, '') || null;
       
@@ -706,7 +714,7 @@ const Checkout = () => {
   // --- Renderização ---
 
   if (items.length === 0) {
-    useEffect(() => { navigate('/menu', { replace: true }); }, [navigate]);
+    useEffect(() => { navigate('/menu'); }, [navigate]);
     return <LoadingSpinner />;
   }
 
