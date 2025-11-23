@@ -20,7 +20,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { MapPin, Phone, Mail, CreditCard, DollarSign, Truck, Loader2, User, RefreshCw, AlertCircle, LogOut, User as UserIcon, Save } from 'lucide-react';
+import { MapPin, Phone, Mail, CreditCard, DollarSign, Truck, Loader2, User, RefreshCw, AlertCircle, LogOut, User as UserIcon, Save, CheckCircle, Terminal } from 'lucide-react';
 import { ZipCodeInput } from '@/components/ZipCodeInput';
 import { PhoneInput } from '@/components/PhoneInput';
 import { CustomerProfileModal } from '@/components/CustomerProfileModal';
@@ -599,10 +599,6 @@ const Checkout = () => {
             toast.error('O endereço de entrega está fora da área de cobertura.');
             return;
         }
-        // Se for delivery, precisamos garantir que os dados do endereço no formulário principal
-        // (que são usados na mutação createOrderMutation) estejam sincronizados com o addressForm
-        // Isso é feito implicitamente pela forma como o addressPayload é construído na mutação createCustomerMutation
-        // e como o delivery_address é construído na createOrderMutation (usando addressFields, que é watch do addressForm).
     }
 
     let customerId: string;
@@ -891,7 +887,7 @@ const Checkout = () => {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="city">Cidade *</Label>
-                      <Input id="city" {...addressForm.register('city')} />
+                        <Input id="city" {...addressForm.register('city')} />
                       {addressForm.formState.errors.city && <p className="text-destructive text-sm">{addressForm.formState.errors.city.message}</p>}
                     </div>
                     
