@@ -647,8 +647,6 @@ const Checkout = () => {
   const handleMercadoPagoCheckout = async (orderId: string, data: CheckoutFormValues) => {
     if (!restaurant) return;
     
-    setIsMercadoPagoOpen(true);
-    
     const clientUrl = window.location.origin + window.location.pathname;
     
     const itemsPayload = items.map(item => ({
@@ -657,6 +655,8 @@ const Checkout = () => {
       quantity: item.quantity,
     }));
     
+    const loadingToastId = toast.loading("Preparando pagamento online...");
+
     try {
       console.log("LOG: Chamando Edge Function create-payment-preference...");
       const { data: mpData, error: mpError } = await supabase.functions.invoke('create-payment-preference', {
@@ -679,9 +679,13 @@ const Checkout = () => {
       
       setMpPreferenceId(orderId);
       setMpInitPoint(init_point);
+      setIsMercadoPagoOpen(true); // Abre o modal APENAS se a preferência for criada
+      
+      toast.dismiss(loadingToastId);
       
     } catch (error: any) {
       console.error("Erro ao criar preferência MP:", error);
+      toast.dismiss(loadingToastId);
       toast.error(`Erro no pagamento online: ${error.message}`);
       setIsMercadoPagoOpen(false);
     }
