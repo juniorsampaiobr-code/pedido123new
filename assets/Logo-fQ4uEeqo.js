@@ -1,0 +1,1 @@
+import{j as s}from"./tanstack-C7aOFagJ.js";import{a as t,S as r}from"./index-B8fqsmuC.js";const n=({className:e})=>s.jsxs("div",{className:t("flex items-center gap-2",e),children:[s.jsx(r,{className:"h-6 w-6 text-primary"}),s.jsx("span",{className:"text-xl font-bold text-foreground",children:"Pedido 123"})]});export{n as L};
