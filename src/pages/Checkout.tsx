@@ -66,7 +66,10 @@ const checkoutSchema = z.object({
   notes: z.string().optional(),
   payment_method_id: z.string().min(1, 'Selecione um método de pagamento.'),
   change_for: z.preprocess(
-    (val) => String(val).replace(',', '.'),
+    (val) => {
+      const s = String(val).replace(',', '.').trim();
+      return s === '' ? null : s; // Retorna null se for string vazia
+    },
     z.coerce.number().optional().nullable()
   ),
 });
@@ -362,7 +365,8 @@ const Checkout = () => {
   // 3. Lógica de Troco
   const changeFor = form.watch('change_for');
   useEffect(() => {
-    if (isCashPayment && changeFor !== null && changeFor !== undefined && changeFor < totalAmount) {
+    // A validação só ocorre se for pagamento em dinheiro E se um valor foi inserido (changeFor > 0)
+    if (isCashPayment && changeFor !== null && changeFor !== undefined && changeFor > 0 && changeFor < totalAmount) {
       form.setError('change_for', { message: 'O valor do troco deve ser maior ou igual ao total do pedido.' });
     } else {
       form.clearErrors('change_for');
