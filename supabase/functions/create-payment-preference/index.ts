@@ -156,6 +156,11 @@ serve(async (req) => {
     
     console.log(`[create-payment-preference] Payer Identification: ${JSON.stringify(payerIdentification)}`);
 
+    // --- NOVO: Adiciona restaurantId nas URLs de retorno ---
+    const successUrl = `${clientUrl.replace(/\/$/, '')}/#/order-success/${orderId}?status=approved&external_reference=${orderId}&restaurantId=${restaurantId}`;
+    const failureUrl = `${clientUrl.replace(/\/$/, '')}/#/checkout?restaurantId=${restaurantId}`;
+    const pendingUrl = `${clientUrl.replace(/\/$/, '')}/#/checkout?restaurantId=${restaurantId}`;
+
 
     const preference = {
       items: preferenceItems,
@@ -170,11 +175,9 @@ serve(async (req) => {
         installments: 1
       },
       back_urls: {
-        // Assegura que clientUrl termina com /#/checkout
-        success: `${clientUrl.replace(/\/$/, '')}/#/order-success/${orderId}?status=approved&external_reference=${orderId}`,
-        // Ajustado para voltar ao checkout sem status de falha/pendência, permitindo que o usuário tente novamente.
-        failure: `${clientUrl.replace(/\/$/, '')}/#/checkout`, 
-        pending: `${clientUrl.replace(/\/$/, '')}/#/checkout`,
+        success: successUrl,
+        failure: failureUrl, 
+        pending: pendingUrl,
       },
       auto_return: 'approved',
       external_reference: orderId,

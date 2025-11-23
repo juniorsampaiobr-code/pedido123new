@@ -129,7 +129,8 @@ const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
 
 const Checkout = () => {
   const navigate = useNavigate();
-  const location = useLocation(); // NOVO: Para ler o estado
+  const location = useLocation();
+  const [searchParams] = useSearchParams(); // NOVO: Para ler query params
   const queryClient = useQueryClient();
   const { items, totalAmount: cartSubtotal, clearCart } = useCart();
   const { data: user, isLoading: isLoadingAuth } = useAuthStatus();
@@ -148,8 +149,11 @@ const Checkout = () => {
   // NOVO ESTADO: Rastreia se o endereço foi salvo/validado
   const [isAddressSaved, setIsAddressSaved] = useState(false);
   
-  // NOVO: Obtém o ID do restaurante do estado de navegação (passado pelo PreCheckout/Auth)
-  const restaurantId = location.state?.restaurantId as string | undefined;
+  // NOVO: Obtém o ID do restaurante do estado de navegação OU dos query params (fallback)
+  const restaurantIdFromState = location.state?.restaurantId as string | undefined;
+  const restaurantIdFromQuery = searchParams.get('restaurantId') as string | undefined;
+  const restaurantId = restaurantIdFromState || restaurantIdFromQuery;
+
 
   // DEBUG: Loga o status do usuário
   useEffect(() => {
