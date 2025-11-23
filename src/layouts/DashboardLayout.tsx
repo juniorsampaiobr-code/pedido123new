@@ -103,6 +103,12 @@ const DashboardLayoutComponent = () => {
     enabled: !!user && (userRole === 'admin' || userRole === 'moderator') && !!userRestaurantId,
     staleTime: Infinity, // Restaurant data is stable, fetch once
   });
+  
+  // NOVO: Determina a URL do som, usando o padrão como fallback
+  const notificationSoundUrl = useMemo(() => {
+    return restaurant?.notification_sound_url || '/default-notification.mp3';
+  }, [restaurant?.notification_sound_url]);
+
 
   // Efeito de Autenticação e Verificação de Role
   useEffect(() => {
@@ -170,15 +176,16 @@ const DashboardLayoutComponent = () => {
 
   // Efeito para redefinir o estado do áudio quando a URL de notificação muda
   useEffect(() => {
-    if (restaurant?.notification_sound_url) {
+    // Usa a URL calculada (com fallback)
+    if (notificationSoundUrl) {
       // Se a URL for diferente da que está sendo carregada, redefina o estado
-      if (audioRef.current?.src !== restaurant.notification_sound_url) {
+      if (audioRef.current?.src !== notificationSoundUrl) {
         setAudioReadyState('loading');
       }
     } else {
       setAudioReadyState('error');
     }
-  }, [restaurant?.notification_sound_url]);
+  }, [notificationSoundUrl]);
 
 
   useEffect(() => {
@@ -469,11 +476,12 @@ const DashboardLayoutComponent = () => {
           {/* Passando userRestaurantId no contexto */}
           <Outlet context={{ restaurant, userRestaurantId }} />
         </div>
-        {restaurant?.notification_sound_url && (
+        {/* Usa a URL calculada (com fallback) */}
+        {notificationSoundUrl && (
           <audio
             ref={audioRef}
             // A URL já contém o parâmetro de cache forçado do Settings.tsx
-            src={restaurant.notification_sound_url}
+            src={notificationSoundUrl}
             onCanPlayThrough={() => {
               setAudioReadyState('ready');
               console.log("Áudio carregado e pronto para tocar.");
