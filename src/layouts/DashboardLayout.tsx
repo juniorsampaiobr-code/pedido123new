@@ -13,9 +13,9 @@ import { EnableSoundModal } from "@/components/EnableSoundModal";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MobileSidebar } from "@/components/MobileSidebar"; 
 import { useIsMobile } from "@/hooks/use-mobile"; 
-import { SoundContext, useSound } from "@/hooks/use-sound"; // Importando do novo hook
-import { AdminProfileModal } from "@/components/AdminProfileModal"; // NOVO IMPORT
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Importando Alert
+import { SoundContext, useSound } from "@/hooks/use-sound";
+import { AdminProfileModal } from "@/components/AdminProfileModal";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type Restaurant = Tables<'restaurants'>;
 type SoundStatus = 'disabled' | 'enabled' | 'error';
@@ -26,7 +26,7 @@ type UserRole = Tables<'user_roles'>;
 
 export type DashboardContextType = {
   restaurant: Restaurant;
-  userRestaurantId: string; // Novo: ID do restaurante do usuário logado
+  userRestaurantId: string;
 };
 
 const navItems = [
@@ -45,13 +45,12 @@ const getPageTitle = (pathname: string) => {
   return page ? page.label : "Dashboard";
 };
 
-// Função para verificar a role do usuário e o restaurant_id associado
 const checkUserRoleAndRestaurant = async (userId: string): Promise<{ role: AppRole | null, restaurantId: string | null }> => {
   const { data, error } = await supabase
     .from('user_roles')
     .select('role, restaurant_id')
     .eq('user_id', userId)
-    .limit(1) // Limita a 1, pois só precisamos da role principal
+    .limit(1)
     .single();
 
   if (error && error.code !== 'PGRST116') {
@@ -66,20 +65,19 @@ const checkUserRoleAndRestaurant = async (userId: string): Promise<{ role: AppRo
   return { role: data.role, restaurantId: data.restaurant_id };
 };
 
-
 const DashboardLayoutComponent = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
   const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [userRole, setUserRole] = useState<AppRole | null | undefined>(undefined); // undefined = loading
-  const [userRestaurantId, setUserRestaurantId] = useState<string | null>(null); // Novo estado
+  const [userRole, setUserRole] = useState<AppRole | null | undefined>(undefined);
+  const [userRestaurantId, setUserRestaurantId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [audioReadyState, setAudioReadyState] = useState<AudioReadyState>('loading');
   const [isEnableSoundModalOpen, setIsEnableSoundModalOpen] = useState(false);
   const [loopingOrderId, setLoopingOrderId] = useState<string | null>(null);
-  const isMobile = useIsMobile(); 
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false); // NOVO ESTADO
+  const isMobile = useIsMobile();
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const [soundStatus, setSoundStatus] = useState<SoundStatus>(() => {
     const savedStatus = localStorage.getItem('soundNotificationStatus');
@@ -90,7 +88,6 @@ const DashboardLayoutComponent = () => {
     localStorage.setItem('soundNotificationStatus', soundStatus);
   }, [soundStatus]);
 
-  // Novo: Query para buscar os dados do restaurante baseado no userRestaurantId
   const { data: restaurant, isLoading: isRestaurantLoading, isError: isRestaurantError, error: restaurantError } = useQuery<Restaurant>({
     queryKey: ['dashboardRestaurant', userRestaurantId],
     queryFn: async () => {
@@ -101,16 +98,20 @@ const DashboardLayoutComponent = () => {
       return data;
     },
     enabled: !!user && (userRole === 'admin' || userRole === 'moderator') && !!userRestaurantId,
-    staleTime: Infinity, // Restaurant data is stable, fetch once
+    staleTime: Infinity,
   });
   
-  // NOVO: Determina a URL do som, usando o padrão como fallback
+  // Ajuste no fallback para usar caminho relativo
   const notificationSoundUrl = useMemo(() => {
-    return restaurant?.notification_sound_url || '/default-notification.mp3';
+    // Se o campo no DB for NULL ou VAZIO, usa o caminho relativo do som padrão
+    if (!restaurant?.notification_sound_url || restaurant.notification_sound_url.trim() === '') {
+        return './default-notification.mp3';
+    }
+    // Caso contrário, usa a URL configurada no DB
+    return restaurant.notification_sound_url;
   }, [restaurant?.notification_sound_url]);
 
 
-  // Efeito de Autenticação e Verificação de Role
   useEffect(() => {
     const checkAuthAndRole = async (session: any) => {
       if (!session?.user) {
@@ -124,32 +125,27 @@ const DashboardLayoutComponent = () => {
       const { role, restaurantId } = await checkUserRoleAndRestaurant(session.user.id);
       setUser(session.user);
       setUserRole(role);
-      setUserRestaurantId(restaurantId); // Armazena o restaurant_id do usuário
+      setUserRestaurantId(restaurantId);
 
-      // Se a role for 'user' (cliente), força o logout do fluxo admin e redireciona para o menu
       if (role === 'user') {
         toast.error("Acesso restrito.", {
           description: "Esta conta é de cliente e não tem permissão para acessar o painel.",
           duration: 5000,
         });
         await supabase.auth.signOut();
-        // Redireciona para a página inicial ou menu público
         const menuUrl = `${window.location.origin}${window.location.pathname}#/`;
         window.location.href = menuUrl;
         return;
       }
 
       if (role !== 'admin' && role !== 'moderator') {
-        // Se a role for null ou outra coisa (e não 'user', que já foi tratado)
         toast.error("Acesso restrito.", {
           description: "Você não tem permissão para acessar o painel. Redirecionando para o login de administrador.",
           duration: 5000,
         });
-        // Redireciona para o login de admin, que pode forçar o logout se necessário
         navigate("/admin-auth", { replace: true });
       }
       
-      // Se o usuário tem role admin/moderator, mas não tem restaurant_id, mostra erro no layout
       if ((role === 'admin' || role === 'moderator') && !restaurantId) {
           console.error("Admin logged in but missing restaurant ID.");
       }
@@ -174,12 +170,9 @@ const DashboardLayoutComponent = () => {
   }, [navigate]);
 
 
-  // Efeito para redefinir o estado do áudio quando a URL de notificação muda
   useEffect(() => {
-    // Usa a URL calculada (com fallback)
     if (notificationSoundUrl) {
-      // Se a URL for diferente da que está sendo carregada, redefina o estado
-      if (audioRef.current?.src !== notificationSoundUrl) {
+      if (audioRef.current?.src !== `${window.location.origin}${window.location.pathname}${notificationSoundUrl}`) {
         setAudioReadyState('loading');
       }
     } else {
@@ -219,7 +212,6 @@ const DashboardLayoutComponent = () => {
   }, [soundStatus, audioReadyState, loopingOrderId]);
 
   useEffect(() => {
-    // Só se inscreve se o usuário for admin/moderator e tiver um restaurant_id
     if ((userRole !== 'admin' && userRole !== 'moderator') || !userRestaurantId) return;
     
     const channel = supabase.channel('new-orders-toast')
@@ -227,8 +219,6 @@ const DashboardLayoutComponent = () => {
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         const newOrder = payload.new as Tables<'orders'>;
         
-        // Toca o som APENAS se o status for 'pending' (pagamento na entrega ou online aprovado)
-        // E se o pedido for do restaurante do usuário logado
         if (newOrder.status === 'pending' && newOrder.id && newOrder.restaurant_id === userRestaurantId) {
           toast.info("🔔 Novo pedido recebido!", { 
             description: `Pedido #${newOrder.id.slice(-4)} está aguardando confirmação.`,
@@ -241,14 +231,10 @@ const DashboardLayoutComponent = () => {
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         const updatedOrder = payload.new as Tables<'orders'>;
         
-        // Se o pedido que estava tocando o som for atualizado, paramos o loop.
         if (updatedOrder.id === loopingOrderId) {
           stopSoundLoop();
         }
         
-        // Exibe toast para confirmação de pagamento online, mas sem tocar o som
-        // O status agora muda de 'pending_payment' para 'pending' (não 'confirmed')
-        // E se o pedido for do restaurante do usuário logado
         if (updatedOrder.status === 'pending' && updatedOrder.id && payload.old.status === 'pending_payment' && updatedOrder.restaurant_id === userRestaurantId) {
           toast.success("✅ Pagamento Confirmado!", { 
             description: `Pedido #${updatedOrder.id.slice(-4)} foi pago e está pronto para preparo.`,
@@ -267,27 +253,23 @@ const DashboardLayoutComponent = () => {
       audioRef.current.loop = false;
       audioRef.current.currentTime = 0;
       
-      // Tentar tocar o som e lidar com erros
       const playPromise = audioRef.current.play();
       
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            // Som tocado com sucesso
             console.log("Som de teste tocado com sucesso");
           })
           .catch((error) => {
             console.error("Erro ao tocar som de teste:", error);
-            setSoundStatus('error'); // Define como erro se a reprodução falhar
+            setSoundStatus('error');
             toast.error("Não foi possível tocar o som de teste.", {
               description: "Interaja com a página para permitir a reprodução de som.",
             });
           });
       }
     } else if (audioReadyState === 'ready') {
-        // Se o som está pronto, mas desativado, tentamos ativar e tocar
         setSoundStatus('enabled');
-        // Chamamos playSound novamente para tentar tocar
         setTimeout(() => playSound(), 100); 
     } else {
       toast.error("Som de notificação não está pronto ou configurado.", {
@@ -343,19 +325,14 @@ const DashboardLayoutComponent = () => {
 
   const handleSignOut = async () => { await supabase.auth.signOut(); };
 
-  // Se estiver carregando a role, o restaurant_id ou os dados do restaurante, mostra o spinner
   if (userRole === undefined || isRestaurantLoading) {
     return <LoadingSpinner />;
   }
   
-  // Se o usuário não for admin/moderator, ele já foi redirecionado no useEffect.
   if (userRole !== 'admin' && userRole !== 'moderator') {
-    // Se chegarmos aqui, significa que o useEffect falhou ou o redirecionamento está pendente.
-    // Retornamos o spinner para evitar renderizar o painel.
     return <LoadingSpinner />;
   }
   
-  // Se o usuário é admin/moderator, mas não tem restaurant_id, mostra erro
   if (!userRestaurantId) {
       return (
         <div className="flex h-screen items-center justify-center">
@@ -370,7 +347,6 @@ const DashboardLayoutComponent = () => {
       );
   }
 
-  // Se o restaurante não for encontrado (e não estiver carregando), algo está errado
   if (isRestaurantError) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -397,14 +373,12 @@ const DashboardLayoutComponent = () => {
         isOpen={isEnableSoundModalOpen} 
         onEnable={handleEnableSoundFromModal} 
       />
-      {/* NOVO MODAL DE PERFIL */}
       <AdminProfileModal 
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         userId={user?.id || null}
       />
       <div className="flex min-h-screen bg-muted/40">
-        {/* Sidebar de Desktop (Visível apenas em telas grandes) */}
         <div className="hidden lg:flex">
           <Sidebar />
         </div>
@@ -413,7 +387,6 @@ const DashboardLayoutComponent = () => {
           <header className="border-b bg-background sticky top-0 z-40">
             <div className="container max-w-none mx-auto px-4 sm:px-8 h-16 flex justify-between items-center">
               <div className="flex items-center gap-4">
-                {/* Mobile Sidebar Trigger (Visível em telas pequenas) */}
                 <div className="lg:hidden">
                   <MobileSidebar /> 
                 </div>
@@ -421,7 +394,6 @@ const DashboardLayoutComponent = () => {
                 <h1 className="text-xl font-semibold">{getPageTitle(location.pathname)}</h1>
               </div>
               <div className="flex items-center gap-2">
-                {/* Botão de Perfil do Admin */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
@@ -473,15 +445,13 @@ const DashboardLayoutComponent = () => {
               </div>
             </div>
           </header>
-          {/* Passando userRestaurantId no contexto */}
           <Outlet context={{ restaurant, userRestaurantId }} />
         </div>
-        {/* Usa a URL calculada (com fallback) */}
+        {/* Garantindo que a URL seja resolvida corretamente */}
         {notificationSoundUrl && (
           <audio
             ref={audioRef}
-            // A URL já contém o parâmetro de cache forçado do Settings.tsx
-            src={notificationSoundUrl}
+            src={notificationSoundUrl.startsWith('http') ? notificationSoundUrl : `${window.location.origin}${window.location.pathname}${notificationSoundUrl}`}
             onCanPlayThrough={() => {
               setAudioReadyState('ready');
               console.log("Áudio carregado e pronto para tocar.");
