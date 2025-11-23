@@ -599,6 +599,10 @@ const Checkout = () => {
             toast.error('O endereço de entrega está fora da área de cobertura.');
             return;
         }
+        // Se for delivery, precisamos garantir que os dados do endereço no formulário principal
+        // (que são usados na mutação createOrderMutation) estejam sincronizados com o addressForm
+        // Isso é feito implicitamente pela forma como o addressPayload é construído na mutação createCustomerMutation
+        // e como o delivery_address é construído na createOrderMutation (usando addressFields, que é watch do addressForm).
     }
 
     let customerId: string;
