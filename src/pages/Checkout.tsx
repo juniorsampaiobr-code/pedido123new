@@ -584,6 +584,11 @@ const Checkout = () => {
   // --- Submissão Principal ---
 
   const onSubmit = async (data: CheckoutFormValues) => {
+    console.log("LOG: onSubmit iniciado.");
+    console.log("LOG: isOnlinePayment:", isOnlinePayment);
+    console.log("LOG: deliveryOption:", deliveryOption);
+    console.log("LOG: isAddressSaved:", isAddressSaved);
+    
     if (items.length === 0) {
       toast.error('Seu carrinho está vazio.');
       navigate('/menu');
@@ -605,8 +610,10 @@ const Checkout = () => {
     
     // 1. Cria/Atualiza o cliente (usando os dados pessoais do form principal e o endereço salvo)
     try {
+      console.log("LOG: Criando/Atualizando cliente...");
       const newCustomer = await createCustomerMutation.mutateAsync(data);
       customerId = newCustomer.id;
+      console.log("LOG: Cliente ID:", customerId);
     } catch (e: any) {
       toast.error(`Falha ao salvar cliente: ${e.message}`);
       return;
@@ -615,7 +622,9 @@ const Checkout = () => {
     // 2. Cria o pedido
     let orderId: string;
     try {
+      console.log("LOG: Criando pedido...");
       orderId = await createOrderMutation.mutateAsync({ customerId, data });
+      console.log("LOG: Pedido ID:", orderId);
     } catch (e: any) {
       toast.error(`Falha ao criar pedido: ${e.message}`);
       return;
@@ -623,9 +632,11 @@ const Checkout = () => {
 
     // 3. Processa o pagamento (se online) ou redireciona para sucesso
     if (isOnlinePayment) {
+      console.log("LOG: Iniciando checkout Mercado Pago...");
       await handleMercadoPagoCheckout(orderId, data);
     } else {
       // Pagamento na entrega ou retirada
+      console.log("LOG: Pagamento na entrega/retirada. Redirecionando para sucesso.");
       clearCart();
       navigate(`/order-success/${orderId}`, { replace: true });
     }
@@ -647,6 +658,7 @@ const Checkout = () => {
     }));
     
     try {
+      console.log("LOG: Chamando Edge Function create-payment-preference...");
       const { data: mpData, error: mpError } = await supabase.functions.invoke('create-payment-preference', {
         body: {
           orderId: orderId,
@@ -662,6 +674,8 @@ const Checkout = () => {
       if (mpError) throw mpError;
       
       const { init_point } = mpData as { init_point: string };
+      
+      console.log("LOG: Preferência MP criada. init_point:", init_point);
       
       setMpPreferenceId(orderId);
       setMpInitPoint(init_point);
