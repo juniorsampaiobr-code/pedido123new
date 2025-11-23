@@ -15,6 +15,7 @@ import { useActiveRestaurantId } from "@/hooks/use-active-restaurant-id";
 import { CpfCnpjInput } from "@/components/CpfCnpjInput"; // Importando CpfCnpjInput
 import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importação corrigida
 import { useQueryClient } from "@tanstack/react-query"; // NOVO IMPORT
+import { Controller } from "react-hook-form"; // Importação do Controller
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
@@ -43,7 +44,11 @@ const Auth = () => {
 
     if (from === '/checkout') {
       console.log("User logged in, redirecting to checkout.");
-      navigate('/checkout', { replace: true });
+      // Se veio do checkout, redireciona para /checkout, garantindo que o restaurantId seja passado no state
+      navigate('/checkout', { 
+        replace: true,
+        state: { restaurantId: restaurantIdFromState } // Usa o ID que veio do PreCheckout
+      });
     } else if (finalRestaurantId) {
       // Se não veio do checkout, mas temos um ID de restaurante (do estado ou ativo), vai para o menu
       console.log("User logged in, redirecting to specific menu:", finalRestaurantId);
@@ -95,8 +100,8 @@ const Auth = () => {
     }
     
     const cleanedCpfCnpj = cleanCpfCnpj(cpfCnpj);
-    if (cleanedCpfCnpj.length !== 11) {
-      toast.error("O CPF é obrigatório e deve conter 11 dígitos.");
+    if (cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14) {
+      toast.error("O CPF deve ter 11 dígitos ou CNPJ 14 dígitos.");
       return false;
     }
     
@@ -215,23 +220,25 @@ const Auth = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Telefone *</Label>
-                    <Controller
-                      name="phone"
-                      control={form.control}
-                      render={({ field }) => <PhoneInput id="phone" {...field} />}
+                    <PhoneInput
+                      id="phone"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required
+                      className="h-12"
                     />
                     <p className="text-xs text-muted-foreground">Formato: (99) 99999-9999</p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="cpfCnpj">CPF *</Label>
+                    <Label htmlFor="cpfCnpj">CPF/CNPJ *</Label>
                     <CpfCnpjInput
                       id="cpfCnpj"
-                      value={cpfCnpj}
+                      value={cpfCpfCnpj}
                       onChange={(e) => setCpfCnpj(e.target.value)}
                       required
                       className="h-12"
                     />
-                    <p className="text-xs text-muted-foreground">Apenas CPF (11 dígitos) é obrigatório no cadastro.</p>
+                    <p className="text-xs text-muted-foreground">CPF (11 dígitos) ou CNPJ (14 dígitos).</p>
                   </div>
                 </>
               )}
@@ -280,11 +287,6 @@ const Auth = () => {
               </Button>
             </div>
             
-            {/* Removendo o link de acesso ao painel de administração */}
-            {/* <Separator className="my-4" />
-            <div className="text-center text-sm text-muted-foreground">
-              É o dono de uma loja? <Link to="/admin-auth" className="text-primary hover:underline">Acesse o painel de administração</Link>
-            </div> */}
           </CardContent>
         </Card>
       </div>
