@@ -53,6 +53,14 @@ const addressSchema = z.object({
 
 type AddressFormValues = z.infer<typeof addressSchema>;
 
+// Schema para change_for: aceita string vazia, null, undefined ou número
+const changeForSchema = z.union([
+  z.string().max(0), // string vazia
+  z.null(),
+  z.undefined(),
+  z.number().min(0)
+]).optional().nullable();
+
 const checkoutSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório.'),
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length >= 10, {
@@ -65,14 +73,7 @@ const checkoutSchema = z.object({
   delivery_option: z.enum(['delivery', 'pickup'], { required_error: 'Selecione uma opção de entrega.' }),
   notes: z.string().optional(),
   payment_method_id: z.string().min(1, 'Selecione um método de pagamento.'),
-  change_for: z.preprocess(
-    (val) => {
-      const s = String(val).replace(',', '.').trim();
-      // Se a string for vazia, retorna undefined para que z.optional() funcione
-      return s === '' ? undefined : s; 
-    },
-    z.coerce.number({ invalid_type_error: 'O troco deve ser um número.' }).optional().nullable()
-  ),
+  change_for: changeForSchema,
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -375,17 +376,8 @@ const Checkout = () => {
     }
   }, [customer, form, user, isLoadingCustomer, addressForm, calculateFee]);
 
-  // 3. Lógica de Troco
-  const changeFor = form.watch('change_for');
-  useEffect(() => {
-    // A validação só ocorre se for pagamento em dinheiro E se um valor foi inserido (changeFor > 0)
-    // Corrigido para verificar corretamente se o campo foi preenchido
-    if (isCashPayment && changeFor !== null && changeFor !== undefined && !isNaN(changeFor) && changeFor > 0 && changeFor < totalAmount) {
-      form.setError('change_for', { message: 'O valor do troco deve ser maior ou igual ao total do pedido.' });
-    } else {
-      form.clearErrors('change_for');
-    }
-  }, [isCashPayment, changeFor, totalAmount, form]);
+  // 3. Lógica de Troco (REMOVIDO O useEffect DE VALIDAÇÃO)
+  // A validação agora é feita apenas no schema Zod e na submissão
   
   // 4. Mutação para salvar APENAS o endereço (chamada pelo botão Salvar Endereço)
   const saveAddressMutation = useMutation({
@@ -554,6 +546,21 @@ const Checkout = () => {
     mutationFn: async ({ customerId, data }: { customerId: string, data: CheckoutFormValues }) => {
       if (!restaurant) throw new Error('Dados do restaurante não disponíveis.');
       
+      // Processa o valor de change_for
+      let changeForValue: number | null = null;
+      if (isCashPayment && data.change_for !== null && data.change_for !== undefined) {
+        // Se for uma string (vazia), converte para null
+        if (typeof data.change_for === 'string' && data.change_for === '') {
+          changeForValue = null;
+        } else {
+          // Se for um número, usa diretamente
+          const numValue = Number(data.change_for);
+          if (!isNaN(numValue) && numValue > totalAmount) {
+            changeForValue = numValue;
+          }
+        }
+      }
+      
       const orderPayload: TablesInsert<'orders'> = {
         restaurant_id: restaurant.id,
         customer_id: customerId,
@@ -564,8 +571,8 @@ const Checkout = () => {
         delivery_address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[3]}, ${addressFields[4]}, ${addressFields[0]}` : null,
         notes: data.notes,
         payment_method_id: data.payment_method_id,
-        // O change_for é undefined/null se o campo estiver vazio, o que é tratado corretamente pelo DB
-        change_for: isCashPayment && data.change_for && data.change_for > totalAmount ? data.change_for : null,
+        // O change_for é null se o campo estiver vazio ou inválido
+        change_for: changeForValue,
       };
 
       const { data: newOrder, error: orderError } = await supabase
@@ -610,6 +617,7 @@ const Checkout = () => {
     console.log("LOG: isOnlinePayment:", isOnlinePayment);
     console.log("LOG: deliveryOption:", deliveryOption);
     console.log("LOG: isAddressSaved:", isAddressSaved);
+    console.log("LOG: change_for data:", data.change_for);
     
     if (items.length === 0) {
       toast.error('Seu carrinho está vazio.');
@@ -1055,7 +1063,10 @@ const Checkout = () => {
                       placeholder={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}
                       {...form.register('change_for', { valueAsNumber: true })}
                     />
-                    {form.formState.errors.change_for && <p className="text-destructive text-sm">{form.formState.errors.change_for.message}</p>}
+                    {/* Exibe erro específico do Zod, se houver */}
+                    {form.formState.errors.change_for?.message && (
+                      <p className="text-destructive text-sm">{form.formState.errors.change_for.message}</p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
