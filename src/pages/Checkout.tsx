@@ -379,7 +379,8 @@ const Checkout = () => {
   const changeFor = form.watch('change_for');
   useEffect(() => {
     // A validação só ocorre se for pagamento em dinheiro E se um valor foi inserido (changeFor > 0)
-    if (isCashPayment && changeFor !== null && changeFor !== undefined && changeFor > 0 && changeFor < totalAmount) {
+    // Corrigido para verificar corretamente se o campo foi preenchido
+    if (isCashPayment && changeFor !== null && changeFor !== undefined && !isNaN(changeFor) && changeFor > 0 && changeFor < totalAmount) {
       form.setError('change_for', { message: 'O valor do troco deve ser maior ou igual ao total do pedido.' });
     } else {
       form.clearErrors('change_for');
