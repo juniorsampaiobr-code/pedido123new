@@ -12,7 +12,7 @@ import { Tables, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { OrderDetailsModal } from "@/components/OrderDetailsModal";
 import { toast } from "sonner";
-import { useSound } from "@/hooks/use-sound";
+// import { useSound } from "@/hooks/use-sound"; // REMOVIDO
 import { useOutletContext } from "react-router-dom";
 import { DashboardContextType } from "@/layouts/DashboardLayout";
 import { PaginationComponent } from "@/components/PaginationComponent";
@@ -166,7 +166,7 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
   totalOrdersInView: number,
 }) => {
   const queryClient = useQueryClient();
-  const { stopSoundLoop } = useSound();
+  // const { stopSoundLoop } = useSound(); // REMOVIDO
   const [currentPage, setCurrentPage] = useState(0); // 0-indexed page
 
   // Usar restaurantId no queryKey e na função fetch
@@ -209,16 +209,16 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
   });
 
   const handleAccept = (orderId: string) => {
-    stopSoundLoop();
+    // stopSoundLoop(); // REMOVIDO
     // Ao aceitar, muda para 'preparing'
     updateStatusMutation.mutate({ orderId, newStatus: 'preparing' as Enums<'order_status'> });
   };
   const handleDecline = (orderId: string) => {
-    stopSoundLoop();
+    // stopSoundLoop(); // REMOVIDO
     updateStatusMutation.mutate({ orderId, newStatus: 'cancelled' });
   };
   const handleViewDetails = (order: Order) => {
-    stopSoundLoop();
+    // stopSoundLoop(); // REMOVIDO
     onViewDetails(order);
   };
   const handleDelete = (orderId: string) => {

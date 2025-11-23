@@ -11,17 +11,12 @@ import { ShoppingCart, Loader2, User, AlertCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MobileSidebar } from "@/components/MobileSidebar"; 
-import { useIsMobile } from "@/hooks/use-mobile"; 
-import { SoundContext } from "@/hooks/use-sound"; // Mantendo SoundContext para tipagem, mas removendo useSound
 import { AdminProfileModal } from "@/components/AdminProfileModal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type Restaurant = Tables<'restaurants'>;
-type SoundStatus = 'disabled' | 'enabled' | 'error';
 type AudioReadyState = 'loading' | 'ready' | 'error';
-type OrderStatus = Enums<'order_status'>;
 type AppRole = Enums<'app_role'>;
-type UserRole = Tables<'user_roles'>;
 
 export type DashboardContextType = {
   restaurant: Restaurant;
@@ -76,8 +71,6 @@ const DashboardLayoutComponent = () => {
   const [loopingOrderId, setLoopingOrderId] = useState<string | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-  // Remove soundStatus state and related localStorage logic
-
   const { data: restaurant, isLoading: isRestaurantLoading, isError: isRestaurantError, error: restaurantError } = useQuery<Restaurant>({
     queryKey: ['dashboardRestaurant', userRestaurantId],
     queryFn: async () => {
@@ -91,13 +84,10 @@ const DashboardLayoutComponent = () => {
     staleTime: Infinity,
   });
   
-  // Ajuste no fallback para usar caminho relativo
   const notificationSoundUrl = useMemo(() => {
-    // Se o campo no DB for NULL ou VAZIO, usa o caminho relativo do som padrão
     if (!restaurant?.notification_sound_url || restaurant.notification_sound_url.trim() === '') {
         return './default-notification.mp3';
     }
-    // Caso contrário, usa a URL configurada no DB
     return restaurant.notification_sound_url;
   }, [restaurant?.notification_sound_url]);
 
@@ -172,8 +162,6 @@ const DashboardLayoutComponent = () => {
   }, [notificationSoundUrl]);
 
 
-  // Remove useEffect para modal de permissão de som
-
   const stopSoundLoop = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -232,8 +220,6 @@ const DashboardLayoutComponent = () => {
     return () => { supabase.removeChannel(channel); };
   }, [queryClient, startSoundLoop, stopSoundLoop, loopingOrderId, userRole, userRestaurantId]);
 
-  // Remove playSound, handleEnableSoundFromModal, handleToggleSound functions
-
   const handleSignOut = async () => { await supabase.auth.signOut(); };
 
   if (userRole === undefined || isRestaurantLoading) {
@@ -276,17 +262,8 @@ const DashboardLayoutComponent = () => {
       return <LoadingSpinner />;
   }
 
-  // O SoundContext.Provider é mantido, mas com valores mockados, para evitar que outros componentes que usam useSound quebrem.
-  const soundContextValue = useMemo(() => ({
-    playSound: () => { /* no-op */ },
-    stopSoundLoop,
-    soundStatus: audioReadyState === 'ready' ? 'enabled' as SoundStatus : 'disabled' as SoundStatus,
-    loopingOrderId,
-  }), [stopSoundLoop, audioReadyState, loopingOrderId]);
-
   return (
-    <SoundContext.Provider value={soundContextValue}>
-      {/* Remove EnableSoundModal */}
+    <>
       <AdminProfileModal 
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
@@ -322,8 +299,6 @@ const DashboardLayoutComponent = () => {
                   <TooltipContent>Meu Perfil</TooltipContent>
                 </Tooltip>
                 
-                {/* Botões de controle de som removidos daqui */}
-                
                 <Button variant="outline" onClick={handleSignOut}>Sair</Button>
               </div>
             </div>
@@ -342,7 +317,7 @@ const DashboardLayoutComponent = () => {
             onError={(e) => {
               console.error("Erro ao carregar o áudio:", e);
               toast.error("Erro ao carregar o som de notificação.", { 
-                description: "Verifique o arquivo em Configurações." 
+                description: "O som de notificação automática pode não funcionar." 
               });
               setAudioReadyState('error');
             }}
@@ -350,7 +325,7 @@ const DashboardLayoutComponent = () => {
           />
         )}
       </div>
-    </SoundContext.Provider>
+    </>
   );
 };
 

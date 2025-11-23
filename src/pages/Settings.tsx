@@ -23,7 +23,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { ZipCodeInput } from '@/components/ZipCodeInput';
-import { useSound } from '@/hooks/use-sound'; // Importando do novo hook
+// import { useSound } from '@/hooks/use-sound'; // REMOVIDO
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Importando Alert
 import { MapLocationSection } from '@/components/MapLocationSection'; // Importando o componente memoizado
@@ -71,7 +71,7 @@ const fetchRestaurantData = async (restaurantId: string): Promise<Restaurant> =>
 
 const Settings = () => {
   const queryClient = useQueryClient();
-  const { playSound } = useSound();
+  // const { playSound } = useSound(); // REMOVIDO
   const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
   const [searchCep, setSearchCep] = useState('');
   const [searchNumber, setSearchNumber] = useState('');
@@ -220,7 +220,26 @@ const Settings = () => {
   const restaurantMutation = useMutation({
     mutationFn: async (data: RestaurantFormValues) => {
       if (!userRestaurantId) throw new Error('ID do restaurante não disponível.'); // Usar userRestaurantId
-      const { error } = await supabase.from('restaurants').update(data).eq('id', userRestaurantId); // Usar userRestaurantId
+      
+      // Cria um payload que exclui notification_sound_url, garantindo que ele não seja alterado
+      const updatePayload: TablesUpdate<'restaurants'> = {
+        name: data.name,
+        description: data.description,
+        logo_url: data.logo_url,
+        street: data.street,
+        number: data.number,
+        neighborhood: data.neighborhood,
+        city: data.city,
+        zip_code: data.zip_code,
+        phone: data.phone,
+        email: data.email,
+        is_active: data.is_active,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        // notification_sound_url é omitido
+      };
+      
+      const { error } = await supabase.from('restaurants').update(updatePayload).eq('id', userRestaurantId); // Usar userRestaurantId
       if (error) throw error;
     },
     onSuccess: () => {
@@ -230,11 +249,6 @@ const Settings = () => {
     onError: (err) => toast.error(`Erro ao salvar configurações: ${err.message}`),
   });
 
-  const handleSoundSave = () => {
-    // Esta função agora está vazia, pois a seção de som foi removida
-    toast.info("A configuração de som foi desativada.");
-  };
-  
   // Chave para forçar a recriação do mapa quando as coordenadas mudam
   const mapKey = useMemo(() => {
     if (lat === null || lng === null) {
