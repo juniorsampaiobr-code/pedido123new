@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { initMercadoPago, Wallet } from '@mercadopago/sdk-react';
+import { initMercadoPago } from '@mercadopago/sdk-react'; // Removendo Wallet
 import { useMercadoPagoPublicKey } from '@/hooks/use-mercado-pago-settings';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -18,14 +18,23 @@ export const MercadoPagoPayment = ({ preferenceId, initPoint, onClose }: Mercado
   useEffect(() => {
     if (publicKey) {
       try {
+        // Inicializa o SDK (necessário para o script, mesmo que não usemos o Brick)
         initMercadoPago(publicKey, { locale: 'pt-BR' });
       } catch (error) {
         console.error("Erro ao inicializar Mercado Pago:", error);
         toast.error("Erro ao carregar o SDK do Mercado Pago.");
         onClose();
+        return;
       }
     }
-  }, [publicKey, onClose]);
+    
+    // Se o initPoint estiver disponível, redireciona imediatamente
+    if (initPoint) {
+        console.log("Redirecionando para o Mercado Pago:", initPoint);
+        window.location.href = initPoint;
+    }
+    
+  }, [publicKey, onClose, initPoint]);
 
   if (isLoadingKey || !publicKey) {
     return (
@@ -39,30 +48,28 @@ export const MercadoPagoPayment = ({ preferenceId, initPoint, onClose }: Mercado
       </Dialog>
     );
   }
-
+  
+  // Se chegarmos aqui, significa que estamos esperando o redirecionamento
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5 text-primary" />
-            Pagamento Online
+            Redirecionando para Pagamento
           </DialogTitle>
           <DialogDescription>
-            Você será redirecionado para o checkout seguro do Mercado Pago.
+            Você está sendo redirecionado para o checkout seguro do Mercado Pago.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="py-4">
-          {/* O componente Wallet do Mercado Pago renderiza o botão de pagamento */}
-          <Wallet 
-            initialization={{ preferenceId: preferenceId }} 
-            customization={{ texts: { valueProp: 'smart_option' } }}
-          />
+        <div className="flex flex-col items-center justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+          <p className="text-sm text-muted-foreground">Aguarde...</p>
         </div>
         
         <Button variant="outline" onClick={onClose}>
-          Cancelar Pagamento
+          Cancelar e Voltar
         </Button>
       </DialogContent>
     </Dialog>
