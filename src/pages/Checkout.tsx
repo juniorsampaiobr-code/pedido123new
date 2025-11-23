@@ -53,14 +53,7 @@ const addressSchema = z.object({
 
 type AddressFormValues = z.infer<typeof addressSchema>;
 
-// Schema para change_for: aceita string vazia, null, undefined ou número
-const changeForSchema = z.union([
-  z.string().max(0), // string vazia
-  z.null(),
-  z.undefined(),
-  z.number().min(0)
-]).optional().nullable();
-
+// NOVO SCHEMA SIMPLIFICADO: Aceita string (vazia ou preenchida)
 const checkoutSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório.'),
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length >= 10, {
@@ -73,7 +66,8 @@ const checkoutSchema = z.object({
   delivery_option: z.enum(['delivery', 'pickup'], { required_error: 'Selecione uma opção de entrega.' }),
   notes: z.string().optional(),
   payment_method_id: z.string().min(1, 'Selecione um método de pagamento.'),
-  change_for: changeForSchema,
+  // Agora é apenas uma string opcional. A validação de número e valor será feita manualmente.
+  change_for: z.string().optional(), 
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -269,7 +263,7 @@ const Checkout = () => {
       delivery_option: 'delivery',
       notes: '',
       payment_method_id: '',
-      change_for: undefined, // Usar undefined para campos opcionais de número
+      change_for: '', // Definindo como string vazia
     },
     mode: 'onBlur',
   });
@@ -345,6 +339,7 @@ const Checkout = () => {
         phone: customer.phone || '',
         email: customer.email || '',
         cpf_cnpj: customer.cpf_cnpj || '',
+        change_for: '', // Garante que o campo de troco é resetado para string vazia
       });
       
       addressForm.reset({
@@ -372,12 +367,30 @@ const Checkout = () => {
         phone: (userMetadata.phone as string) || '',
         email: user.email || '',
         cpf_cnpj: (userMetadata.cpf_cnpj as string) || '',
+        change_for: '', // Garante que o campo de troco é resetado para string vazia
       });
     }
   }, [customer, form, user, isLoadingCustomer, addressForm, calculateFee]);
 
-  // 3. Lógica de Troco (REMOVIDO O useEffect DE VALIDAÇÃO)
-  // A validação agora é feita apenas no schema Zod e na submissão
+  // 3. Lógica de Troco (Validação manual)
+  const changeForString = form.watch('change_for');
+  
+  useEffect(() => {
+    if (isCashPayment && changeForString && changeForString.trim() !== '') {
+      const cleanedValue = changeForString.replace(',', '.');
+      const changeForValue = parseFloat(cleanedValue);
+      
+      if (isNaN(changeForValue)) {
+        form.setError('change_for', { message: 'O troco deve ser um número válido.' });
+      } else if (changeForValue < totalAmount) {
+        form.setError('change_for', { message: `O troco deve ser maior ou igual ao total do pedido (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}).` });
+      } else {
+        form.clearErrors('change_for');
+      }
+    } else {
+      form.clearErrors('change_for');
+    }
+  }, [isCashPayment, changeForString, totalAmount, form]);
   
   // 4. Mutação para salvar APENAS o endereço (chamada pelo botão Salvar Endereço)
   const saveAddressMutation = useMutation({
@@ -546,18 +559,15 @@ const Checkout = () => {
     mutationFn: async ({ customerId, data }: { customerId: string, data: CheckoutFormValues }) => {
       if (!restaurant) throw new Error('Dados do restaurante não disponíveis.');
       
-      // Processa o valor de change_for
+      // Processa o valor de change_for (agora é uma string)
       let changeForValue: number | null = null;
-      if (isCashPayment && data.change_for !== null && data.change_for !== undefined) {
-        // Se for uma string (vazia), converte para null
-        if (typeof data.change_for === 'string' && data.change_for === '') {
-          changeForValue = null;
-        } else {
-          // Se for um número, usa diretamente
-          const numValue = Number(data.change_for);
-          if (!isNaN(numValue) && numValue > totalAmount) {
-            changeForValue = numValue;
-          }
+      if (isCashPayment && data.change_for && data.change_for.trim() !== '') {
+        const cleanedValue = data.change_for.replace(',', '.');
+        const numValue = parseFloat(cleanedValue);
+        
+        // A validação de que é um número e é maior que o total já foi feita no useEffect
+        if (!isNaN(numValue) && numValue > totalAmount) {
+          changeForValue = numValue;
         }
       }
       
@@ -618,6 +628,21 @@ const Checkout = () => {
     console.log("LOG: deliveryOption:", deliveryOption);
     console.log("LOG: isAddressSaved:", isAddressSaved);
     console.log("LOG: change_for data:", data.change_for);
+    
+    // Validação manual do troco antes de prosseguir
+    if (isCashPayment && data.change_for && data.change_for.trim() !== '') {
+      const cleanedValue = data.change_for.replace(',', '.');
+      const changeForValue = parseFloat(cleanedValue);
+      
+      if (isNaN(changeForValue)) {
+        toast.error('O troco deve ser um número válido.');
+        return;
+      }
+      if (changeForValue < totalAmount) {
+        toast.error(`O troco deve ser maior ou igual ao total do pedido (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}).`);
+        return;
+      }
+    }
     
     if (items.length === 0) {
       toast.error('Seu carrinho está vazio.');
@@ -1061,10 +1086,15 @@ const Checkout = () => {
                       type="number" 
                       step="0.01" 
                       placeholder={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}
-                      {...form.register('change_for', { valueAsNumber: true })}
+                      // REMOVENDO valueAsNumber: true para garantir que o valor vazio seja tratado como string vazia
+                      {...form.register('change_for')} 
                     />
                     {/* Exibe erro específico do Zod, se houver */}
                     {form.formState.errors.change_for?.message && (
+                      <p className="text-destructive text-sm">{form.formState.errors.change_for.message}</p>
+                    )}
+                    {/* Exibe erro manual de validação de valor */}
+                    {form.formState.errors.change_for?.type === 'manual' && (
                       <p className="text-destructive text-sm">{form.formState.errors.change_for.message}</p>
                     )}
                   </div>
