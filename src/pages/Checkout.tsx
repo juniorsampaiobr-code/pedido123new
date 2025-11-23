@@ -223,7 +223,8 @@ const Checkout = () => {
       setDeliveryFee(0);
       setDeliveryTime(null);
       setIsDeliveryAreaValid(false);
-      toast.error("Não foi possível encontrar o endereço. Verifique o CEP e o número.");
+      // MENSAGEM ALTERADA AQUI
+      toast.error("O endereço está errado ou incompleto, revise todos os campos e clique em salvar endereço.");
       return { coords: null, fee: 0, time: null, isValid: false };
     }
 
@@ -407,7 +408,7 @@ const Checkout = () => {
       const fullAddress = `${data.street}, ${data.number}, ${data.neighborhood}, ${data.city}, ${data.zip_code}`;
       
       const addressPayload: TablesInsert<'customers'> = {
-        user_id: userId || null,
+        user_id: user?.id || null,
         name: form.getValues('name'), // Usa o nome atual do formulário principal
         phone: form.getValues('phone'), // Usa o telefone atual do formulário principal
         email: form.getValues('email') || null,
