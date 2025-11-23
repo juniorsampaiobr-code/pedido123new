@@ -44,6 +44,9 @@ serve(async (req) => {
 
     let restaurantId: string;
     const restaurantName = fullName ? `${fullName}'s Restaurante` : 'Novo Restaurante';
+    
+    // Define a URL padrão do som (agora que está no diretório public)
+    const defaultNotificationSoundUrl = '/default-notification.mp3';
 
     // 1. Tenta encontrar um restaurante existente vinculado ao usuário
     const { data: existingRestaurant, error: fetchRestaurantError } = await supabaseAdmin
@@ -72,6 +75,8 @@ serve(async (req) => {
           description: 'Seu novo restaurante Pedido 123!',
           owner_user_id: userId, 
           is_active: true,
+          // NOVO: Define o som de notificação padrão
+          notification_sound_url: defaultNotificationSoundUrl,
         })
         .select('id')
         .single();
