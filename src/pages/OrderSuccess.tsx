@@ -57,6 +57,7 @@ const OrderSuccess = () => {
   
   // Prioriza o ID da URL, mas verifica também o external_reference do Mercado Pago
   const orderId = paramOrderId || searchParams.get('external_reference');
+  const restaurantIdFromQuery = searchParams.get('restaurantId'); // NOVO: Lê o restaurantId da query param
   const paymentStatus = searchParams.get('status'); // Status do Mercado Pago (approved, pending, failure)
 
   const { clearCart } = useCart();
@@ -90,7 +91,12 @@ const OrderSuccess = () => {
   const currentStatus = order?.status || 'pending_payment';
   const statusInfo = ORDER_STATUS_MAP[currentStatus] || ORDER_STATUS_MAP.pending_payment;
   
+  // CORREÇÃO 1: Usar os últimos 4 caracteres do UUID do pedido
   const orderNumber = order?.id ? order.id.slice(-4) : 'N/A';
+  
+  // NOVO: Determina o ID do restaurante para o link de retorno
+  const finalRestaurantId = order?.restaurant_id || restaurantIdFromQuery;
+
   const totalAmount = order?.total_amount || 0;
   const deliveryFee = order?.delivery_fee || 0;
   const subtotal = totalAmount - deliveryFee;
@@ -111,8 +117,8 @@ const OrderSuccess = () => {
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground mb-6">ID do pedido não encontrado. Por favor, volte ao menu.</p>
-            <Link to="/menu">
-              <Button size="lg">Voltar ao Cardápio</Button>
+            <Link to="/">
+              <Button size="lg">Voltar ao Início</Button>
             </Link>
           </CardContent>
         </Card>
@@ -137,7 +143,7 @@ const OrderSuccess = () => {
           <CardContent>
             <p className="text-muted-foreground mb-4">{errorOrder?.message || "Ocorreu um erro desconhecido ao buscar os detalhes do pedido."}</p>
             <Button onClick={() => refetchOrder()} className="mr-2"><RefreshCw className="h-4 w-4 mr-2" /> Tentar Novamente</Button>
-            <Link to="/menu">
+            <Link to={finalRestaurantId ? `/menu/${finalRestaurantId}` : '/'}>
               <Button variant="outline">Voltar ao Cardápio</Button>
             </Link>
           </CardContent>
@@ -220,7 +226,8 @@ const OrderSuccess = () => {
           
           {/* Ações */}
           <div className="pt-6 flex justify-center">
-            <Link to="/menu">
+            {/* CORREÇÃO 2: Usando o ID do restaurante para o link de retorno */}
+            <Link to={finalRestaurantId ? `/menu/${finalRestaurantId}` : '/'}>
               <Button size="lg">Fazer Novo Pedido</Button>
             </Link>
           </div>

@@ -97,7 +97,8 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSele
 }) => {
   const statusInfo = ORDER_STATUS_MAP[order.status || 'pending'];
   const customerName = order.customer?.name || 'Cliente Desconhecido';
-  const orderNumber = order.created_at ? new Date(order.created_at).getTime().toString().slice(-4) : 'N/A';
+  // CORREÇÃO 1: Usar os últimos 4 caracteres do UUID do pedido
+  const orderNumber = order.id ? order.id.slice(-4) : 'N/A';
 
   return (
     <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col relative">
