@@ -73,7 +73,6 @@ const Settings = () => {
   const queryClient = useQueryClient();
   const { playSound } = useSound();
   const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
-  const [soundFile, setSoundFile] = useState<File | null>(null);
   const [searchCep, setSearchCep] = useState('');
   const [searchNumber, setSearchNumber] = useState('');
   const [isSearchingCep, setIsSearchingCep] = useState(false);
@@ -231,66 +230,10 @@ const Settings = () => {
     onError: (err) => toast.error(`Erro ao salvar configurações: ${err.message}`),
   });
 
-  const soundMutation = useMutation({
-    mutationFn: async (file: File) => {
-      if (!userRestaurantId) throw new Error('ID do restaurante não disponível.'); // Usar userRestaurantId
-      
-      if (file.type !== 'audio/mpeg' && file.type !== 'audio/mp3') {
-        throw new Error('O arquivo deve ser do tipo MP3.');
-      }
-      
-      const filePath = `${userRestaurantId}/notification.mp3`; // Usar userRestaurantId
-
-      console.log(`[Sound Upload] Attempting upload to settings/${filePath}`);
-      const { error: uploadError } = await supabase.storage
-        .from('settings')
-        .upload(filePath, file, { 
-          upsert: true,
-          contentType: 'audio/mpeg', // Força o tipo MIME
-        });
-      if (uploadError) throw uploadError;
-
-      const { data: publicUrlData } = supabase.storage
-        .from('settings')
-        .getPublicUrl(filePath);
-      
-      if (!publicUrlData.publicUrl) {
-        throw new Error("Falha ao obter a URL pública do arquivo.");
-      }
-      
-      // Adicionando o parâmetro de cache para forçar o recarregamento no DashboardLayout
-      const notificationUrl = `${publicUrlData.publicUrl}?t=${new Date().getTime()}`; 
-      
-      console.log(`[DB Update] Updating restaurant ID: ${userRestaurantId} with URL: ${notificationUrl}`); // Usar userRestaurantId
-      
-      const { error: dbError } = await supabase
-        .from('restaurants')
-        .update({ notification_sound_url: notificationUrl })
-        .eq('id', userRestaurantId); // Usar userRestaurantId
-      
-      if (dbError) {
-        console.error("[DB Update Error] Supabase Error:", dbError);
-        throw new Error(`Falha ao salvar URL no banco de dados: ${dbError.message}`);
-      }
-    },
-    onSuccess: () => {
-      toast.success('Som de notificação atualizado com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['restaurantSettings', userRestaurantId] }); // Usar userRestaurantId
-      setSoundFile(null);
-    },
-    onError: (err: any) => {
-      console.error("Erro detalhado no upload do som:", err);
-      toast.error(`Erro ao salvar som: ${err.message}`);
-    },
-  });
-
   const handleSoundSave = () => {
-    if (soundFile) {
-      soundMutation.mutate(soundFile);
-    }
+    // Esta função agora está vazia, pois a seção de som foi removida
+    toast.info("A configuração de som foi desativada.");
   };
-  
-  const isSoundConfigured = !!restaurant?.notification_sound_url;
   
   // Chave para forçar a recriação do mapa quando as coordenadas mudam
   const mapKey = useMemo(() => {
@@ -378,7 +321,6 @@ const Settings = () => {
                     <FormField control={form.control} name="longitude" render={({ field }) => (<FormItem><FormLabel>Longitude</FormLabel><FormControl><Input {...field} placeholder="-47.408315" value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
 
-                  <h3 className="text-lg font-semibold pt-4 border-t mt-6">Contato</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>Telefone</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
@@ -388,59 +330,6 @@ const Settings = () => {
                 </form>
               </Form>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold flex items-center gap-2">
-              <Music className="h-6 w-6 text-primary" />
-              Notificação Sonora
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Envie um arquivo MP3 para ser usado como som de notificação para novos pedidos.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isSoundConfigured && (
-              <div className="flex items-center justify-between p-3 border rounded-lg bg-green-50/50 dark:bg-green-900/20">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  <span className="font-medium text-sm">Som Salvo: notification.mp3</span>
-                </div>
-                <Button variant="outline" size="sm" onClick={playSound}>
-                  <Volume2 className="h-4 w-4 mr-2" /> Testar
-                </Button>
-              </div>
-            )}
-            {!isSoundConfigured && !isLoading && (
-              <div className="flex items-center gap-3 p-3 border rounded-lg bg-yellow-50/50 dark:bg-yellow-900/20">
-                <XCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                <span className="font-medium text-sm">Nenhum som de notificação configurado.</span>
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="sound-upload">Arquivo de Som (MP3)</Label>
-              <label className="flex items-center justify-center w-full h-12 px-4 border-2 border-dashed rounded-md cursor-pointer hover:bg-muted">
-                <Upload className="w-4 w-4 mr-2" />
-                <span>{soundFile?.name || 'Escolher Arquivo MP3'}</span>
-                <input
-                  id="sound-upload"
-                  type="file"
-                  className="hidden"
-                  accept=".mp3"
-                  onChange={(e) => setSoundFile(e.target.files?.[0] || null)}
-                />
-              </label>
-            </div>
-            <Button 
-              onClick={handleSoundSave} 
-              className="w-full h-12 text-lg" 
-              disabled={!soundFile || soundMutation.isPending || !userRestaurantId}
-            >
-              {soundMutation.isPending ? 'Salvando Som...' : 'Salvar Som de Notificação'}
-            </Button>
           </CardContent>
         </Card>
       </div>
