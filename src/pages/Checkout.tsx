@@ -184,6 +184,73 @@ const Checkout = () => {
     staleTime: 0,
   });
 
+  // --- Definições de Variáveis e Callbacks (Movidas para o topo) ---
+  
+  const restaurantCoords: [number, number] | null = useMemo(() => {
+    if (restaurant?.latitude && restaurant?.longitude) {
+      return [restaurant.latitude, restaurant.longitude];
+    }
+    return null;
+  }, [restaurant]);
+
+  const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, lat?: number | null, lng?: number | null) => {
+    if (!restaurant || !restaurantCoords || !restaurant.delivery_enabled) {
+      setDeliveryFee(0);
+      setIsDeliveryAreaValid(true);
+      setDeliveryTime(null);
+      return { coords: null, fee: 0, time: null, isValid: true };
+    }
+
+    const fullAddress = `${street}, ${number}, ${city}, ${zip_code}`;
+    let coords: { lat: number, lng: number } | null = null;
+    
+    if (lat && lng) {
+        coords = { lat, lng };
+    } else {
+        setIsGeocoding(true);
+        const loadingToast = toast.loading("Calculando taxa de entrega...");
+        coords = await geocodeAddress(fullAddress);
+        setIsGeocoding(false);
+        toast.dismiss(loadingToast);
+    }
+
+    if (!coords) {
+      setDeliveryFee(0);
+      setDeliveryTime(null);
+      setIsDeliveryAreaValid(false);
+      toast.error("Não foi possível encontrar o endereço. Verifique o CEP e o número.");
+      return { coords: null, fee: 0, time: null, isValid: false };
+    }
+
+    setCustomerCoords([coords.lat, coords.lng]);
+
+    if (deliveryZones && deliveryZones.length > 0) {
+      const feeResult = calculateDeliveryFee(
+        [coords.lat, coords.lng],
+        restaurantCoords,
+        deliveryZones
+      );
+
+      if (feeResult) {
+        setDeliveryFee(feeResult.fee);
+        setDeliveryTime([feeResult.minTime, feeResult.maxTime]);
+        setIsDeliveryAreaValid(true);
+        return { coords, fee: feeResult.fee, time: [feeResult.minTime, feeResult.maxTime], isValid: true };
+      } else {
+        setDeliveryFee(0);
+        setDeliveryTime(null);
+        setIsDeliveryAreaValid(false);
+        toast.error("Endereço fora da área de entrega.");
+        return { coords, fee: 0, time: null, isValid: false };
+      }
+    } else {
+      setDeliveryFee(0);
+      setDeliveryTime(null);
+      setIsDeliveryAreaValid(true);
+      return { coords, fee: 0, time: null, isValid: true };
+    }
+  }, [restaurant, restaurantCoords, deliveryZones]);
+
   // --- Form Setup ---
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -301,72 +368,6 @@ const Checkout = () => {
       });
     }
   }, [customer, form, user, isLoadingCustomer, addressForm, calculateFee]);
-
-  // 2. Lógica de Geocodificação e Cálculo de Taxa de Entrega
-  const restaurantCoords: [number, number] | null = useMemo(() => {
-    if (restaurant?.latitude && restaurant?.longitude) {
-      return [restaurant.latitude, restaurant.longitude];
-    }
-    return null;
-  }, [restaurant]);
-
-  const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, lat?: number | null, lng?: number | null) => {
-    if (!restaurant || !restaurantCoords || !restaurant.delivery_enabled) {
-      setDeliveryFee(0);
-      setIsDeliveryAreaValid(true);
-      setDeliveryTime(null);
-      return { coords: null, fee: 0, time: null, isValid: true };
-    }
-
-    const fullAddress = `${street}, ${number}, ${city}, ${zip_code}`;
-    let coords: { lat: number, lng: number } | null = null;
-    
-    if (lat && lng) {
-        coords = { lat, lng };
-    } else {
-        setIsGeocoding(true);
-        const loadingToast = toast.loading("Calculando taxa de entrega...");
-        coords = await geocodeAddress(fullAddress);
-        setIsGeocoding(false);
-        toast.dismiss(loadingToast);
-    }
-
-    if (!coords) {
-      setDeliveryFee(0);
-      setDeliveryTime(null);
-      setIsDeliveryAreaValid(false);
-      toast.error("Não foi possível encontrar o endereço. Verifique o CEP e o número.");
-      return { coords: null, fee: 0, time: null, isValid: false };
-    }
-
-    setCustomerCoords([coords.lat, coords.lng]);
-
-    if (deliveryZones && deliveryZones.length > 0) {
-      const feeResult = calculateDeliveryFee(
-        [coords.lat, coords.lng],
-        restaurantCoords,
-        deliveryZones
-      );
-
-      if (feeResult) {
-        setDeliveryFee(feeResult.fee);
-        setDeliveryTime([feeResult.minTime, feeResult.maxTime]);
-        setIsDeliveryAreaValid(true);
-        return { coords, fee: feeResult.fee, time: [feeResult.minTime, feeResult.maxTime], isValid: true };
-      } else {
-        setDeliveryFee(0);
-        setDeliveryTime(null);
-        setIsDeliveryAreaValid(false);
-        toast.error("Endereço fora da área de entrega.");
-        return { coords, fee: 0, time: null, isValid: false };
-      }
-    } else {
-      setDeliveryFee(0);
-      setDeliveryTime(null);
-      setIsDeliveryAreaValid(true);
-      return { coords, fee: 0, time: null, isValid: true };
-    }
-  }, [restaurant, restaurantCoords, deliveryZones]);
 
   // 3. Lógica de Troco
   const changeFor = form.watch('change_for');
