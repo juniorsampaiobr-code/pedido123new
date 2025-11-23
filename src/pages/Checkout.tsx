@@ -765,7 +765,11 @@ const Checkout = () => {
 
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-foreground">Finalizar Pedido</h1>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Finalizar Pedido</h1>
+            {/* NOVO: Nome do Restaurante */}
+            <p className="text-lg text-muted-foreground font-medium">{restaurant.name}</p>
+          </div>
           {user && (
             <div className="flex items-center gap-2">
               <Button 
