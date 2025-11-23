@@ -68,9 +68,10 @@ const checkoutSchema = z.object({
   change_for: z.preprocess(
     (val) => {
       const s = String(val).replace(',', '.').trim();
-      return s === '' ? null : s; // Retorna null se for string vazia
+      // Se a string for vazia, retorna undefined para que z.optional() funcione
+      return s === '' ? undefined : s; 
     },
-    z.coerce.number().optional().nullable()
+    z.coerce.number({ invalid_type_error: 'O troco deve ser um número.' }).optional().nullable()
   ),
 });
 
@@ -189,7 +190,7 @@ const Checkout = () => {
       delivery_option: 'delivery',
       notes: '',
       payment_method_id: '',
-      change_for: null,
+      change_for: undefined, // Usar undefined para campos opcionais de número
     },
     mode: 'onBlur',
   });
@@ -547,6 +548,7 @@ const Checkout = () => {
         delivery_address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[3]}, ${addressFields[4]}, ${addressFields[0]}` : null,
         notes: data.notes,
         payment_method_id: data.payment_method_id,
+        // O change_for é undefined/null se o campo estiver vazio, o que é tratado corretamente pelo DB
         change_for: isCashPayment && data.change_for && data.change_for > totalAmount ? data.change_for : null,
       };
 
