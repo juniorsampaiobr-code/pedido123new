@@ -14,6 +14,7 @@ import { Loader2 } from "lucide-react";
 import { useActiveRestaurantId } from "@/hooks/use-active-restaurant-id";
 import { CpfCnpjInput } from "@/components/CpfCnpjInput"; // Importando CpfCnpjInput
 import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importação corrigida
+import { useQueryClient } from "@tanstack/react-query"; // NOVO IMPORT
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
@@ -21,6 +22,7 @@ const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient(); // NOVO
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
@@ -62,6 +64,8 @@ const Auth = () => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          // Se o evento for SIGNED_IN, a query já foi invalidada no handleEmailAuth
+          // Se for INITIAL_SESSION ou outro evento, faz o redirect
           handleRedirect(session.user, restaurantIdFromState);
         }
       }
@@ -144,6 +148,8 @@ const Auth = () => {
 
         if (data.session) {
           toast.success("Conta criada e login efetuado com sucesso!");
+          // NOVO: Invalida a query de status de autenticação
+          queryClient.invalidateQueries({ queryKey: ['authStatus'] });
         } else {
           toast.success("Conta criada! Verifique seu email para confirmar.");
         }
@@ -157,6 +163,8 @@ const Auth = () => {
         if (error) throw error;
         
         toast.success("Login realizado com sucesso!");
+        // NOVO: Invalida a query de status de autenticação
+        queryClient.invalidateQueries({ queryKey: ['authStatus'] });
       }
     } catch (error: any) {
       if (error.message.includes("Email not confirmed")) {
@@ -207,16 +215,13 @@ const Auth = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Telefone *</Label>
-                    <PhoneInput
-                      id="phone"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      required
-                      className="h-12"
+                    <Controller
+                      name="phone"
+                      control={form.control}
+                      render={({ field }) => <PhoneInput id="phone" {...field} />}
                     />
                     <p className="text-xs text-muted-foreground">Formato: (99) 99999-9999</p>
                   </div>
-                  {/* NOVO CAMPO CPF/CNPJ */}
                   <div className="space-y-2">
                     <Label htmlFor="cpfCnpj">CPF *</Label>
                     <CpfCnpjInput
