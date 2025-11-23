@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, Enums, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
@@ -79,17 +79,18 @@ type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
 // --- Funções de Fetch ---
 
-const fetchRestaurantData = async (): Promise<Restaurant> => {
+// AGORA RECEBE O ID DO RESTAURANTE
+const fetchRestaurantData = async (restaurantId: string): Promise<Restaurant> => {
   const { data, error } = await supabase
     .from('restaurants')
     .select('id, name, address, phone, email, street, number, neighborhood, city, zip_code, latitude, longitude, delivery_enabled')
+    .eq('id', restaurantId) // Busca pelo ID específico
     .eq('is_active', true)
-    .order('created_at', { ascending: false }) // Busca o mais recente ativo
     .limit(1)
     .single();
 
   if (error) throw new Error(`Erro ao buscar restaurante: ${error.message}`);
-  if (!data) throw new Error('Nenhum restaurante ativo encontrado.');
+  if (!data) throw new Error('Restaurante não encontrado ou inativo.');
   return data as Restaurant; 
 };
 
@@ -133,6 +134,7 @@ const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
 
 const Checkout = () => {
   const navigate = useNavigate();
+  const location = useLocation(); // NOVO: Para ler o estado
   const queryClient = useQueryClient();
   const { items, totalAmount: cartSubtotal, clearCart } = useCart();
   const { data: user, isLoading: isLoadingAuth } = useAuthStatus();
@@ -150,6 +152,9 @@ const Checkout = () => {
   
   // NOVO ESTADO: Rastreia se o endereço foi salvo/validado
   const [isAddressSaved, setIsAddressSaved] = useState(false);
+  
+  // NOVO: Obtém o ID do restaurante do estado de navegação (passado pelo PreCheckout/Auth)
+  const restaurantId = location.state?.restaurantId as string | undefined;
 
   // DEBUG: Loga o status do usuário
   useEffect(() => {
@@ -158,20 +163,21 @@ const Checkout = () => {
 
   // Fetch de dados essenciais
   const { data: restaurant, isLoading: isLoadingRestaurant, isError: isErrorRestaurant, error: errorRestaurant, refetch: refetchRestaurant } = useQuery<Restaurant>({
-    queryKey: ['checkoutRestaurantData'],
-    queryFn: fetchRestaurantData,
+    queryKey: ['checkoutRestaurantData', restaurantId], // Adiciona restaurantId na chave
+    queryFn: () => fetchRestaurantData(restaurantId!), // Usa o ID específico
+    enabled: !!restaurantId, // Só busca se o ID estiver disponível
     staleTime: Infinity,
   });
 
   const { data: deliveryZones, isLoading: isLoadingZones } = useQuery<DeliveryZone[]>({
-    queryKey: ['checkoutDeliveryZones'],
+    queryKey: ['checkoutDeliveryZones', restaurantId],
     queryFn: () => fetchDeliveryZones(restaurant!.id),
     enabled: !!restaurant,
     staleTime: Infinity,
   });
 
   const { data: paymentMethods, isLoading: isLoadingMethods } = useQuery<PaymentMethod[]>({
-    queryKey: ['checkoutPaymentMethods'],
+    queryKey: ['checkoutPaymentMethods', restaurantId],
     queryFn: () => fetchPaymentMethods(restaurant!.id),
     enabled: !!restaurant,
     staleTime: Infinity,
@@ -714,8 +720,24 @@ const Checkout = () => {
 
   // --- Renderização ---
 
+  // Se o ID do restaurante não estiver disponível, mostra erro/loading
+  if (!restaurantId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Alert variant="destructive" className="max-w-lg">
+          <Terminal className="h-4 w-4" />
+          <AlertTitle>Erro de Rastreamento</AlertTitle>
+          <AlertDescription>
+            Não foi possível identificar o restaurante para o qual o pedido está sendo feito. Por favor, volte ao menu.
+          </AlertDescription>
+          <Link to="/"><Button className="mt-3" variant="secondary" size="sm">Voltar</Button></Link>
+        </Alert>
+      </div>
+    );
+  }
+
   if (items.length === 0) {
-    useEffect(() => { navigate('/menu'); }, [navigate]);
+    useEffect(() => { navigate(`/menu/${restaurantId}`); }, [navigate, restaurantId]);
     return <LoadingSpinner />;
   }
 
