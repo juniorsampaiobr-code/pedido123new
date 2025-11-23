@@ -13,6 +13,7 @@ import { PhoneInput } from "@/components/PhoneInput";
 import { Loader2 } from "lucide-react";
 import { useActiveRestaurantId } from "@/hooks/use-active-restaurant-id";
 import { CpfCnpjInput } from "@/components/CpfCnpjInput"; // Importando CpfCnpjInput
+import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importação corrigida
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
