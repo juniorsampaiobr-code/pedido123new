@@ -126,7 +126,16 @@ const OrderSuccess = () => {
     }
   }, [orderId, clearCart, cartCleared]);
 
-  const currentStatus = order?.status || 'pending_payment';
+  // Lógica para determinar o status a ser exibido:
+  // 1. Se o status do MP for 'pending', exibe 'pending_payment' (Aguardando Pagamento)
+  // 2. Caso contrário, usa o status do DB
+  const currentStatus = useMemo(() => {
+    if (paymentStatus === 'pending') {
+      return 'pending_payment' as OrderStatus;
+    }
+    return order?.status || 'pending_payment';
+  }, [order?.status, paymentStatus]);
+  
   const statusInfo = ORDER_STATUS_MAP[currentStatus] || ORDER_STATUS_MAP.pending_payment;
   
   // CORREÇÃO 1: Usar os últimos 4 caracteres do UUID do pedido

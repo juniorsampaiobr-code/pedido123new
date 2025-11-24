@@ -156,11 +156,9 @@ serve(async (req) => {
     
     console.log(`[create-payment-preference] Payer Identification: ${JSON.stringify(payerIdentification)}`);
 
-    // --- NOVO: Adiciona restaurantId nas URLs de retorno ---
-    const successUrl = `${clientUrl.replace(/\/$/, '')}/#/order-success/${orderId}?status=approved&external_reference=${orderId}&restaurantId=${restaurantId}`;
-    const failureUrl = `${clientUrl.replace(/\/$/, '')}/#/checkout?restaurantId=${restaurantId}`;
-    const pendingUrl = `${clientUrl.replace(/\/$/, '')}/#/checkout?restaurantId=${restaurantId}`;
-
+    // --- Ajuste nas URLs de retorno: Todas apontam para PaymentRedirect para verificação ---
+    // O Mercado Pago adiciona 'status', 'external_reference' e 'payment_id' automaticamente.
+    const redirectBaseUrl = `${clientUrl.replace(/\/$/, '')}/#/payment-redirect/${orderId}?restaurantId=${restaurantId}`;
 
     const preference = {
       items: preferenceItems,
@@ -175,11 +173,12 @@ serve(async (req) => {
         installments: 1
       },
       back_urls: {
-        success: successUrl,
-        failure: failureUrl, 
-        pending: pendingUrl,
+        success: redirectBaseUrl,
+        failure: redirectBaseUrl, 
+        pending: redirectBaseUrl,
       },
-      auto_return: 'approved',
+      // Remove auto_return para garantir que o PaymentRedirect sempre seja chamado
+      // auto_return: 'approved', 
       external_reference: orderId,
       statement_descriptor: sanitizedRestaurantName,
     };
@@ -208,10 +207,9 @@ serve(async (req) => {
       
       console.error("[create-payment-preference] Mercado Pago API Error:", errorBody);
       
-      let cause = errorBody.message || response.statusText;
-      if (errorBody.cause && Array.isArray(errorBody.cause) && errorBody.cause.length > 0) {
-          cause = errorBody.cause[0].description || errorBody.cause[0].code || cause;
-      }
+      let cause = errorBody.cause && Array.isArray(errorBody.cause) && errorBody.cause.length > 0
+          ? errorBody.cause[0].description || errorBody.cause[0].code || response.statusText
+          : errorBody.message || response.statusText;
       
       throw new Error(`Mercado Pago Error: ${cause}`);
     }
@@ -234,7 +232,7 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ error: errorMessage }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       status: 500,
     });
   }
