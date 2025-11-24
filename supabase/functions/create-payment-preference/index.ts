@@ -177,8 +177,8 @@ serve(async (req) => {
         failure: redirectBaseUrl, 
         pending: redirectBaseUrl,
       },
-      // Remove auto_return para garantir que o PaymentRedirect sempre seja chamado
-      // auto_return: 'approved', 
+      // NOVO: Adiciona auto_return para forçar o redirecionamento
+      auto_return: 'all', 
       external_reference: orderId,
       statement_descriptor: sanitizedRestaurantName,
     };
