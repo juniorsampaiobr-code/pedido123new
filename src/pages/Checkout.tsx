@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables, Enums, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { useCart } from '@/hooks/use-cart';
 import { useMercadoPagoPublicKey } from '@/hooks/use-mercado-pago-settings';
-import { geocodeAddress, calculateDeliveryFee } from '@/utils/location';
+import { geocodeAddress, calculateDeliveryFee } from '@/utils/location'; // Certifique-se de que a função foi atualizada
 import { useAuthStatus } from '@/hooks/use-auth-status';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -26,7 +26,7 @@ import { PhoneInput } from '@/components/PhoneInput';
 import { CustomerProfileModal } from '@/components/CustomerProfileModal';
 import { MercadoPagoPayment } from '@/components/MercadoPagoPayment';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
-import { ClientLocationMap } from '@/components/ClientLocationMap'; // NOVO IMPORT
+import { ClientLocationMap } from '@/components/ClientLocationMap';
 import { cn } from '@/lib/utils';
 
 // --- Tipos ---
@@ -199,7 +199,7 @@ const Checkout = () => {
     return null;
   }, [restaurant]);
 
-  const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, lat?: number | null, lng?: number | null) => {
+  const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, neighborhood: string, lat?: number | null, lng?: number | null) => {
     if (!restaurant || !restaurantCoords || !restaurant.delivery_enabled) {
       setDeliveryFee(0);
       setIsDeliveryAreaValid(true);
@@ -215,7 +215,8 @@ const Checkout = () => {
     } else {
         setIsGeocoding(true);
         const loadingToast = toast.loading("Calculando taxa de entrega...");
-        coords = await geocodeAddress(fullAddress);
+        // Passa os componentes esperados para validação
+        coords = await geocodeAddress(fullAddress, { city, neighborhood });
         setIsGeocoding(false);
         toast.dismiss(loadingToast);
     }
@@ -361,7 +362,7 @@ const Checkout = () => {
           setCustomerCoords([customer.latitude, customer.longitude]);
           setIsAddressSaved(true);
           // Tenta calcular a taxa de entrega imediatamente se o endereço for válido
-          calculateFee(zip_code, street, number, city, customer.latitude, customer.longitude);
+          calculateFee(zip_code, street, number, city, neighborhood, customer.latitude, customer.longitude);
       }
 
     } else if (user && !isLoadingCustomer) {
@@ -476,7 +477,7 @@ const Checkout = () => {
     const data = addressForm.getValues();
     
     // 1. Calcula a taxa e obtém as coordenadas
-    const feeResult = await calculateFee(data.zip_code, data.street, data.number, data.city);
+    const feeResult = await calculateFee(data.zip_code, data.street, data.number, data.city, data.neighborhood);
     
     if (!feeResult.isValid) {
         setIsAddressSaved(false);
@@ -517,7 +518,7 @@ const Checkout = () => {
         email: data.email || null,
         cpf_cnpj: cleanedCpfCnpj,
         // Endereço e coordenadas são obtidos do estado/addressForm se for delivery
-        address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[3]}, ${addressFields[4]}, ${addressFields[0]}` : null,
+        address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` : null,
         latitude: customerCoords ? customerCoords[0] : null,
         longitude: customerCoords ? customerCoords[1] : null,
       };
@@ -586,7 +587,7 @@ const Checkout = () => {
         total_amount: totalAmount,
         delivery_fee: deliveryFee,
         // Usa o endereço salvo/validado
-        delivery_address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[3]}, ${addressFields[4]}, ${addressFields[0]}` : null,
+        delivery_address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` : null,
         notes: data.notes,
         payment_method_id: data.payment_method_id,
         // O change_for é null se o campo estiver vazio ou inválido
@@ -1034,7 +1035,7 @@ const Checkout = () => {
                       <ClientLocationMap 
                         latitude={customerCoords[0]} 
                         longitude={customerCoords[1]} 
-                        address={`${addressFields[1]}, ${addressFields[2]} - ${addressFields[3]}, ${addressFields[4]}, ${addressFields[0]}`} 
+                        address={`${addressFields[1]}, ${addressFields[2]} - ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}`} 
                       />
                     </div>
                   )}

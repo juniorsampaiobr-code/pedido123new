@@ -14,50 +14,107 @@ const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 };
 
 /**
- * Simula a geocodificação de um endereço e retorna as coordenadas.
+ * Geocodifica um endereço e valida os componentes.
  * 
- * @param address - Endereço completo (Rua, Número, Cidade, CEP)
+ * @param address - Endereço completo (Rua, Número, Bairro, Cidade, CEP)
+ * @param expectedComponents - Componentes esperados para validação (bairro, cidade)
  * @returns Promise com { lat: number, lng: number } ou null se falhar.
  */
-export const geocodeAddress = async (address: string): Promise<{ lat: number, lng: number } | null> => {
+export const geocodeAddress = async (
+  address: string,
+  expectedComponents?: { neighborhood?: string; city?: string }
+): Promise<{ lat: number; lng: number } | null> => {
   const sanitizedAddress = address.replace(/\s+/g, ' ').trim();
-  const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(sanitizedAddress)}&limit=1`;
-  
+  const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(sanitizedAddress)}&limit=1&addressdetails=1`;
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
-  
+
   try {
     console.log("LOG: geocodeAddress - URL da API:", nominatimUrl);
-    const response = await fetch(nominatimUrl, { signal: controller.signal });
-    
+    const response = await fetch(nominatimUrl, {
+      signal: controller.signal,
+      headers: {
+        // É uma boa prática identificar o aplicativo
+        'User-Agent': 'Pedido123-App/1.0 (https://juniorsampaiobr-code.github.io/pedido123new/)'
+      }
+    });
+
     if (!response.ok) {
       console.error("LOG: geocodeAddress - Resposta da API não OK. Status:", response.status);
       return null;
     }
-    
+
     const data = await response.json();
-    
+
     if (data && Array.isArray(data) && data.length > 0) {
       const result = data[0];
       const lat = parseFloat(result.lat);
       const lon = parseFloat(result.lon);
-      
+
       if (Number.isFinite(lat) && Number.isFinite(lon)) {
-        console.log("LOG: geocodeAddress - Sucesso. Coordenadas:", [lat, lon]);
+        console.log("LOG: geocodeAddress - Geocodificação bem-sucedida. Coordenadas:", [lat, lon]);
+        console.log("LOG: geocodeAddress - Detalhes do endereço retornado:", result.address);
+
+        // Se componentes esperados foram fornecidos, validar
+        if (expectedComponents) {
+          const returnedAddress = result.address;
+          
+          // Normalizar strings para comparação (remover acentos, maiúsculas)
+          const normalize = (str: string) => 
+            str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : '';
+
+          const expectedNeighborhood = normalize(expectedComponents.neighborhood || '');
+          const returnedNeighborhood = normalize(returnedAddress.suburb || returnedAddress.neighbourhood || '');
+          
+          const expectedCity = normalize(expectedComponents.city || '');
+          const returnedCity = normalize(returnedAddress.city || '');
+
+          console.log("LOG: geocodeAddress - Validação de componentes:");
+          console.log("  Esperado Bairro:", expectedNeighborhood, "| Retornado:", returnedNeighborhood);
+          console.log("  Esperado Cidade:", expectedCity, "| Retornado:", returnedCity);
+
+          // Verificação mais flexível: se o esperado estiver contido no retornado ou vice-versa
+          const isNeighborhoodValid = !expectedNeighborhood || 
+            returnedNeighborhood.includes(expectedNeighborhood) || 
+            expectedNeighborhood.includes(returnedNeighborhood);
+            
+          const isCityValid = !expectedCity || 
+            returnedCity.includes(expectedCity) || 
+            expectedCity.includes(returnedCity);
+
+          if (!isNeighborhoodValid) {
+            console.warn("LOG: geocodeAddress - Validação falhou: Bairro não corresponde.");
+            toast.error("O bairro informado não corresponde ao endereço encontrado. Por favor, verifique.");
+            return null;
+          }
+
+          if (!isCityValid) {
+            console.warn("LOG: geocodeAddress - Validação falhou: Cidade não corresponde.");
+            toast.error("A cidade informada não corresponde ao endereço encontrado. Por favor, verifique.");
+            return null;
+          }
+
+          console.log("LOG: geocodeAddress - Todos os componentes validados com sucesso.");
+        }
+
         return { lat, lng: lon };
       }
     }
-    
+
     console.warn("LOG: geocodeAddress - Falha. Nenhum resultado encontrado ou coordenadas inválidas para:", sanitizedAddress);
-    return null; 
+    toast.error("Não foi possível encontrar o endereço. Verifique todos os campos e tente novamente.");
+    return null;
 
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       console.error("LOG: geocodeAddress - Timeout na requisição (10s). Endereço:", sanitizedAddress);
+      toast.error("A requisição para encontrar o endereço demorou muito. Tente novamente.");
     } else {
       console.error("LOG: geocodeAddress - Erro durante a requisição:", error);
+      toast.error("Ocorreu um erro ao buscar o endereço. Tente novamente.");
     }
-    return null; 
+    return null;
   } finally {
     clearTimeout(timeoutId);
   }
