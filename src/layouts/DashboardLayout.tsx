@@ -173,16 +173,23 @@ const DashboardLayoutComponent = () => {
   const startSoundLoop = useCallback((orderId: string) => {
     // Tenta tocar o som se estiver pronto
     if (audioRef.current && audioReadyState === 'ready') {
-      if (loopingOrderId) return; 
-      setLoopingOrderId(orderId);
-      audioRef.current.loop = true;
-      audioRef.current.play().catch(error => {
-        console.error("Erro na reprodução automática de áudio:", error);
-        setLoopingOrderId(null);
-        // Não mostra toast de aviso, pois o usuário não tem controle sobre isso
-      });
+      // Se já estiver tocando um som para outro pedido, pare-o primeiro
+      if (loopingOrderId && loopingOrderId !== orderId) {
+        stopSoundLoop();
+      }
+      
+      // Se não estiver tocando ou for o mesmo pedido, inicie o loop
+      if (!loopingOrderId || loopingOrderId === orderId) {
+        setLoopingOrderId(orderId);
+        audioRef.current.loop = true;
+        audioRef.current.play().catch(error => {
+          console.error("Erro na reprodução automática de áudio:", error);
+          setLoopingOrderId(null);
+          // Não mostra toast de aviso, pois o usuário não tem controle sobre isso
+        });
+      }
     }
-  }, [audioReadyState, loopingOrderId]);
+  }, [audioReadyState, loopingOrderId, stopSoundLoop]);
 
   useEffect(() => {
     if ((userRole !== 'admin' && userRole !== 'moderator') || !userRestaurantId) return;
@@ -205,10 +212,6 @@ const DashboardLayoutComponent = () => {
         const updatedOrder = payload.new as Tables<'orders'>;
         const oldOrder = payload.old as Tables<'orders'>;
         
-        if (updatedOrder.id === loopingOrderId) {
-          stopSoundLoop();
-        }
-        
         // Verifica se o status mudou de 'pending_payment' para 'pending'
         const isPaymentConfirmed = oldOrder?.status === 'pending_payment' && updatedOrder.status === 'pending';
         
@@ -219,6 +222,11 @@ const DashboardLayoutComponent = () => {
           });
           // Toca o som de notificação para pedidos confirmados
           startSoundLoop(updatedOrder.id); 
+        }
+        
+        // Se o pedido que estava tocando foi atualizado (ex: aceito), pare o som
+        if (updatedOrder.id === loopingOrderId) {
+          stopSoundLoop();
         }
       })
       .subscribe();
