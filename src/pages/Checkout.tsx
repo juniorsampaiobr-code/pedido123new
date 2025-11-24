@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables, Enums, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { useCart } from '@/hooks/use-cart';
 import { useMercadoPagoPublicKey } from '@/hooks/use-mercado-pago-settings';
-import { geocodeAddress, calculateDeliveryFee } from '@/utils/location'; // Certifique-se de que a função foi atualizada
+import { geocodeAddress, calculateDeliveryFee } from '@/utils/location';
 import { useAuthStatus } from '@/hooks/use-auth-status';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -200,14 +200,47 @@ const Checkout = () => {
   }, [restaurant]);
 
   const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, neighborhood: string, lat?: number | null, lng?: number | null) => {
-    if (!restaurant || !restaurantCoords || !restaurant.delivery_enabled) {
+    
+    // 1. Lógica de Frete Grátis se a entrega dinâmica estiver desativada
+    if (restaurant && restaurant.delivery_enabled === false) {
+      // Ainda precisamos geocodificar para validar o endereço e obter as coordenadas
+      const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${zip_code}`;
+      let coords: { lat: number, lng: number } | null = null;
+      
+      if (lat && lng) {
+          coords = { lat, lng };
+      } else {
+          setIsGeocoding(true);
+          const loadingToast = toast.loading("Validando endereço para frete grátis...");
+          coords = await geocodeAddress(fullAddress); 
+          setIsGeocoding(false);
+          toast.dismiss(loadingToast);
+      }
+      
+      if (!coords) {
+        setDeliveryFee(0);
+        setDeliveryTime(null);
+        setIsDeliveryAreaValid(false);
+        toast.error("O endereço está errado ou incompleto, revise todos os campos e clique em salvar endereço.");
+        return { coords: null, fee: 0, time: null, isValid: false };
+      }
+      
+      // Se o endereço for válido, a taxa é 0 (frete grátis)
+      setCustomerCoords([coords.lat, coords.lng]);
+      setDeliveryFee(0);
+      setDeliveryTime([30, 45]); // Tempo padrão
+      setIsDeliveryAreaValid(true);
+      return { coords, fee: 0, time: [30, 45], isValid: true };
+    }
+    
+    // 2. Lógica de Entrega Dinâmica (Se delivery_enabled for true ou null/undefined)
+    if (!restaurant || !restaurantCoords) {
       setDeliveryFee(0);
       setIsDeliveryAreaValid(true);
       setDeliveryTime(null);
       return { coords: null, fee: 0, time: null, isValid: true };
     }
 
-    // Usamos todos os campos para a geocodificação, mas não passamos mais os componentes para validação estrita
     const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${zip_code}`;
     let coords: { lat: number, lng: number } | null = null;
     
@@ -216,7 +249,6 @@ const Checkout = () => {
     } else {
         setIsGeocoding(true);
         const loadingToast = toast.loading("Calculando taxa de entrega...");
-        // Chamada sem o segundo parâmetro de validação estrita
         coords = await geocodeAddress(fullAddress); 
         setIsGeocoding(false);
         toast.dismiss(loadingToast);
@@ -226,7 +258,6 @@ const Checkout = () => {
       setDeliveryFee(0);
       setDeliveryTime(null);
       setIsDeliveryAreaValid(false);
-      // MENSAGEM ALTERADA AQUI
       toast.error("O endereço está errado ou incompleto, revise todos os campos e clique em salvar endereço.");
       return { coords: null, fee: 0, time: null, isValid: false };
     }
@@ -253,6 +284,7 @@ const Checkout = () => {
         return { coords, fee: 0, time: null, isValid: false };
       }
     } else {
+      // Se não há zonas configuradas, mas a entrega está habilitada, cobramos 0
       setDeliveryFee(0);
       setDeliveryTime(null);
       setIsDeliveryAreaValid(true);
@@ -479,7 +511,6 @@ const Checkout = () => {
     const data = addressForm.getValues();
     
     // 1. Calcula a taxa e obtém as coordenadas
-    // Passamos todos os campos para a geocodificação, mas sem a validação estrita de componentes
     const feeResult = await calculateFee(data.zip_code, data.street, data.number, data.city, data.neighborhood);
     
     if (!feeResult.isValid) {
@@ -953,11 +984,12 @@ const Checkout = () => {
                   <p className="text-sm text-muted-foreground">Preencha e salve o endereço para calcular a taxa de entrega.</p>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {!restaurant.delivery_enabled && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>Entrega Desativada</AlertTitle>
-                      <AlertDescription>O restaurante não está aceitando pedidos para entrega no momento.</AlertDescription>
+                  {/* Aviso se a entrega dinâmica estiver desativada, mas o frete for grátis */}
+                  {restaurant.delivery_enabled === false && (
+                    <Alert variant="default" className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 text-blue-700">
+                      <Truck className="h-4 w-4" />
+                      <AlertTitle>Frete Grátis Ativo</AlertTitle>
+                      <AlertDescription>As taxas de entrega dinâmica estão desativadas. O frete será R$ 0,00.</AlertDescription>
                     </Alert>
                   )}
                   
@@ -999,7 +1031,7 @@ const Checkout = () => {
                     <Button 
                         type="submit" 
                         className="w-full h-10 text-base mt-4"
-                        disabled={saveAddressMutation.isPending || isGeocoding || !restaurant.delivery_enabled}
+                        disabled={saveAddressMutation.isPending || isGeocoding} // Não desabilita se delivery_enabled for false
                     >
                         {saveAddressMutation.isPending || isGeocoding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                         Salvar Endereço e Calcular Taxa
@@ -1013,26 +1045,33 @@ const Checkout = () => {
                     </Alert>
                   )}
                   
-                  {!isDeliveryAreaValid && isAddressSaved && !isGeocoding && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>Fora da Área de Entrega</AlertTitle>
-                      <AlertDescription>Seu endereço está fora da área de cobertura do restaurante.</AlertDescription>
-                    </Alert>
+                  {/* Mensagens de status da entrega */}
+                  {isAddressSaved && !isGeocoding && (
+                    <>
+                      {/* Caso 1: Entrega Dinâmica ATIVA e Fora da Área */}
+                      {restaurant.delivery_enabled !== false && !isDeliveryAreaValid && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertTitle>Fora da Área de Entrega</AlertTitle>
+                          <AlertDescription>Seu endereço está fora da área de cobertura do restaurante.</AlertDescription>
+                        </Alert>
+                      )}
+                      
+                      {/* Caso 2: Entrega Dinâmica ATIVA e Dentro da Área (ou Frete Grátis ATIVO) */}
+                      {(restaurant.delivery_enabled === false || (isDeliveryAreaValid && deliveryTime)) && (
+                        <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 text-green-700">
+                          <Truck className="h-4 w-4" />
+                          <AlertTitle>Entrega Disponível</AlertTitle>
+                          <AlertDescription>
+                            Taxa de entrega: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}. 
+                            Tempo estimado: {deliveryTime ? `${deliveryTime[0]} - ${deliveryTime[1]}` : '30 - 45'} minutos.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </>
                   )}
                   
-                  {deliveryTime && isDeliveryAreaValid && isAddressSaved && !isGeocoding && (
-                    <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 text-green-700">
-                      <Truck className="h-4 w-4" />
-                      <AlertTitle>Entrega Disponível</AlertTitle>
-                      <AlertDescription>
-                        Taxa de entrega: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}. 
-                        Tempo estimado: {deliveryTime[0]} - {deliveryTime[1]} minutos.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  
-                  {/* NOVO: Mapa do Cliente após salvar o endereço */}
+                  {/* Mapa do Cliente após salvar o endereço */}
                   {isAddressSaved && customerCoords && (
                     <div className="mt-6">
                       <ClientLocationMap 
