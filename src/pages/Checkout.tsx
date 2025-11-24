@@ -26,7 +26,8 @@ import { PhoneInput } from '@/components/PhoneInput';
 import { CustomerProfileModal } from '@/components/CustomerProfileModal';
 import { MercadoPagoPayment } from '@/components/MercadoPagoPayment';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
-import { cn } from '@/lib/utils'; // IMPORT FALTANTE
+import { ClientLocationMap } from '@/components/ClientLocationMap'; // NOVO IMPORT
+import { cn } from '@/lib/utils';
 
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
@@ -357,6 +358,7 @@ const Checkout = () => {
       
       // Se o cliente tem um endereço salvo, consideramos ele validado inicialmente
       if (customer.address && customer.latitude && customer.longitude) {
+          setCustomerCoords([customer.latitude, customer.longitude]);
           setIsAddressSaved(true);
           // Tenta calcular a taxa de entrega imediatamente se o endereço for válido
           calculateFee(zip_code, street, number, city, customer.latitude, customer.longitude);
@@ -453,6 +455,7 @@ const Checkout = () => {
       setDeliveryTime(variables.time);
       setIsDeliveryAreaValid(variables.isValid);
       setIsAddressSaved(true);
+      setCustomerCoords([variables.lat, variables.lng]); // Atualiza as coordenadas do cliente
       toast.success('Endereço salvo e taxa de entrega calculada!');
     },
     onError: (err) => {
@@ -1023,6 +1026,17 @@ const Checkout = () => {
                         Tempo estimado: {deliveryTime[0]} - {deliveryTime[1]} minutos.
                       </AlertDescription>
                     </Alert>
+                  )}
+                  
+                  {/* NOVO: Mapa do Cliente após salvar o endereço */}
+                  {isAddressSaved && customerCoords && (
+                    <div className="mt-6">
+                      <ClientLocationMap 
+                        latitude={customerCoords[0]} 
+                        longitude={customerCoords[1]} 
+                        address={`${addressFields[1]}, ${addressFields[2]} - ${addressFields[3]}, ${addressFields[4]}, ${addressFields[0]}`} 
+                      />
+                    </div>
                   )}
                 </CardContent>
               </Card>
