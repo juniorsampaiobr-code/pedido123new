@@ -203,16 +203,22 @@ const DashboardLayoutComponent = () => {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         const updatedOrder = payload.new as Tables<'orders'>;
+        const oldOrder = payload.old as Tables<'orders'>;
         
         if (updatedOrder.id === loopingOrderId) {
           stopSoundLoop();
         }
         
-        if (updatedOrder.status === 'pending' && updatedOrder.id && payload.old.status === 'pending_payment' && updatedOrder.restaurant_id === userRestaurantId) {
+        // Verifica se o status mudou de 'pending_payment' para 'pending'
+        const isPaymentConfirmed = oldOrder?.status === 'pending_payment' && updatedOrder.status === 'pending';
+        
+        if (isPaymentConfirmed && updatedOrder.id && updatedOrder.restaurant_id === userRestaurantId) {
           toast.success("✅ Pagamento Confirmado!", { 
             description: `Pedido #${updatedOrder.id.slice(-4)} foi pago e está pronto para preparo.`,
             duration: 5000,
           });
+          // Toca o som de notificação para pedidos confirmados
+          startSoundLoop(updatedOrder.id); 
         }
       })
       .subscribe();
