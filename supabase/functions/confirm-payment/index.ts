@@ -14,16 +14,54 @@ serve(async (req) => {
 
   try {
     const { orderId } = await req.json();
-    const accessToken = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN');
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    
+    // 1. Buscar o Access Token do restaurante no DB (usando Service Role)
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!accessToken) throw new Error("Mercado Pago access token is not configured.");
+    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+        console.error("[confirm-payment] FATAL: Missing Supabase environment variables.");
+        throw new Error("Supabase environment variables are not configured correctly.");
+    }
+
+    const supabaseAdmin = createClient(
+      SUPABASE_URL,
+      SERVICE_ROLE_KEY,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
+    
+    // 1.1. Buscar o restaurant_id do pedido
+    const { data: orderData, error: orderFetchError } = await supabaseAdmin
+        .from('orders')
+        .select('restaurant_id')
+        .eq('id', orderId)
+        .single();
+        
+    if (orderFetchError) throw new Error(`Failed to fetch order restaurant ID: ${orderFetchError.message}`);
+    const restaurantId = orderData.restaurant_id;
+
+    // 1.2. Buscar o Access Token do restaurante no DB
+    const { data: settingsData, error: settingsError } = await supabaseAdmin
+        .from('payment_settings')
+        .select('mercado_pago_access_token')
+        .eq('restaurant_id', restaurantId)
+        .single();
+        
+    if (settingsError || !settingsData?.mercado_pago_access_token) {
+        console.error(`[confirm-payment] Access Token not found for restaurant ${restaurantId}.`);
+        throw new Error("Mercado Pago Access Token não configurado para este restaurante.");
+    }
+    
+    const accessToken = settingsData.mercado_pago_access_token;
+    
     if (!orderId) throw new Error("Order ID is required.");
 
-    // 1. Busca o pagamento usando external_reference (orderId)
+    // 2. Busca o pagamento usando external_reference (orderId)
     const searchResponse = await fetch(`https://api.mercadopago.com/v1/payments/search?sort=date_created&criteria=desc&external_reference=${orderId}`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -33,7 +71,6 @@ serve(async (req) => {
     if (!searchResponse.ok) {
         const errorText = await searchResponse.text();
         console.error("Failed to search for payment. MP Response:", errorText);
-        // Tenta extrair uma mensagem de erro mais útil
         let errorMessage = "Failed to search for payment.";
         try {
             const errorJson = JSON.parse(errorText);
@@ -56,7 +93,7 @@ serve(async (req) => {
     
     const paymentStatus = payment.status;
 
-    // 2. Se o pagamento estiver aprovado, atualiza o status do pedido no banco de dados para 'pending'
+    // 3. Se o pagamento estiver aprovado, atualiza o status do pedido no banco de dados para 'pending'
     if (paymentStatus === 'approved') {
       const { error: updateError } = await supabaseAdmin
         .from('orders')
@@ -79,7 +116,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error(error);
-    return new Response(JSON.stringify({ error: error.message, status: 'error' }), {
+    const errorMessage = error instanceof Error ? error.message : "Internal Server Error";
+    return new Response(JSON.stringify({ error: errorMessage, status: 'error' }), {
       headers: corsHeaders,
       status: 500,
     });
