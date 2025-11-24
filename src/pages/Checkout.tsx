@@ -207,7 +207,8 @@ const Checkout = () => {
       return { coords: null, fee: 0, time: null, isValid: true };
     }
 
-    const fullAddress = `${street}, ${number}, ${city}, ${zip_code}`;
+    // Usamos todos os campos para a geocodificação, mas não passamos mais os componentes para validação estrita
+    const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${zip_code}`;
     let coords: { lat: number, lng: number } | null = null;
     
     if (lat && lng) {
@@ -215,8 +216,8 @@ const Checkout = () => {
     } else {
         setIsGeocoding(true);
         const loadingToast = toast.loading("Calculando taxa de entrega...");
-        // Passa os componentes esperados para validação
-        coords = await geocodeAddress(fullAddress, { city, neighborhood });
+        // Chamada sem o segundo parâmetro de validação estrita
+        coords = await geocodeAddress(fullAddress); 
         setIsGeocoding(false);
         toast.dismiss(loadingToast);
     }
@@ -408,6 +409,7 @@ const Checkout = () => {
       
       if (!customer?.id && !userId) throw new Error('ID do cliente ou usuário não encontrado.');
       
+      // Endereço completo formatado: Rua, Número, Bairro, Cidade, CEP
       const fullAddress = `${data.street}, ${data.number}, ${data.neighborhood}, ${data.city}, ${data.zip_code}`;
       
       const addressPayload: TablesInsert<'customers'> = {
@@ -477,6 +479,7 @@ const Checkout = () => {
     const data = addressForm.getValues();
     
     // 1. Calcula a taxa e obtém as coordenadas
+    // Passamos todos os campos para a geocodificação, mas sem a validação estrita de componentes
     const feeResult = await calculateFee(data.zip_code, data.street, data.number, data.city, data.neighborhood);
     
     if (!feeResult.isValid) {
@@ -648,7 +651,7 @@ const Checkout = () => {
         return;
       }
       if (changeForValue < totalAmount) {
-        toast.error(`O troco deve ser maior ou igual ao total do pedido (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}).`);
+        form.setError('change_for', { type: 'manual', message: `O troco deve ser maior ou igual ao total do pedido (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}).` });
         return;
       }
     }

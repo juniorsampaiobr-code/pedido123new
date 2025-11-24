@@ -17,7 +17,7 @@ const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
  * Geocodifica um endereço e valida os componentes.
  * 
  * @param address - Endereço completo (Rua, Número, Bairro, Cidade, CEP)
- * @param expectedComponents - Componentes esperados para validação (bairro, cidade)
+ * @param expectedComponents - Componentes esperados para validação (bairro, cidade) - AGORA IGNORADO
  * @returns Promise com { lat: number, lng: number } ou null se falhar.
  */
 export const geocodeAddress = async (
@@ -54,49 +54,9 @@ export const geocodeAddress = async (
 
       if (Number.isFinite(lat) && Number.isFinite(lon)) {
         console.log("LOG: geocodeAddress - Geocodificação bem-sucedida. Coordenadas:", [lat, lon]);
-        console.log("LOG: geocodeAddress - Detalhes do endereço retornado:", result.address);
-
-        // Se componentes esperados foram fornecidos, validar
-        if (expectedComponents) {
-          const returnedAddress = result.address;
-          
-          // Normalizar strings para comparação (remover acentos, maiúsculas)
-          const normalize = (str: string) => 
-            str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : '';
-
-          const expectedNeighborhood = normalize(expectedComponents.neighborhood || '');
-          const returnedNeighborhood = normalize(returnedAddress.suburb || returnedAddress.neighbourhood || '');
-          
-          const expectedCity = normalize(expectedComponents.city || '');
-          const returnedCity = normalize(returnedAddress.city || '');
-
-          console.log("LOG: geocodeAddress - Validação de componentes:");
-          console.log("  Esperado Bairro:", expectedNeighborhood, "| Retornado:", returnedNeighborhood);
-          console.log("  Esperado Cidade:", expectedCity, "| Retornado:", returnedCity);
-
-          // Verificação mais flexível: se o esperado estiver contido no retornado ou vice-versa
-          const isNeighborhoodValid = !expectedNeighborhood || 
-            returnedNeighborhood.includes(expectedNeighborhood) || 
-            expectedNeighborhood.includes(returnedNeighborhood);
-            
-          const isCityValid = !expectedCity || 
-            returnedCity.includes(expectedCity) || 
-            expectedCity.includes(returnedCity);
-
-          if (!isNeighborhoodValid) {
-            console.warn("LOG: geocodeAddress - Validação falhou: Bairro não corresponde.");
-            toast.error("O bairro informado não corresponde ao endereço encontrado. Por favor, verifique.");
-            return null;
-          }
-
-          if (!isCityValid) {
-            console.warn("LOG: geocodeAddress - Validação falhou: Cidade não corresponde.");
-            toast.error("A cidade informada não corresponde ao endereço encontrado. Por favor, verifique.");
-            return null;
-          }
-
-          console.log("LOG: geocodeAddress - Todos os componentes validados com sucesso.");
-        }
+        
+        // Removemos a validação estrita de bairro/cidade aqui.
+        // Apenas garantimos que as coordenadas foram encontradas.
 
         return { lat, lng: lon };
       }
