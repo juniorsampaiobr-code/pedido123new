@@ -32,6 +32,7 @@ const PaymentRedirect = () => {
 
   const mpStatus = searchParams.get('status'); // approved, pending, failure
   const externalReference = searchParams.get('external_reference');
+  const restaurantIdFromQuery = searchParams.get('restaurantId'); // Lendo o restaurantId da query
 
   // Garante que temos o ID do pedido
   const finalOrderId = orderId || externalReference;
@@ -43,6 +44,9 @@ const PaymentRedirect = () => {
     enabled: !!finalOrderId,
     staleTime: 0,
   });
+  
+  // Determina o ID do restaurante para o redirecionamento final
+  const finalRestaurantId = order?.restaurant_id || restaurantIdFromQuery;
 
   useEffect(() => {
     if (!finalOrderId) {
@@ -81,23 +85,26 @@ const PaymentRedirect = () => {
         
         const paymentResult = data as { status: string, message: string };
         
+        // Constrói a URL de sucesso, incluindo o restaurantId
+        const successUrl = `/order-success/${finalOrderId}?status=${paymentResult.status}${finalRestaurantId ? `&restaurantId=${finalRestaurantId}` : ''}`;
+        
         if (paymentResult.status === 'approved') {
           setStatusMessage('Pagamento Aprovado! Redirecionando...');
           toast.success('Pagamento aprovado!');
           // Redireciona para a página de sucesso
-          navigate(`/order-success/${finalOrderId}?status=approved`, { replace: true });
+          navigate(successUrl, { replace: true });
         } else if (paymentResult.status === 'pending') {
           setStatusMessage('Pagamento Pendente. Aguardando confirmação...');
           toast.warning('Pagamento pendente. Você será notificado quando for confirmado.');
           // Redireciona para a página de sucesso, que mostrará o status 'pending_payment'
-          navigate(`/order-success/${finalOrderId}?status=pending`, { replace: true });
+          navigate(successUrl, { replace: true });
         } else {
           // status: rejected, failure, etc.
           setStatusMessage(`Pagamento Recusado. Status: ${paymentResult.status}`);
           toast.error('Pagamento recusado. Tente novamente.');
           setIsError(true);
-          // Redireciona para o checkout para tentar novamente
-          navigate('/checkout', { replace: true });
+          // Redireciona para o checkout para tentar novamente, preservando o restaurantId
+          navigate(`/checkout${finalRestaurantId ? `?restaurantId=${finalRestaurantId}` : ''}`, { replace: true });
         }
 
       } catch (err: any) {
@@ -107,13 +114,13 @@ const PaymentRedirect = () => {
         setIsProcessing(false);
         toast.error('Erro ao processar pagamento. Tente novamente.');
         // Redireciona para o checkout em caso de erro de comunicação
-        navigate('/checkout', { replace: true });
+        navigate(`/checkout${finalRestaurantId ? `?restaurantId=${finalRestaurantId}` : ''}`, { replace: true });
       }
     };
 
     confirmPayment();
 
-  }, [finalOrderId, isLoadingOrder, order, navigate, searchParams]);
+  }, [finalOrderId, isLoadingOrder, order, navigate, searchParams, finalRestaurantId]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-muted">
