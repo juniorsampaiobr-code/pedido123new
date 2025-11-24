@@ -167,12 +167,12 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
 }) => {
   const queryClient = useQueryClient();
   // const { stopSoundLoop } = useSound(); // REMOVIDO
-  const [currentPage, setCurrentPage] = useState(0); // 0-indexed page
+  const [currentPage, setCurrentPage] = useState(1); // 1-indexed page for PaginationComponent
 
   // Usar restaurantId no queryKey e na função fetch
   const { data, isLoading, isError, error, refetch } = useQuery<FetchOrdersResult>({
     queryKey: ['orders', status, restaurantId, currentPage],
-    queryFn: () => fetchOrders(restaurantId, status, currentPage),
+    queryFn: () => fetchOrders(restaurantId, status, currentPage - 1), // Passa 0-indexed para a função fetch
     enabled: !!restaurantId, // Só busca se restaurantId estiver disponível
   });
 
@@ -226,7 +226,7 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
   };
   
   const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page - 1); // Componente de paginação é 1-indexed
+    setCurrentPage(page); // Componente de paginação é 1-indexed
   }, []);
 
   const handleSelectOrder = useCallback((orderId: string, isChecked: boolean) => {
@@ -291,7 +291,7 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
       {totalPages > 1 && (
         <div className="flex justify-center pt-4">
           <PaginationComponent 
-            currentPage={currentPage + 1} 
+            currentPage={currentPage} 
             totalPages={totalPages} 
             onPageChange={handlePageChange} 
           />
@@ -354,7 +354,7 @@ const Orders = () => {
       // Abre o diálogo de confirmação para exclusão
       document.getElementById('mass-delete-trigger')?.click();
     } else {
-      massActionMutation.mutate({ orderIds: selectedOrders, action: massAction as Enums<'order_status'> });
+      massActionMutation.mutate({ orderIds: selectedOrders, action: massAction as Enums<'order_status'> | 'delete' });
     }
   };
 
