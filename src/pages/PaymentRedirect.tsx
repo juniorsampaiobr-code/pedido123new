@@ -81,7 +81,14 @@ const PaymentRedirect = () => {
           body: { orderId: finalOrderId },
         });
 
-        if (error) throw new Error(error.message);
+        if (error) {
+          // Se a Edge Function retornar um erro (como 404 ou 500)
+          let errorMessage = error.message;
+          if (errorMessage.includes("non-2xx status code")) {
+              errorMessage = "Falha de comunicação com o servidor. Verifique se a função 'confirm-payment' está implantada.";
+          }
+          throw new Error(errorMessage);
+        }
         
         const paymentResult = data as { status: string, message: string };
         
