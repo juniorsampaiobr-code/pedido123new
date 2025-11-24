@@ -177,7 +177,7 @@ serve(async (req) => {
         failure: redirectBaseUrl, 
         pending: redirectBaseUrl,
       },
-      // NOVO: Adiciona auto_return para forçar o redirecionamento
+      // Adiciona auto_return para forçar o redirecionamento
       auto_return: 'all', 
       external_reference: orderId,
       statement_descriptor: sanitizedRestaurantName,
