@@ -30,7 +30,19 @@ serve(async (req) => {
       },
     });
 
-    if (!searchResponse.ok) throw new Error("Failed to search for payment.");
+    if (!searchResponse.ok) {
+        const errorText = await searchResponse.text();
+        console.error("Failed to search for payment. MP Response:", errorText);
+        // Tenta extrair uma mensagem de erro mais útil
+        let errorMessage = "Failed to search for payment.";
+        try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.message || errorMessage;
+        } catch (e) {
+            // Ignora erro de parse
+        }
+        throw new Error(errorMessage);
+    }
 
     const searchData = await searchResponse.json();
     const payment = searchData.results?.[0];
