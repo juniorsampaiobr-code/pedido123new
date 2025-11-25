@@ -84,17 +84,39 @@ const fetchOrders = async (restaurantId: string, status: Enums<'order_status'> |
   return { orders: data as Order[], count: count || 0 };
 };
 
+// Função para buscar o nome do método de pagamento
+const fetchPaymentMethodName = async (paymentMethodId: string): Promise<string> => {
+  const { data, error } = await supabase
+    .from('payment_methods')
+    .select('name')
+    .eq('id', paymentMethodId)
+    .single();
+
+  if (error) {
+    console.error("Erro ao buscar nome do método de pagamento:", error);
+    return 'Método Desconhecido';
+  }
+  return data?.name || 'Método Desconhecido';
+};
+
 // Função para gerar conteúdo de impressão do pedido
-const generatePrintContent = (order: Order, items: any[]) => {
+const generatePrintContent = (order: Order, items: any[], paymentMethodName: string) => {
   const orderNumber = order.id ? order.id.slice(-4) : 'N/A';
   const customerName = order.customer?.name || 'Cliente Desconhecido';
   const customerPhone = order.customer?.phone || 'Não informado';
   const deliveryAddress = order.delivery_address || 'Retirada no local';
-  const paymentMethodName = order.payment_method_id || 'Não especificado';
   const createdAt = order.created_at ? new Date(order.created_at).toLocaleString('pt-BR') : 'Data desconhecida';
   const changeFor = order.change_for ? `Troco para: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.change_for)}` : '';
   const deliveryFee = order.delivery_fee ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.delivery_fee) : 'Grátis';
   const subtotal = order.total_amount - (order.delivery_fee || 0);
+
+  // Lógica para observação de pagamento online
+  let paymentNote = '';
+  if (paymentMethodName.toLowerCase().includes('online') && order.status !== 'cancelled' && order.status !== 'pending_payment') {
+    paymentNote = '<div style="margin-top: 10px; padding: 5px; border: 1px solid #000; text-align: center; font-weight: bold; background-color: #ccffcc;">PAGO ONLINE - NÃO COBRAR</div>';
+  } else if (order.status === 'pending_payment') {
+    paymentNote = '<div style="margin-top: 10px; padding: 5px; border: 1px solid #000; text-align: center; font-weight: bold; background-color: #ffffcc;">AGUARDANDO PAGAMENTO</div>';
+  }
 
   let itemsHtml = '';
   items.forEach(item => {
@@ -149,6 +171,7 @@ const generatePrintContent = (order: Order, items: any[]) => {
         <h3 style="margin: 0 0 5px 0;">Pagamento</h3>
         <p style="margin: 0;">${paymentMethodName}</p>
         ${changeFor ? `<p style="margin: 0;">${changeFor}</p>` : ''}
+        ${paymentNote}
       </div>
       
       ${order.notes ? `
@@ -358,7 +381,7 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
             onDelete={handleDelete}
             isSelected={selectedOrders.includes(order.id)}
             onSelect={handleSelectOrder}
-            onPrint={onPrint}
+            onPrint={handlePrintOrder}
           />
         ))}
       </div>
@@ -406,13 +429,19 @@ const Orders = () => {
   // Função para imprimir pedido
   const handlePrintOrder = async (order: Order) => {
     try {
-      // Buscar itens do pedido
+      // 1. Buscar itens do pedido
       const items = await fetchOrderItemsForPrint(order.id);
       
-      // Gerar conteúdo HTML para impressão
-      const printContent = generatePrintContent(order, items);
+      // 2. Buscar o nome do método de pagamento
+      let paymentMethodName = 'Não especificado';
+      if (order.payment_method_id) {
+        paymentMethodName = await fetchPaymentMethodName(order.payment_method_id);
+      }
       
-      // Criar janela de impressão
+      // 3. Gerar conteúdo HTML para impressão
+      const printContent = generatePrintContent(order, items, paymentMethodName);
+      
+      // 4. Criar janela de impressão
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write(`
@@ -422,6 +451,8 @@ const Orders = () => {
               <style>
                 @media print {
                   body { margin: 0; }
+                  /* Estilo para garantir que a linha tracejada apareça */
+                  .dashed-line { border-top: 1px dashed #000; }
                 }
               </style>
             </head>
@@ -443,7 +474,7 @@ const Orders = () => {
         toast.error('Não foi possível abrir a janela de impressão. Verifique as permissões do navegador.');
       }
     } catch (error) {
-      console.error('Erro ao imprimir pedido:', error);
+      console.error('Erro ao preparar impressão do pedido:', error);
       toast.error('Erro ao preparar impressão do pedido.');
     }
   };
