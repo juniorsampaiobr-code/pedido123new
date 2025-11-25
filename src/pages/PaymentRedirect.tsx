@@ -47,6 +47,15 @@ const PaymentRedirect = () => {
   
   // Determina o ID do restaurante para o redirecionamento final
   const finalRestaurantId = order?.restaurant_id || restaurantIdFromQuery;
+  
+  // Função de redirecionamento de fallback
+  const redirectToMenu = (id: string | undefined) => {
+      if (id) {
+          navigate(`/menu/${id}`, { replace: true });
+      } else {
+          navigate('/', { replace: true });
+      }
+  };
 
   useEffect(() => {
     if (!finalOrderId) {
@@ -54,8 +63,8 @@ const PaymentRedirect = () => {
       setIsError(true);
       setIsProcessing(false);
       toast.error('Erro de redirecionamento: ID do pedido ausente.');
-      // Redireciona para o menu se o ID estiver faltando
-      navigate('/menu', { replace: true });
+      // Redireciona para o menu/raiz se o ID estiver faltando
+      redirectToMenu(finalRestaurantId);
       return;
     }
 
@@ -66,8 +75,8 @@ const PaymentRedirect = () => {
       setIsError(true);
       setIsProcessing(false);
       toast.error('Erro: Pedido não existe.');
-      // Redireciona para o menu se o pedido não existir
-      navigate('/menu', { replace: true });
+      // Redireciona para o menu/raiz se o pedido não existir
+      redirectToMenu(finalRestaurantId);
       return;
     }
 
