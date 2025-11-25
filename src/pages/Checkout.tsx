@@ -623,7 +623,16 @@ const Checkout = () => {
       }
       
       // Determina o tempo de entrega a ser salvo
-      const [minTime, maxTime] = deliveryTime || [null, null];
+      let [minTime, maxTime] = deliveryTime || [null, null];
+      
+      // Fallback de segurança: se for entrega ou retirada e o tempo for nulo (o que não deve acontecer
+      // se o useEffect rodou corretamente), usamos um tempo padrão.
+      if ((deliveryOption === 'delivery' || deliveryOption === 'pickup') && (!minTime || !maxTime)) {
+          // Usando o padrão de entrega se for delivery, ou retirada se for pickup
+          const fallbackTime = deliveryOption === 'pickup' ? [15, 30] : [30, 45];
+          minTime = fallbackTime[0];
+          maxTime = fallbackTime[1];
+      }
       
       const orderPayload: TablesInsert<'orders'> = {
         restaurant_id: restaurant.id,

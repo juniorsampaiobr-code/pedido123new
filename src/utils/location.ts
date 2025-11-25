@@ -109,8 +109,11 @@ export const calculateDeliveryFee = (
     // A taxa é apenas a taxa fixa da zona (delivery_fee)
     const fixedFee = zone.delivery_fee || 0;
     
+    // Usa o tempo mínimo configurado na zona
     const minTime = zone.min_delivery_time_minutes || 0;
-    const maxTime = minTime + 15; // Estimativa simples
+    
+    // Define o tempo máximo como o mínimo + 15 minutos (intervalo padrão)
+    const maxTime = minTime + 15; 
 
     return { 
       fee: parseFloat(fixedFee.toFixed(2)),
