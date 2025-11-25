@@ -7,7 +7,7 @@ import { useCart } from '@/hooks/use-cart';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, XCircle, Clock, MapPin, CreditCard, Package, Truck, Terminal, RefreshCw, Check, AlertCircle, Loader2, Timer } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, MapPin, CreditCard, Package, Truck, Terminal, RefreshCw, Check, AlertCircle, Loader2, Timer, Phone, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -24,9 +24,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+type Restaurant = Tables<'restaurants'>; // Novo tipo
 type Order = Tables<'orders'> & { 
   customer: Tables<'customers'> | null,
   payment_methods: Tables<'payment_methods'> | null,
+  restaurant: Pick<Restaurant, 'name' | 'phone' | 'address'> | null; // Adicionando dados do restaurante
 };
 type OrderItem = Tables<'order_items'> & { products: Tables<'products'> | null };
 type OrderStatus = Enums<'order_status'>;
@@ -46,7 +48,12 @@ const CANCELLABLE_STATUSES: OrderStatus[] = ['pending_payment', 'pending', 'prep
 const fetchOrderDetails = async (orderId: string): Promise<Order> => {
   const { data, error } = await supabase
     .from('orders')
-    .select('*, customer:customers(name, phone, email, cpf_cnpj), payment_methods(name)')
+    .select(`
+      *, 
+      customer:customers(name, phone, email, cpf_cnpj), 
+      payment_methods(name),
+      restaurant:restaurants(name, phone, address)
+    `) // Buscando dados do restaurante
     .eq('id', orderId)
     .limit(1)
     .single();
@@ -158,6 +165,11 @@ const OrderSuccess = () => {
   const minTime = order?.min_delivery_time_minutes;
   const maxTime = order?.max_delivery_time_minutes;
   const deliveryTimeText = (minTime && maxTime) ? `${minTime} - ${maxTime} minutos` : 'Em breve';
+  
+  // Dados do Restaurante
+  const restaurantName = order?.restaurant?.name || 'Restaurante';
+  const restaurantPhone = order?.restaurant?.phone;
+  const restaurantAddress = order?.restaurant?.address;
 
   if (!orderId) {
     return (
@@ -222,6 +234,34 @@ const OrderSuccess = () => {
         </CardHeader>
         <CardContent className="space-y-6">
           
+          {/* Informações do Restaurante */}
+          <div className="border-b pb-4 space-y-3">
+            <h3 className="text-xl font-semibold flex items-center gap-2">
+              <Store className="h-5 w-5 text-primary" />
+              {restaurantName}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              {restaurantPhone && (
+                <div className="flex items-start gap-3">
+                  <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold">Telefone</p>
+                    <p className="text-muted-foreground">{restaurantPhone}</p>
+                  </div>
+                </div>
+              )}
+              {restaurantAddress && (
+                <div className="flex items-start gap-3 md:col-span-1">
+                  <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold">Endereço</p>
+                    <p className="text-muted-foreground">{restaurantAddress}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Detalhes do Cliente e Entrega */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b pb-4">
             <div className="flex items-start gap-3">
