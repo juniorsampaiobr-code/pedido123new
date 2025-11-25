@@ -20,20 +20,20 @@ type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
 
 // Definindo o tipo Order com as relações que estamos buscando
+// Incluindo payment_methods(name) na definição do tipo
 type Order = OrderBase & { 
   customer: Customer | null;
   payment_methods: Pick<PaymentMethod, 'name'> | null;
 };
 
 type OrderItem = Tables<'order_items'> & { products: Tables<'products'> | null };
-// Removendo a definição de PaymentMethod duplicada, pois já está definida acima
 
 const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: React.ElementType, color: string }> = {
   pending: { label: 'Pendente', icon: Clock, color: 'bg-yellow-500' },
   preparing: { label: 'Em Preparação', icon: Package, color: 'bg-orange-500' },
   ready: { label: 'Pronto', icon: CheckCircle, color: 'bg-green-500' },
   delivering: { label: 'Em Entrega', icon: Truck, color: 'bg-blue-500' },
-  delivered: { label: 'Entregue', icon: Check, color: 'bg-purple-500' }, // Usando Check em vez de CheckCheck
+  delivered: { label: 'Entregue', icon: Check, color: 'bg-purple-500' },
   cancelled: { label: 'Cancelado', icon: XCircle, color: 'bg-destructive' },
   pending_payment: { label: 'Aguardando Pagamento', icon: Euro, color: 'bg-gray-500' },
 };
@@ -47,16 +47,22 @@ const fetchOrderItems = async (orderId: string): Promise<OrderItem[]> => {
   return data as OrderItem[];
 };
 
+// Função para buscar os detalhes do pedido com as relações
 const fetchOrderDetails = async (orderId: string): Promise<Order> => {
   const { data, error } = await supabase
     .from('orders')
-    // Adicionando 'email' na seleção do customer
-    .select('*, customer:customers(name, phone, cpf_cnpj, email), payment_methods(name)')
+    .select(`
+      *,
+      customer:customers(name, phone, cpf_cnpj, email),
+      payment_methods(name)
+    `)
     .eq('id', orderId)
     .limit(1)
     .single();
 
   if (error) throw new Error(`Erro ao buscar detalhes do pedido: ${error.message}`);
+  if (!data) throw new Error('Pedido não encontrado.');
+  
   // O cast é seguro porque a query acima garante as relações
   return data as Order;
 };
@@ -94,13 +100,16 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
     }
   }, [order?.id, isOpen]);
 
+  // Extraindo dados do pedido
   const customerName = order?.customer?.name || 'Cliente Desconhecido';
   const customerPhone = order?.customer?.phone;
   const customerEmail = order?.customer?.email;
   const customerCpfCnpj = order?.customer?.cpf_cnpj;
   const deliveryAddress = order?.delivery_address;
+  
   // Usando o nome do método de pagamento da relação
   const paymentMethodName = order?.payment_methods?.name || 'Não especificado'; 
+  
   const statusInfo = order?.status ? ORDER_STATUS_MAP[order.status] : null;
   const orderNumber = order?.id ? order.id.slice(-4) : 'N/A';
   const createdAt = order?.created_at ? new Date(order.created_at) : null;
