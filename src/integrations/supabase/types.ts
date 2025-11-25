@@ -297,6 +297,8 @@ export type Database = {
           updated_at: string | null
           payment_method_id: string | null
           change_for: number | null
+          min_delivery_time_minutes: number | null // NOVO
+          max_delivery_time_minutes: number | null // NOVO
         }
         Insert: {
           created_at?: string | null
@@ -311,6 +313,8 @@ export type Database = {
           updated_at?: string | null
           payment_method_id?: string | null
           change_for?: number | null
+          min_delivery_time_minutes?: number | null // NOVO
+          max_delivery_time_minutes?: number | null // NOVO
         }
         Update: {
           created_at?: string | null
@@ -325,6 +329,8 @@ export type Database = {
           updated_at?: string | null
           payment_method_id?: string | null
           change_for?: number | null
+          min_delivery_time_minutes?: number | null // NOVO
+          max_delivery_time_minutes?: number | null // NOVO
         }
         Relationships: [
           {

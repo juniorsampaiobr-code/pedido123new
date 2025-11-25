@@ -7,7 +7,7 @@ import { useCart } from '@/hooks/use-cart';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, XCircle, Clock, MapPin, CreditCard, Package, Truck, Terminal, RefreshCw, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, MapPin, CreditCard, Package, Truck, Terminal, RefreshCw, Check, AlertCircle, Loader2, Timer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -153,6 +153,11 @@ const OrderSuccess = () => {
   const paymentMethodName = order?.payment_methods?.name || 'Não especificado';
   
   const isCancellable = CANCELLABLE_STATUSES.includes(currentStatus as OrderStatus);
+  
+  // NOVO: Tempo de entrega
+  const minTime = order?.min_delivery_time_minutes;
+  const maxTime = order?.max_delivery_time_minutes;
+  const deliveryTimeText = (minTime && maxTime) ? `${minTime} - ${maxTime} minutos` : 'Em breve';
 
   if (!orderId) {
     return (
@@ -165,7 +170,7 @@ const OrderSuccess = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground mb-6">ID do pedido não encontrado. Por favor, volte ao menu.</p>
+            <p className="text-muted-foreground mb-6">ID do pedido não encontrado na URL. Por favor, volte ao menu.</p>
             <Link to="/">
               <Button size="lg">Voltar ao Início</Button>
             </Link>
@@ -218,7 +223,7 @@ const OrderSuccess = () => {
         <CardContent className="space-y-6">
           
           {/* Detalhes do Cliente e Entrega */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b pb-4">
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 text-primary flex-shrink-0" />
               <div>
@@ -232,6 +237,13 @@ const OrderSuccess = () => {
                 <p className="font-semibold">Pagamento</p>
                 <p className="text-sm text-muted-foreground">{paymentMethodName}</p>
                 {changeFor && <p className="text-xs text-muted-foreground">Troco para: {changeFor}</p>}
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Timer className="h-5 w-5 text-primary flex-shrink-0" />
+              <div>
+                <p className="font-semibold">Tempo Estimado</p>
+                <p className="text-sm text-muted-foreground">{deliveryTimeText}</p>
               </div>
             </div>
           </div>

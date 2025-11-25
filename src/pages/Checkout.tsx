@@ -140,7 +140,8 @@ const Checkout = () => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [deliveryFee, setDeliveryFee] = useState(0);
-  const [deliveryTime, setDeliveryTime] = useState<[number, number] | null>(null);
+  // deliveryTime agora armazena [min, max] em minutos
+  const [deliveryTime, setDeliveryTime] = useState<[number, number] | null>(null); 
   const [isDeliveryAreaValid, setIsDeliveryAreaValid] = useState(true);
   const [customerCoords, setCustomerCoords] = useState<[number, number] | null>(null);
   const [isMercadoPagoOpen, setIsMercadoPagoOpen] = useState(false);
@@ -201,6 +202,9 @@ const Checkout = () => {
 
   const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, neighborhood: string, lat?: number | null, lng?: number | null) => {
     
+    // Tempo padrão de entrega (usado para retirada ou frete grátis)
+    const DEFAULT_DELIVERY_TIME: [number, number] = [30, 45]; 
+    
     // 1. Lógica de Frete Grátis se a entrega dinâmica estiver desativada
     if (restaurant && restaurant.delivery_enabled === false) {
       // Ainda precisamos geocodificar para validar o endereço e obter as coordenadas
@@ -228,17 +232,17 @@ const Checkout = () => {
       // Se o endereço for válido, a taxa é 0 (frete grátis)
       setCustomerCoords([coords.lat, coords.lng]);
       setDeliveryFee(0);
-      setDeliveryTime([30, 45]); // Tempo padrão
+      setDeliveryTime(DEFAULT_DELIVERY_TIME); // Tempo padrão
       setIsDeliveryAreaValid(true);
-      return { coords, fee: 0, time: [30, 45], isValid: true };
+      return { coords, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
     }
     
     // 2. Lógica de Entrega Dinâmica (Se delivery_enabled for true ou null/undefined)
     if (!restaurant || !restaurantCoords) {
       setDeliveryFee(0);
       setIsDeliveryAreaValid(true);
-      setDeliveryTime(null);
-      return { coords: null, fee: 0, time: null, isValid: true };
+      setDeliveryTime(DEFAULT_DELIVERY_TIME); // Tempo padrão
+      return { coords: null, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
     }
 
     const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${zip_code}`;
@@ -284,11 +288,11 @@ const Checkout = () => {
         return { coords, fee: 0, time: null, isValid: false };
       }
     } else {
-      // Se não há zonas configuradas, mas a entrega está habilitada, cobramos 0
+      // Se não há zonas configuradas, mas a entrega está habilitada, cobramos 0 e usamos o tempo padrão
       setDeliveryFee(0);
-      setDeliveryTime(null);
+      setDeliveryTime(DEFAULT_DELIVERY_TIME);
       setIsDeliveryAreaValid(true);
-      return { coords, fee: 0, time: null, isValid: true };
+      return { coords, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
     }
   }, [restaurant, restaurantCoords, deliveryZones]);
 
@@ -333,13 +337,17 @@ const Checkout = () => {
   
   // Se a opção de entrega mudar para 'pickup', o endereço é considerado salvo
   useEffect(() => {
+    const DEFAULT_PICKUP_TIME: [number, number] = [15, 30]; // Tempo padrão para retirada
+    
     if (deliveryOption === 'pickup') {
       setDeliveryFee(0);
       setIsDeliveryAreaValid(true);
       setIsAddressSaved(true);
+      setDeliveryTime(DEFAULT_PICKUP_TIME); // Define tempo de retirada
     } else {
       // Se mudar para 'delivery', o endereço precisa ser salvo novamente
       setIsAddressSaved(false);
+      setDeliveryTime(null); // Limpa o tempo até o endereço ser salvo
     }
   }, [deliveryOption]);
 
@@ -614,6 +622,9 @@ const Checkout = () => {
         }
       }
       
+      // Determina o tempo de entrega a ser salvo
+      const [minTime, maxTime] = deliveryTime || [null, null];
+      
       const orderPayload: TablesInsert<'orders'> = {
         restaurant_id: restaurant.id,
         customer_id: customerId,
@@ -626,6 +637,9 @@ const Checkout = () => {
         payment_method_id: data.payment_method_id,
         // O change_for é null se o campo estiver vazio ou inválido
         change_for: changeForValue,
+        // NOVO: Salva o tempo de entrega
+        min_delivery_time_minutes: minTime,
+        max_delivery_time_minutes: maxTime,
       };
 
       const { data: newOrder, error: orderError } = await supabase
