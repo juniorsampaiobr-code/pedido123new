@@ -63,6 +63,9 @@ const fetchOrderDetails = async (orderId: string): Promise<Order> => {
   if (error) throw new Error(`Erro ao buscar detalhes do pedido: ${error.message}`);
   if (!data) throw new Error('Pedido não encontrado.');
   
+  // Log temporário para depuração
+  console.log("Dados do pedido carregados:", data);
+  
   // O cast é seguro porque a query acima garante as relações
   return data as Order;
 };
@@ -99,6 +102,13 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
       fetchItems();
     }
   }, [order?.id, isOpen]);
+
+  // Log temporário para depuração
+  useEffect(() => {
+    if (order) {
+      console.log("Order prop recebida:", order);
+    }
+  }, [order]);
 
   // Extraindo dados do pedido
   const customerName = order?.customer?.name || 'Cliente Desconhecido';
