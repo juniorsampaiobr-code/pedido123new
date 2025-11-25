@@ -202,7 +202,7 @@ const Checkout = () => {
 
   const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, neighborhood: string, lat?: number | null, lng?: number | null) => {
     
-    // Tempo padrão de entrega (usado para retirada ou frete grátis)
+    // Tempo padrão de entrega (usado para retirada ou frete grátis sem zonas)
     const DEFAULT_DELIVERY_TIME: [number, number] = [30, 45]; 
     
     // 1. Lógica de Frete Grátis se a entrega dinâmica estiver desativada
@@ -229,10 +229,28 @@ const Checkout = () => {
         return { coords: null, fee: 0, time: null, isValid: false };
       }
       
-      // Se o endereço for válido, a taxa é 0 (frete grátis)
       setCustomerCoords([coords.lat, coords.lng]);
+      
+      // Mesmo com frete grátis, tenta calcular o tempo com base nas zonas
+      if (deliveryZones && deliveryZones.length > 0) {
+        const feeResult = calculateDeliveryFee(
+          [coords.lat, coords.lng],
+          restaurantCoords!,
+          deliveryZones
+        );
+        
+        if (feeResult) {
+          // Frete grátis, mas usa o tempo da zona
+          setDeliveryFee(0);
+          setDeliveryTime([feeResult.minTime, feeResult.maxTime]);
+          setIsDeliveryAreaValid(true);
+          return { coords, fee: 0, time: [feeResult.minTime, feeResult.maxTime], isValid: true };
+        }
+      }
+      
+      // Se não houver zonas ou o endereço estiver fora, usa o tempo padrão
       setDeliveryFee(0);
-      setDeliveryTime(DEFAULT_DELIVERY_TIME); // Tempo padrão
+      setDeliveryTime(DEFAULT_DELIVERY_TIME);
       setIsDeliveryAreaValid(true);
       return { coords, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
     }
