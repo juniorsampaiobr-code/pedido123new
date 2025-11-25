@@ -80,6 +80,8 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Estado para o nome do método de pagamento buscado separadamente
+  const [paymentMethodName, setPaymentMethodName] = useState<string>('Carregando...');
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -103,6 +105,35 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
     }
   }, [order?.id, isOpen]);
 
+  // Efeito para buscar o nome do método de pagamento separadamente
+  useEffect(() => {
+    const fetchPaymentMethodName = async () => {
+      if (!order?.payment_method_id) {
+        setPaymentMethodName('Não especificado');
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('payment_methods')
+          .select('name')
+          .eq('id', order.payment_method_id)
+          .single();
+
+        if (error) throw error;
+        
+        setPaymentMethodName(data?.name || 'Método não encontrado');
+      } catch (err) {
+        console.error("Failed to fetch payment method name:", err);
+        setPaymentMethodName('Erro ao carregar');
+      }
+    };
+
+    if (isOpen && order) {
+      fetchPaymentMethodName();
+    }
+  }, [isOpen, order]);
+
   // Log temporário para depuração
   useEffect(() => {
     if (order) {
@@ -117,9 +148,7 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
   const customerCpfCnpj = order?.customer?.cpf_cnpj;
   const deliveryAddress = order?.delivery_address;
   
-  // Usando o nome do método de pagamento da relação
-  const paymentMethodName = order?.payment_methods?.name || 'Não especificado'; 
-  
+  // statusInfo, orderNumber, createdAt, formattedDate, changeFor, deliveryFee permanecem os mesmos
   const statusInfo = order?.status ? ORDER_STATUS_MAP[order.status] : null;
   const orderNumber = order?.id ? order.id.slice(-4) : 'N/A';
   const createdAt = order?.created_at ? new Date(order.created_at) : null;
