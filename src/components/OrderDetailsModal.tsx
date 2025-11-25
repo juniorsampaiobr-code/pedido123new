@@ -15,10 +15,18 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-type Order = Tables<'orders'>;
-type OrderItem = Tables<'order_items'> & { products: Tables<'products'> | null };
+type OrderBase = Tables<'orders'>;
 type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
+
+// Definindo o tipo Order com as relações que estamos buscando
+type Order = OrderBase & { 
+  customer: Customer | null;
+  payment_methods: Pick<PaymentMethod, 'name'> | null;
+};
+
+type OrderItem = Tables<'order_items'> & { products: Tables<'products'> | null };
+// Removendo a definição de PaymentMethod duplicada, pois já está definida acima
 
 const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: React.ElementType, color: string }> = {
   pending: { label: 'Pendente', icon: Clock, color: 'bg-yellow-500' },
@@ -49,6 +57,7 @@ const fetchOrderDetails = async (orderId: string): Promise<Order> => {
     .single();
 
   if (error) throw new Error(`Erro ao buscar detalhes do pedido: ${error.message}`);
+  // O cast é seguro porque a query acima garante as relações
   return data as Order;
 };
 
@@ -90,7 +99,8 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
   const customerEmail = order?.customer?.email;
   const customerCpfCnpj = order?.customer?.cpf_cnpj;
   const deliveryAddress = order?.delivery_address;
-  const paymentMethodName = order?.payment_methods?.name || 'Não especificado';
+  // Usando o nome do método de pagamento da relação
+  const paymentMethodName = order?.payment_methods?.name || 'Não especificado'; 
   const statusInfo = order?.status ? ORDER_STATUS_MAP[order.status] : null;
   const orderNumber = order?.id ? order.id.slice(-4) : 'N/A';
   const createdAt = order?.created_at ? new Date(order.created_at) : null;
@@ -157,7 +167,7 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
                 <MapPin className="h-4 w-4 mt-0.5 mr-2 text-muted-foreground flex-shrink-0" />
                 <div>
                   <p className="font-medium">Endereço de Entrega</p>
-                  <p>{deliveryAddress || 'Não informado'}</p>
+                  <p>{deliveryAddress || 'Retirada no local'}</p>
                 </div>
               </div>
               <div className="flex items-start">
