@@ -381,7 +381,7 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
             onDelete={handleDelete}
             isSelected={selectedOrders.includes(order.id)}
             onSelect={handleSelectOrder}
-            onPrint={handlePrintOrder}
+            onPrint={onPrint}
           />
         ))}
       </div>
