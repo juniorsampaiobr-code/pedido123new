@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form'; // Importando Controller
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,14 +23,16 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { ZipCodeInput } from '@/components/ZipCodeInput';
-// import { useSound } from '@/hooks/use-sound'; // REMOVIDO
+import { PhoneInput } from '@/components/PhoneInput'; // Importando PhoneInput
 import { cn } from '@/lib/utils';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Importando Alert
-import { MapLocationSection } from '@/components/MapLocationSection'; // Importando o componente memoizado
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MapLocationSection } from '@/components/MapLocationSection';
 import { useOutletContext } from 'react-router-dom';
-import { DashboardContextType } from '@/layouts/DashboardLayout'; // Importar o tipo do contexto
+import { DashboardContextType } from '@/layouts/DashboardLayout';
 
 type Restaurant = Tables<'restaurants'>;
+
+const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 
 const restaurantSchema = z.object({
   name: z.string().min(1, 'O nome do restaurante é obrigatório.'),
@@ -41,7 +43,10 @@ const restaurantSchema = z.object({
   neighborhood: z.string().optional(),
   city: z.string().optional(),
   zip_code: z.string().optional(),
-  phone: z.string().optional(),
+  // TORNANDO OBRIGATÓRIO E VALIDANDO
+  phone: z.string().min(1, 'Telefone é obrigatório.').transform(cleanPhoneNumber).refine(val => val.length >= 10, {
+    message: 'O telefone deve ter pelo menos 10 dígitos (incluindo DDD).',
+  }),
   email: z.string().email('Email inválido.').optional().or(z.literal('')),
   is_active: z.boolean().default(true),
   latitude: z.preprocess(
@@ -71,7 +76,6 @@ const fetchRestaurantData = async (restaurantId: string): Promise<Restaurant> =>
 
 const Settings = () => {
   const queryClient = useQueryClient();
-  // const { playSound } = useSound(); // REMOVIDO
   const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
   const [searchCep, setSearchCep] = useState('');
   const [searchNumber, setSearchNumber] = useState('');
@@ -97,7 +101,7 @@ const Settings = () => {
       neighborhood: '',
       city: '',
       zip_code: '',
-      phone: '',
+      phone: '', // Valor inicial vazio
       email: '',
       is_active: true,
       latitude: null,
@@ -117,7 +121,7 @@ const Settings = () => {
         neighborhood: restaurant.neighborhood || '',
         city: restaurant.city || '',
         zip_code: restaurant.zip_code || '',
-        phone: restaurant.phone || '',
+        phone: restaurant.phone || '', // Preenche o telefone
         email: restaurant.email || '',
         is_active: restaurant.is_active ?? true,
         latitude: restaurant.latitude ?? null,
@@ -231,7 +235,7 @@ const Settings = () => {
         neighborhood: data.neighborhood,
         city: data.city,
         zip_code: data.zip_code,
-        phone: data.phone,
+        phone: data.phone, // Incluindo o telefone
         email: data.email,
         is_active: data.is_active,
         latitude: data.latitude,
@@ -336,7 +340,19 @@ const Settings = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="phone" render={({ field }) => (<FormItem><FormLabel>Telefone</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField 
+                      control={form.control} 
+                      name="phone" 
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Telefone *</FormLabel>
+                          <FormControl>
+                            <PhoneInput {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} 
+                    />
                     <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
                   <FormField control={form.control} name="is_active" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><FormLabel className="font-normal">Restaurante Ativo</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
