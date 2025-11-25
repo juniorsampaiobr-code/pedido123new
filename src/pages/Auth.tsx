@@ -233,7 +233,7 @@ const Auth = () => {
                     <Label htmlFor="cpfCnpj">CPF/CNPJ *</Label>
                     <CpfCnpjInput
                       id="cpfCnpj"
-                      value={cpfCnpj} {/* CORRIGIDO: Usando cpfCnpj */}
+                      value={cpfCnpj}
                       onChange={(e) => setCpfCnpj(e.target.value)}
                       required
                       className="h-12"
