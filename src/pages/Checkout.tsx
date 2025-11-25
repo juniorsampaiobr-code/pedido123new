@@ -634,6 +634,8 @@ const Checkout = () => {
           maxTime = fallbackTime[1];
       }
       
+      console.log("LOG: Tempo de entrega salvo no pedido:", minTime, maxTime); // NOVO LOG
+      
       const orderPayload: TablesInsert<'orders'> = {
         restaurant_id: restaurant.id,
         customer_id: customerId,
