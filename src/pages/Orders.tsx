@@ -7,12 +7,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShoppingCart, Terminal, RefreshCw, Check, X, DollarSign, Trash2, Loader2, Package, Truck, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { ShoppingCart, Terminal, RefreshCw, Check, X, DollarSign, Trash2, Loader2, Package, Truck, Clock, CheckCircle, XCircle, Printer } from 'lucide-react';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { OrderDetailsModal } from "@/components/OrderDetailsModal";
 import { toast } from "sonner";
-// import { useSound } from "@/hooks/use-sound"; // REMOVIDO
 import { useOutletContext } from "react-router-dom";
 import { DashboardContextType } from "@/layouts/DashboardLayout";
 import { PaginationComponent } from "@/components/PaginationComponent";
@@ -66,7 +65,6 @@ interface FetchOrdersResult {
 
 const PAGE_SIZE = 12;
 
-// Usar userRestaurantId na função fetch
 const fetchOrders = async (restaurantId: string, status: Enums<'order_status'> | 'all', page: number): Promise<FetchOrdersResult> => {
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
@@ -86,7 +84,88 @@ const fetchOrders = async (restaurantId: string, status: Enums<'order_status'> |
   return { orders: data as Order[], count: count || 0 };
 };
 
-const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSelected, onSelect }: { 
+// Função para gerar conteúdo de impressão do pedido
+const generatePrintContent = (order: Order, items: any[]) => {
+  const orderNumber = order.id ? order.id.slice(-4) : 'N/A';
+  const customerName = order.customer?.name || 'Cliente Desconhecido';
+  const customerPhone = order.customer?.phone || 'Não informado';
+  const deliveryAddress = order.delivery_address || 'Retirada no local';
+  const paymentMethodName = order.payment_method_id || 'Não especificado';
+  const createdAt = order.created_at ? new Date(order.created_at).toLocaleString('pt-BR') : 'Data desconhecida';
+  const changeFor = order.change_for ? `Troco para: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.change_for)}` : '';
+  const deliveryFee = order.delivery_fee ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.delivery_fee) : 'Grátis';
+  const subtotal = order.total_amount - (order.delivery_fee || 0);
+
+  let itemsHtml = '';
+  items.forEach(item => {
+    itemsHtml += `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+        <span>${item.quantity}x ${item.products?.name || 'Produto não encontrado'}</span>
+        <span>${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.subtotal)}</span>
+      </div>
+      ${item.notes ? `<div style="font-size: 12px; color: #666; margin-bottom: 10px;">Obs: ${item.notes}</div>` : ''}
+    `;
+  });
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 300px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center; border-bottom: 1px dashed #000; padding-bottom: 10px; margin-bottom: 10px;">
+        <h2 style="margin: 0;">PEDIDO #${orderNumber}</h2>
+        <p style="margin: 5px 0;">${createdAt}</p>
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <h3 style="margin: 0 0 5px 0;">Cliente</h3>
+        <p style="margin: 0;">${customerName}</p>
+        <p style="margin: 0;">${customerPhone}</p>
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <h3 style="margin: 0 0 5px 0;">Entrega</h3>
+        <p style="margin: 0;">${deliveryAddress}</p>
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <h3 style="margin: 0 0 5px 0;">Itens</h3>
+        ${itemsHtml}
+      </div>
+      
+      <div style="border-top: 1px dashed #000; padding-top: 10px; margin-bottom: 15px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+          <span>Subtotal:</span>
+          <span>${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(subtotal)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+          <span>Taxa de Entrega:</span>
+          <span>${deliveryFee}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 16px; margin-top: 10px;">
+          <span>Total:</span>
+          <span>${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total_amount)}</span>
+        </div>
+      </div>
+      
+      <div style="margin-bottom: 15px;">
+        <h3 style="margin: 0 0 5px 0;">Pagamento</h3>
+        <p style="margin: 0;">${paymentMethodName}</p>
+        ${changeFor ? `<p style="margin: 0;">${changeFor}</p>` : ''}
+      </div>
+      
+      ${order.notes ? `
+        <div style="margin-bottom: 15px;">
+          <h3 style="margin: 0 0 5px 0;">Observações</h3>
+          <p style="margin: 0;">${order.notes}</p>
+        </div>
+      ` : ''}
+      
+      <div style="text-align: center; margin-top: 20px;">
+        <p style="font-size: 12px;">Obrigado pela preferência!</p>
+      </div>
+    </div>
+  `;
+};
+
+const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSelected, onSelect, onPrint }: { 
   order: Order, 
   onViewDetails: (order: Order) => void, 
   onAccept: (orderId: string) => void, 
@@ -94,10 +173,10 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSele
   onDelete: (orderId: string) => void,
   isSelected: boolean;
   onSelect: (orderId: string, isChecked: boolean) => void;
+  onPrint: (order: Order) => void;
 }) => {
   const statusInfo = ORDER_STATUS_MAP[order.status || 'pending'];
   const customerName = order.customer?.name || 'Cliente Desconhecido';
-  // CORREÇÃO 1: Usar os últimos 4 caracteres do UUID do pedido
   const orderNumber = order.id ? order.id.slice(-4) : 'N/A';
 
   return (
@@ -126,6 +205,9 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSele
             </>
           )}
           <Button variant="outline" size="sm" onClick={() => onViewDetails(order)}>Detalhes</Button>
+          <Button variant="outline" size="icon" onClick={() => onPrint(order)}>
+            <Printer className="h-4 w-4" />
+          </Button>
           
           <AlertDialog>
             <AlertDialogTrigger asChild>
@@ -157,23 +239,22 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSele
   );
 };
 
-const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSelectedOrders, totalOrdersInView }: { 
+const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSelectedOrders, totalOrdersInView, onPrint }: { 
   status: Enums<'order_status'> | 'all', 
   onViewDetails: (order: Order) => void, 
-  restaurantId: string, // Receber restaurantId como prop
+  restaurantId: string,
   selectedOrders: string[],
   setSelectedOrders: React.Dispatch<React.SetStateAction<string[]>>,
   totalOrdersInView: number,
+  onPrint: (order: Order) => void;
 }) => {
   const queryClient = useQueryClient();
-  // const { stopSoundLoop } = useSound(); // REMOVIDO
-  const [currentPage, setCurrentPage] = useState(1); // 1-indexed page for PaginationComponent
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Usar restaurantId no queryKey e na função fetch
   const { data, isLoading, isError, error, refetch } = useQuery<FetchOrdersResult>({
     queryKey: ['orders', status, restaurantId, currentPage],
-    queryFn: () => fetchOrders(restaurantId, status, currentPage - 1), // Passa 0-indexed para a função fetch
-    enabled: !!restaurantId, // Só busca se restaurantId estiver disponível
+    queryFn: () => fetchOrders(restaurantId, status, currentPage - 1),
+    enabled: !!restaurantId,
   });
 
   const orders = data?.orders || [];
@@ -182,7 +263,6 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: Enums<'order_status'> }) => {
-      // Ao aceitar, muda para 'preparing'
       const statusToSet = newStatus === 'pending' ? 'preparing' : newStatus; 
       const { error } = await supabase.from('orders').update({ status: statusToSet }).eq('id', orderId);
       if (error) throw new Error(error.message);
@@ -197,7 +277,6 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
 
   const deleteMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      // A exclusão em cascata deve cuidar dos order_items
       const { error } = await supabase.from('orders').delete().eq('id', orderId);
       if (error) throw new Error(error.message);
     },
@@ -209,16 +288,12 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
   });
 
   const handleAccept = (orderId: string) => {
-    // stopSoundLoop(); // REMOVIDO
-    // Ao aceitar, muda para 'preparing'
     updateStatusMutation.mutate({ orderId, newStatus: 'preparing' as Enums<'order_status'> });
   };
   const handleDecline = (orderId: string) => {
-    // stopSoundLoop(); // REMOVIDO
     updateStatusMutation.mutate({ orderId, newStatus: 'cancelled' });
   };
   const handleViewDetails = (order: Order) => {
-    // stopSoundLoop(); // REMOVIDO
     onViewDetails(order);
   };
   const handleDelete = (orderId: string) => {
@@ -226,7 +301,7 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
   };
   
   const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page); // Componente de paginação é 1-indexed
+    setCurrentPage(page);
   }, []);
 
   const handleSelectOrder = useCallback((orderId: string, isChecked: boolean) => {
@@ -244,7 +319,6 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
       const allIds = orders.map(o => o.id);
       setSelectedOrders(prev => [...new Set([...prev, ...allIds])]);
     } else {
-      // Remove apenas os IDs desta página da seleção global
       const currentIds = new Set(orders.map(o => o.id));
       setSelectedOrders(prev => prev.filter(id => !currentIds.has(id)));
     }
@@ -284,6 +358,7 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
             onDelete={handleDelete}
             isSelected={selectedOrders.includes(order.id)}
             onSelect={handleSelectOrder}
+            onPrint={onPrint}
           />
         ))}
       </div>
@@ -302,7 +377,7 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
 };
 
 const Orders = () => {
-  const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
+  const { userRestaurantId } = useOutletContext<DashboardContextType>();
   const queryClient = useQueryClient();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -313,8 +388,64 @@ const Orders = () => {
   const handleCloseModal = () => { setIsModalOpen(false); setSelectedOrder(null); };
   
   const handleRefreshAll = () => {
-    queryClient.invalidateQueries({ queryKey: ['orders', userRestaurantId] }); // Usar userRestaurantId
+    queryClient.invalidateQueries({ queryKey: ['orders', userRestaurantId] });
     toast.info("Atualizando pedidos...", { description: "Buscando novos dados no servidor." });
+  };
+
+  // Função para buscar itens do pedido para impressão
+  const fetchOrderItemsForPrint = async (orderId: string) => {
+    const { data, error } = await supabase
+      .from('order_items')
+      .select('*, products(name)')
+      .eq('order_id', orderId);
+    
+    if (error) throw new Error(`Erro ao buscar itens do pedido: ${error.message}`);
+    return data;
+  };
+
+  // Função para imprimir pedido
+  const handlePrintOrder = async (order: Order) => {
+    try {
+      // Buscar itens do pedido
+      const items = await fetchOrderItemsForPrint(order.id);
+      
+      // Gerar conteúdo HTML para impressão
+      const printContent = generatePrintContent(order, items);
+      
+      // Criar janela de impressão
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Pedido #${order.id ? order.id.slice(-4) : 'N/A'}</title>
+              <style>
+                @media print {
+                  body { margin: 0; }
+                }
+              </style>
+            </head>
+            <body>
+              ${printContent}
+              <script>
+                window.onload = function() {
+                  window.print();
+                  window.onafterprint = function() {
+                    window.close();
+                  }
+                }
+              </script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      } else {
+        toast.error('Não foi possível abrir a janela de impressão. Verifique as permissões do navegador.');
+      }
+    } catch (error) {
+      console.error('Erro ao imprimir pedido:', error);
+      toast.error('Erro ao preparar impressão do pedido.');
+    }
   };
 
   const massActionMutation = useMutation({
@@ -324,7 +455,6 @@ const Orders = () => {
         if (error) throw new Error(error.message);
         return 'deleted';
       } else {
-        // Se a ação for 'pending', ao aceitar, muda para 'preparing'
         const statusToSet = action === 'pending' ? 'preparing' : action;
         const { error } = await supabase.from('orders').update({ status: statusToSet }).in('id', orderIds);
         if (error) throw new Error(error.message);
@@ -340,7 +470,7 @@ const Orders = () => {
       }
       setSelectedOrders([]);
       setMassAction('');
-      queryClient.invalidateQueries({ queryKey: ['orders', userRestaurantId] }); // Usar userRestaurantId
+      queryClient.invalidateQueries({ queryKey: ['orders', userRestaurantId] });
     },
     onError: (err) => {
       toast.error(`Erro na ação em massa: ${err.message}`);
@@ -351,7 +481,6 @@ const Orders = () => {
     if (!massAction || selectedOrders.length === 0) return;
 
     if (massAction === 'delete') {
-      // Abre o diálogo de confirmação para exclusão
       document.getElementById('mass-delete-trigger')?.click();
     } else {
       massActionMutation.mutate({ orderIds: selectedOrders, action: massAction as Enums<'order_status'> | 'delete' });
@@ -371,7 +500,6 @@ const Orders = () => {
 
   const isMassActionPending = massActionMutation.isPending;
 
-  // Garantir que userRestaurantId esteja disponível antes de renderizar
   if (!userRestaurantId) {
       return <div className="flex h-screen items-center justify-center">Carregando...</div>;
   }
@@ -380,7 +508,6 @@ const Orders = () => {
     <>
       <OrderDetailsModal order={selectedOrder} isOpen={isModalOpen} onClose={handleCloseModal} />
       
-      {/* Diálogo de Confirmação de Exclusão em Massa */}
       <AlertDialog>
         <AlertDialogTrigger asChild>
           <button id="mass-delete-trigger" className="hidden" />
@@ -413,7 +540,6 @@ const Orders = () => {
             </Button>
           </div>
           
-          {/* Barra de Ações em Massa */}
           {selectedOrders.length > 0 && (
             <div className="flex items-center gap-2 p-2 border rounded-lg bg-card shadow-lg animate-fade-in">
               <ShoppingCart className="h-5 w-5 text-primary mr-2" />
@@ -442,7 +568,6 @@ const Orders = () => {
           )}
         </div>
         
-        {/* Usar userRestaurantId aqui */}
         {userRestaurantId ? (
           <Tabs defaultValue="pending">
             <TabsList className="w-full overflow-x-auto justify-start">{statusTabs.map(tab => <TabsTrigger key={tab.value} value={tab.value} className="whitespace-nowrap">{tab.label}</TabsTrigger>)}</TabsList>
@@ -451,10 +576,11 @@ const Orders = () => {
                 <OrdersList 
                   status={tab.value} 
                   onViewDetails={handleViewDetails} 
-                  restaurantId={userRestaurantId} // Passar userRestaurantId
+                  restaurantId={userRestaurantId}
                   selectedOrders={selectedOrders}
                   setSelectedOrders={setSelectedOrders}
                   totalOrdersInView={selectedOrders.length}
+                  onPrint={handlePrintOrder}
                 />
               </TabsContent>
             ))}
