@@ -199,6 +199,7 @@ const DashboardLayoutComponent = () => {
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         const newOrder = payload.new as Tables<'orders'>;
         
+        // 1. Novo pedido (INSERT)
         if (newOrder.status === 'pending' && newOrder.id && newOrder.restaurant_id === userRestaurantId) {
           toast.info("🔔 Novo pedido recebido!", { 
             description: `Pedido #${newOrder.id.slice(-4)} está aguardando confirmação.`,
@@ -210,22 +211,24 @@ const DashboardLayoutComponent = () => {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         const updatedOrder = payload.new as Tables<'orders'>;
-        const oldOrder = payload.old as Tables<'orders'>;
         
-        // Verifica se o status mudou de 'pending_payment' para 'pending'
-        const isPaymentConfirmed = oldOrder?.status === 'pending_payment' && updatedOrder.status === 'pending';
-        
-        if (isPaymentConfirmed && updatedOrder.id && updatedOrder.restaurant_id === userRestaurantId) {
+        if (updatedOrder.restaurant_id !== userRestaurantId) return;
+
+        // 2. Pagamento Confirmado (UPDATE para 'pending')
+        // Como não temos o 'old' payload garantido, verificamos se o novo status é 'pending'
+        // e se o pedido não estava tocando (para evitar loop se o admin aceitar o pedido)
+        if (updatedOrder.status === 'pending' && updatedOrder.id && updatedOrder.id !== loopingOrderId) {
+          // Se o status for 'pending', é um novo pedido ou um pagamento confirmado.
+          // Assumimos que se for um UPDATE para 'pending', é uma confirmação de pagamento.
           toast.success("✅ Pagamento Confirmado!", { 
             description: `Pedido #${updatedOrder.id.slice(-4)} foi pago e está pronto para preparo.`,
             duration: 5000,
           });
-          // Toca o som de notificação para pedidos confirmados
           startSoundLoop(updatedOrder.id); 
         }
         
-        // Se o pedido que estava tocando foi atualizado (ex: aceito), pare o som
-        if (updatedOrder.id === loopingOrderId) {
+        // 3. Parar o som se o pedido que estava tocando for atualizado para qualquer outro status
+        if (updatedOrder.id === loopingOrderId && updatedOrder.status !== 'pending' && updatedOrder.status !== 'pending_payment') {
           stopSoundLoop();
         }
       })
