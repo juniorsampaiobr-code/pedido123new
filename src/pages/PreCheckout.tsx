@@ -8,25 +8,14 @@ import { useQuery } from '@tanstack/react-query';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useCart } from '@/hooks/use-cart';
 import { useActiveRestaurantId } from '@/hooks/use-active-restaurant-id'; // Importando o novo hook
-
-// Hook para verificar o status de autenticação
-const useAuthStatus = () => {
-  return useQuery({
-    queryKey: ['authStatus'],
-    queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      return session?.user || null;
-    },
-    staleTime: Infinity,
-  });
-};
+import { useAuthStatus } from '@/hooks/use-auth-status'; // Importando o hook centralizado
 
 const PreCheckout = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const currentRestaurantId = searchParams.get('restaurantId'); // Lê o ID do restaurante da URL
   
-  const { data: user, isLoading: isLoadingAuth } = useAuthStatus();
+  const { data: user, isLoading: isLoadingAuth } = useAuthStatus(); // Usando o hook centralizado
   const { data: defaultRestaurantId, isLoading: isLoadingRestaurantId } = useActiveRestaurantId();
   const { totalItems } = useCart();
 
