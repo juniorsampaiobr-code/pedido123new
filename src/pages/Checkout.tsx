@@ -20,7 +20,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { MapPin, Phone, Mail, CreditCard, DollarSign, Truck, Loader2, User, RefreshCw, AlertCircle, LogOut, User as UserIcon, Save, CheckCircle, Terminal } from 'lucide-react';
+import { MapPin, Phone, Mail, CreditCard, DollarSign, Truck, Loader2, User, RefreshCw, AlertCircle, LogOut, User as UserIcon, Save, CheckCircle, Terminal, ArrowLeft } from 'lucide-react';
 import { ZipCodeInput } from '@/components/ZipCodeInput';
 import { PhoneInput } from '@/components/PhoneInput';
 import { CustomerProfileModal } from '@/components/CustomerProfileModal';
@@ -908,10 +908,17 @@ const Checkout = () => {
 
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Finalizar Pedido</h1>
-            {/* NOVO: Nome do Restaurante */}
-            <p className="text-lg text-muted-foreground font-medium">{restaurant.name}</p>
+          <div className="flex items-center gap-3">
+            {/* NOVO BOTÃO DE VOLTAR */}
+            <Link to={`/menu/${restaurantId}`}>
+              <Button variant="ghost" size="icon" aria-label="Voltar ao Menu">
+                <ArrowLeft className="h-6 w-6" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Finalizar Pedido</h1>
+              <p className="text-lg text-muted-foreground font-medium">{restaurant.name}</p>
+            </div>
           </div>
           {user && (
             <div className="flex items-center gap-2">
