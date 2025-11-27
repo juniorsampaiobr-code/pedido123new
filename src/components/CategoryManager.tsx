@@ -1,25 +1,36 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Plus, Edit, Trash2, Terminal } from 'lucide-react';
+import { Plus, Edit, Trash2, Terminal, Loader2 } from 'lucide-react';
 import { AddCategoryModal } from './AddCategoryModal';
+import { EditCategoryModal } from './EditCategoryModal'; // Importando o novo modal
+import { Tables } from '@/integrations/supabase/types';
+import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
+type Category = Tables<'categories'>; // Definindo o tipo Category
 type Product = {
   id: string;
   name: string;
   is_available: boolean | null;
 };
 
-type CategoryWithProducts = {
-  id: string;
-  name: string;
-  display_order: number | null;
-  is_active: boolean | null;
+type CategoryWithProducts = Category & {
   products: Product[];
 };
 
@@ -50,12 +61,16 @@ const fetchCategoriesWithProducts = async (restaurantId: string): Promise<Catego
     products: products.filter(product => product.category_id === category.id),
   }));
 
-  return categoriesWithProducts;
+  return categoriesWithProducts as CategoryWithProducts[];
 };
 
 // Atualizar a assinatura do componente
 export const CategoryManager = ({ restaurantId }: CategoryManagerProps) => {
+  const queryClient = useQueryClient();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
 
   // Usar restaurantId no queryKey e na função fetch
   const { data: categories, isLoading, isError, error } = useQuery<CategoryWithProducts[]>({
@@ -63,11 +78,80 @@ export const CategoryManager = ({ restaurantId }: CategoryManagerProps) => {
     queryFn: () => fetchCategoriesWithProducts(restaurantId!),
     enabled: !!restaurantId, // Só busca se restaurantId estiver disponível
   });
+  
+  const handleDeleteCategory = (categoryId: string) => {
+    setDeletingCategoryId(categoryId);
+  };
+
+  const deleteMutation = useMutation({
+    mutationFn: async (categoryId: string) => {
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', categoryId);
+      
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      toast.success('Categoria excluída com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['categoriesWithProducts', restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ['categories', restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ['menuData'] });
+      setDeletingCategoryId(null);
+    },
+    onError: (err) => {
+      toast.error(`Erro ao excluir categoria: ${err.message}`);
+      setDeletingCategoryId(null);
+    },
+  });
+
+  const categoryToDelete = categories?.find(c => c.id === deletingCategoryId);
 
   return (
     <>
-      {/* Passar restaurantId para o modal */}
-      <AddCategoryModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} restaurantId={restaurantId} />
+      {/* Modal de Adição */}
+      <AddCategoryModal 
+        isOpen={isAddModalOpen} 
+        onClose={() => setIsAddModalOpen(false)} 
+        restaurantId={restaurantId} 
+      />
+      
+      {/* Modal de Edição */}
+      <EditCategoryModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingCategory(null);
+        }}
+        category={editingCategory}
+        restaurantId={restaurantId}
+      />
+      
+      {/* Diálogo de Confirmação de Exclusão */}
+      <AlertDialog open={!!deletingCategoryId} onOpenChange={(open) => !open && setDeletingCategoryId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza que deseja excluir esta categoria?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é permanente. A categoria "{categoryToDelete?.name || 'selecionada'}" será removida.
+              <br />
+              **Atenção:** Os produtos associados a esta categoria não serão excluídos, mas ficarão sem categoria.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deleteMutation.mutate(deletingCategoryId!)}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Categorias</h2>
@@ -134,8 +218,23 @@ export const CategoryManager = ({ restaurantId }: CategoryManagerProps) => {
                     </div>
                   </div>
                   <div className="flex gap-2 pt-2 border-t">
-                    <Button variant="outline" className="w-full"><Edit className="mr-2 h-4 w-4" /> Editar</Button>
-                    <Button variant="destructive" size="icon"><Trash2 className="h-4 w-4" /></Button>
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => {
+                        setEditingCategory(category);
+                        setIsEditModalOpen(true);
+                      }}
+                    >
+                      <Edit className="mr-2 h-4 w-4" /> Editar
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="icon"
+                      onClick={() => handleDeleteCategory(category.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
