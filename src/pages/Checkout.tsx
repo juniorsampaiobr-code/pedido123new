@@ -1002,12 +1002,12 @@ const Checkout = () => {
                       <Label htmlFor="delivery" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer">
                         <RadioGroupItem value="delivery" id="delivery" className="sr-only" />
                         <Truck className="mb-3 h-6 w-6" />
-                        Entrega
+                        <span translate="no">Entrega</span>
                       </Label>
                       <Label htmlFor="pickup" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer">
                         <RadioGroupItem value="pickup" id="pickup" className="sr-only" />
                         <MapPin className="mb-3 h-6 w-6" />
-                        Retirada no Local
+                        <span translate="no">Retirada no Local</span>
                       </Label>
                     </RadioGroup>
                   )}
@@ -1158,7 +1158,7 @@ const Checkout = () => {
                             <div className="flex items-center space-x-3">
                               <RadioGroupItem value={method.id} id={method.id} disabled={isMpOnline} />
                               <div>
-                                <p className="font-medium">{method.name}</p>
+                                <p className="font-medium" translate="no">{method.name}</p>
                                 <p className="text-xs text-muted-foreground">{method.description}</p>
                                 {isMpOnline && (
                                   <p className="text-xs text-destructive mt-1">Pagamento online indisponível (Chave Pública não configurada).</p>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,7 +28,7 @@ type Restaurant = Tables<'restaurants'>; // Novo tipo
 type Order = Tables<'orders'> & { 
   customer: Tables<'customers'> | null,
   payment_methods: Tables<'payment_methods'> | null,
-  restaurant: Pick<Restaurant, 'name' | 'phone' | 'address'> | null; // Adicionando dados do restaurante
+  restaurant: Pick<Restaurant, 'name' | 'phone' | 'address'> | null, // Adicionando dados do restaurante
 };
 type OrderItem = Tables<'order_items'> & { products: Tables<'products'> | null };
 type OrderStatus = Enums<'order_status'>;
@@ -77,6 +77,9 @@ const OrderSuccess = () => {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   
+  // NOVO ESTADO: Controla a abertura do modal de cancelamento
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false); 
+  
   // Prioriza o ID da URL, mas verifica também o external_reference do Mercado Pago
   const orderId = paramOrderId || searchParams.get('external_reference');
   const restaurantIdFromQuery = searchParams.get('restaurantId'); // NOVO: Lê o restaurantId da query param
@@ -113,14 +116,18 @@ const OrderSuccess = () => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
+      // 1. Fecha o modal imediatamente para evitar conflitos de DOM
+      setIsCancelModalOpen(false); 
+      
       toast.success('Pedido cancelado com sucesso.');
-      // Invalida a query para forçar a atualização do status na tela
+      // 2. Invalida a query para forçar a atualização do status na tela
       queryClient.invalidateQueries({ queryKey: ['orderSuccessDetails', orderId] });
-      // Invalida as queries do painel admin para que o restaurante veja o cancelamento
+      // 3. Invalida as queries do painel admin para que o restaurante veja o cancelamento
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
     onError: (err) => {
       toast.error(`Falha ao cancelar pedido: ${err.message}`);
+      setIsCancelModalOpen(false); // Garante que o modal feche mesmo com erro
     },
   });
 
@@ -328,7 +335,7 @@ const OrderSuccess = () => {
           {/* Ações */}
           <div className="pt-6 flex flex-col sm:flex-row justify-center gap-4">
             {isCancellable && (
-              <AlertDialog>
+              <AlertDialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
                 <AlertDialogTrigger asChild>
                   <Button variant="destructive" disabled={cancelOrderMutation.isPending}>
                     {cancelOrderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
@@ -343,13 +350,13 @@ const OrderSuccess = () => {
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Não, Manter Pedido</AlertDialogCancel>
+                    <AlertDialogCancel disabled={cancelOrderMutation.isPending}>Não, Manter Pedido</AlertDialogCancel>
                     <AlertDialogAction 
                       onClick={() => cancelOrderMutation.mutate(orderId!)}
                       className="bg-destructive hover:bg-destructive/90"
                       disabled={cancelOrderMutation.isPending}
                     >
-                      Sim, Cancelar
+                      {cancelOrderMutation.isPending ? 'Cancelando...' : 'Sim, Cancelar'}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
