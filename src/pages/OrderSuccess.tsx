@@ -274,7 +274,7 @@ const OrderSuccess = () => {
             <div className="flex items-start gap-3">
               <CreditCard className="h-5 w-5 text-primary flex-shrink-0" />
               <div>
-                <p className="font-semibold">Pagamento</p>
+                <p className="font-semibold">Pagamento</p> {/* CORRIGIDO: Garantindo que o rótulo seja 'Pagamento' */}
                 <p className="text-sm text-muted-foreground">{paymentMethodName}</p>
                 {changeFor && <p className="text-xs text-muted-foreground">Troco para: {changeFor}</p>}
               </div>
