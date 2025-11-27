@@ -267,14 +267,14 @@ const OrderSuccess = () => {
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 text-primary flex-shrink-0" />
               <div>
-                <p className="font-semibold">Entrega</p>
+                <p className="font-semibold" translate="no">Entrega</p>
                 <p className="text-sm text-muted-foreground">{order.delivery_address || 'Retirada no local'}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <CreditCard className="h-5 w-5 text-primary flex-shrink-0" />
               <div>
-                <p className="font-semibold">Pagamento</p> {/* CORRIGIDO: Garantindo que o rótulo seja 'Pagamento' */}
+                <p className="font-semibold" translate="no">Pagamento</p>
                 <p className="text-sm text-muted-foreground">{paymentMethodName}</p>
                 {changeFor && <p className="text-xs text-muted-foreground">Troco para: {changeFor}</p>}
               </div>
@@ -282,7 +282,7 @@ const OrderSuccess = () => {
             <div className="flex items-start gap-3">
               <Timer className="h-5 w-5 text-primary flex-shrink-0" />
               <div>
-                <p className="font-semibold">Tempo Estimado</p>
+                <p className="font-semibold" translate="no">Tempo Estimado</p>
                 <p className="text-sm text-muted-foreground">{deliveryTimeText}</p>
               </div>
             </div>
