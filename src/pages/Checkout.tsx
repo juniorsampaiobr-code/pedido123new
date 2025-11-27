@@ -683,9 +683,10 @@ const Checkout = () => {
       const orderItemsPayload: TablesInsert<'order_items'>[] = items.map(item => ({
         order_id: newOrder.id,
         product_id: item.product.id,
-        quantity: item.quantity,
-        unit_price: item.product.price,
-        subtotal: item.subtotal,
+        // Garantir que quantity, unit_price e subtotal sejam números com precisão limitada
+        quantity: parseFloat(item.quantity.toFixed(3)), // 3 casas decimais para quantidade (peso)
+        unit_price: parseFloat(item.product.price.toFixed(2)), // 2 casas decimais para preço unitário
+        subtotal: parseFloat(item.subtotal.toFixed(2)), // 2 casas decimais para subtotal
         notes: item.notes,
       }));
 
@@ -712,7 +713,7 @@ const Checkout = () => {
     console.log("LOG: onSubmit iniciado.");
     console.log("LOG: isOnlinePayment:", isOnlinePayment);
     console.log("LOG: deliveryOption:", deliveryOption);
-    console.log("LOG: isAddressSaved:", isAddressSaved);
+    console.log("LOG: isAddressSaved: ", isAddressSaved);
     console.log("LOG: change_for data:", data.change_for);
     
     // Validação manual do troco antes de prosseguir
@@ -732,7 +733,7 @@ const Checkout = () => {
     
     if (items.length === 0) {
       toast.error('Seu carrinho está vazio.');
-      navigate('/menu');
+      navigate(`/menu/${restaurantId}`);
       return;
     }
     
