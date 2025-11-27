@@ -134,14 +134,7 @@ const Menu = () => {
   // Determina se o checkout deve ser bloqueado
   const isCheckoutBlocked = !isOpen;
 
-  const copyMenuLink = () => {
-    if (menuData?.restaurant) {
-      // O link agora inclui o ID do restaurante
-      const menuLink = `${window.location.origin}${window.location.pathname}#/menu/${restaurantId}`;
-      navigator.clipboard.writeText(menuLink);
-      toast.success("Link do cardápio copiado!");
-    }
-  };
+  // REMOVENDO FUNÇÃO copyMenuLink
   
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -235,15 +228,7 @@ const Menu = () => {
           {/* Restaurant Menu Link */}
           <div className="mt-3 flex items-center justify-between">
             <BusinessStatus restaurant={restaurant} hours={realtimeHours} />
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={copyMenuLink}
-              className="hidden sm:flex items-center gap-2"
-            >
-              <Copy className="h-4 w-4" />
-              Copiar Link
-            </Button>
+            {/* REMOVENDO BOTÃO COPIAR LINK */}
           </div>
         </div>
       </header>
@@ -289,14 +274,7 @@ const Menu = () => {
       )}
       
       {/* Floating action button for mobile */}
-      <div className="fixed bottom-20 right-4 sm:hidden">
-        <Button 
-          onClick={copyMenuLink}
-          className="rounded-full h-12 w-12 shadow-lg"
-        >
-          <Copy className="h-5 w-5" />
-        </Button>
-      </div>
+      {/* REMOVENDO BOTÃO FLUTUANTE DE COPIAR LINK */}
     </div>
   );
 };
