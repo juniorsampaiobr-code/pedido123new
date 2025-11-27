@@ -13,7 +13,8 @@ const FloatingCartButtonComponent = ({ totalItems, onClick, isCheckoutBlocked }:
     <Button
       onClick={onClick}
       className={cn(
-        "fixed bottom-4 right-4 z-40 rounded-full h-14 w-14 shadow-xl transition-transform duration-300",
+        // Posição: Topo Direito (em vez de bottom-4 right-4)
+        "fixed top-4 right-4 z-40 rounded-full h-14 w-14 shadow-xl transition-transform duration-300",
         totalItems > 0 ? "scale-100" : "scale-0 pointer-events-none"
       )}
       aria-label={`Ver carrinho com ${totalItems} itens`}
