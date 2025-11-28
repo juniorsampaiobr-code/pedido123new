@@ -27,12 +27,13 @@ interface WeightProductModalProps {
 const WeightProductModalComponent = ({ isOpen, onClose, product, onAddToCart, isCheckoutBlocked }: WeightProductModalProps) => {
   // Inicializa com 0.5kg como padrão para produtos pesáveis
   const [quantity, setQuantity] = useState(0.5); 
-  const [notes, setNotes] = useState('');
+  // Removendo o estado 'notes'
+  // const [notes, setNotes] = useState('');
 
   React.useEffect(() => {
     if (isOpen) {
       setQuantity(0.5);
-      setNotes('');
+      // setNotes(''); // Removendo reset de notes
     }
   }, [isOpen]);
 
@@ -46,7 +47,8 @@ const WeightProductModalComponent = ({ isOpen, onClose, product, onAddToCart, is
 
   const handleConfirm = () => {
     if (quantity <= 0) return;
-    onAddToCart(quantity, notes);
+    // Passando string vazia para notes
+    onAddToCart(quantity, ''); 
     onClose();
   };
 
@@ -106,7 +108,8 @@ const WeightProductModalComponent = ({ isOpen, onClose, product, onAddToCart, is
             </div>
           </div>
 
-          <div className="space-y-2">
+          {/* REMOVIDO: Campo de Observações */}
+          {/* <div className="space-y-2">
             <label htmlFor="notes" className="text-sm font-medium">Observações (Opcional)</label>
             <Textarea
               id="notes"
@@ -116,7 +119,7 @@ const WeightProductModalComponent = ({ isOpen, onClose, product, onAddToCart, is
               rows={2}
               disabled={isCheckoutBlocked}
             />
-          </div>
+          </div> */}
         </div>
         
         <DialogFooter className="pt-4">
