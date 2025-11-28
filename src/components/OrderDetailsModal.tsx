@@ -20,13 +20,15 @@ type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
 
 // Definindo o tipo Order com as relações que estamos buscando
-// Incluindo payment_methods(name) na definição do tipo
 type Order = OrderBase & { 
   customer: Customer | null;
   payment_methods: Pick<PaymentMethod, 'name'> | null;
 };
 
-type OrderItem = Tables<'order_items'> & { products: Tables<'products'> | null };
+// Atualizando OrderItem para incluir is_price_by_weight do produto
+type OrderItem = Tables<'order_items'> & { 
+  products: (Tables<'products'> & { is_price_by_weight: boolean | null }) | null 
+};
 
 const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: React.ElementType, color: string }> = {
   pending: { label: 'Pendente', icon: Clock, color: 'bg-yellow-500' },
@@ -41,7 +43,7 @@ const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: Rea
 const fetchOrderItems = async (orderId: string): Promise<OrderItem[]> => {
   const { data, error } = await supabase
     .from('order_items')
-    .select('*, products(name)')
+    .select('*, products(name, is_price_by_weight)') // Buscando is_price_by_weight
     .eq('order_id', orderId);
   if (error) throw new Error(error.message);
   return data as OrderItem[];
@@ -238,18 +240,25 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
             <div>
               <h3 className="font-semibold mb-2">Itens do Pedido</h3>
               <div className="space-y-2">
-                {orderItems.map((item) => (
-                  <div key={item.id} className="flex justify-between items-start p-2 bg-muted/50 rounded">
-                    <div>
-                      <p className="font-medium">{item.products?.name || 'Produto não encontrado'}</p>
-                      {item.notes && <p className="text-xs text-muted-foreground">Obs: {item.notes}</p>}
+                {orderItems.map((item) => {
+                  const isWeight = item.products?.is_price_by_weight;
+                  const quantityLabel = isWeight 
+                    ? `${item.quantity} kg` 
+                    : `${item.quantity} x`;
+                  
+                  return (
+                    <div key={item.id} className="flex justify-between items-start p-2 bg-muted/50 rounded">
+                      <div>
+                        <p className="font-medium">{item.products?.name || 'Produto não encontrado'}</p>
+                        {item.notes && <p className="text-xs text-muted-foreground">Obs: {item.notes}</p>}
+                      </div>
+                      <div className="text-right">
+                        <p>{quantityLabel} {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unit_price)}</p>
+                        <p className="font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.subtotal)}</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p>{item.quantity} x {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unit_price)}</p>
-                      <p className="font-semibold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.subtotal)}</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
