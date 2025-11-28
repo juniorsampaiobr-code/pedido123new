@@ -13,8 +13,10 @@ import { Enums } from "@/integrations/supabase/types";
 import { PhoneInput } from "@/components/PhoneInput";
 import { Separator } from "@/components/ui/separator";
 import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importando LoadingSpinner
+import { CpfCnpjInput } from "@/components/CpfCnpjInput"; // NOVO: Importando CpfCnpjInput
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
+const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
 
 const checkUserRoleAndRestaurant = async (userId: string): Promise<{ role: Enums<'app_role'> | null, restaurantId: string | null }> => {
   const { data, error } = await supabase
@@ -48,7 +50,6 @@ const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role
   }
   
   // Se o usuário tem a role 'user' (cliente), ele não deve prosseguir com o setup de admin.
-  // Isso impede que clientes criem restaurantes acidentalmente.
   if (role === 'user') {
       console.log(`[AdminAuth] User ${user.id} is a customer ('user' role). Blocking admin setup.`);
       return { role: 'user', restaurantId: null };
@@ -58,9 +59,17 @@ const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role
   console.log(`[AdminAuth] Running setup for user ${user.id}. Current role: ${role}, Restaurant ID: ${restaurantId}`);
   
   const fullName = user.user_metadata.full_name || 'Novo Usuário';
+  // NOVO: Passando o nome da loja e o CPF/CNPJ para a Edge Function
+  const storeName = user.user_metadata.store_name || fullName;
+  const cpfCnpj = user.user_metadata.cpf_cnpj || null;
   
   const { error: setupError, data: setupData } = await supabase.functions.invoke('ensure-admin-access', {
-    body: { userId: user.id, fullName: fullName },
+    body: { 
+      userId: user.id, 
+      fullName: fullName,
+      storeName: storeName, // NOVO
+      cpfCnpj: cpfCnpj, // NOVO
+    },
   });
   
   if (setupError) {
@@ -97,6 +106,8 @@ const AdminAuth = () => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [storeName, setStoreName] = useState(""); // NOVO ESTADO
+  const [cpfCnpj, setCpfCnpj] = useState(""); // NOVO ESTADO
   const [session, setSession] = useState<Session | null>(null);
 
   const handleRedirect = async (user: User) => {
@@ -173,9 +184,18 @@ const AdminAuth = () => {
         toast.error("O Nome Completo é obrigatório.");
         return false;
       }
+      if (!storeName.trim()) {
+        toast.error("O Nome da Loja é obrigatório.");
+        return false;
+      }
       const cleanedPhone = cleanPhoneNumber(phone);
       if (cleanedPhone.length !== 11) {
         toast.error("O Telefone deve conter 11 dígitos (DDD + 9 dígitos).");
+        return false;
+      }
+      const cleanedCpfCnpj = cleanCpfCnpj(cpfCnpj);
+      if (cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14) {
+        toast.error("O CPF deve ter 11 dígitos ou CNPJ 14 dígitos.");
         return false;
       }
     }
@@ -199,6 +219,7 @@ const AdminAuth = () => {
     try {
       if (isSignUp) {
         const cleanedPhone = cleanPhoneNumber(phone);
+        const cleanedCpfCnpj = cleanCpfCnpj(cpfCnpj);
         
         // Ao se cadastrar pelo fluxo AdminAuth, garantimos que a Edge Function
         // será chamada para criar o restaurante e a role 'admin' se necessário.
@@ -209,6 +230,8 @@ const AdminAuth = () => {
             data: {
               full_name: fullName,
               phone: cleanedPhone,
+              store_name: storeName, // NOVO: Nome da Loja
+              cpf_cnpj: cleanedCpfCnpj, // NOVO: CPF/CNPJ
             },
           }
         });
@@ -353,6 +376,18 @@ const AdminAuth = () => {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="storeName">Nome da Loja *</Label>
+                      <Input
+                        id="storeName"
+                        type="text"
+                        placeholder="Nome do seu restaurante"
+                        value={storeName}
+                        onChange={(e) => setStoreName(e.target.value)}
+                        required
+                        className="h-12"
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="phone">Telefone *</Label>
                       <PhoneInput
                         id="phone"
@@ -362,6 +397,17 @@ const AdminAuth = () => {
                         className="h-12"
                       />
                       <p className="text-xs text-muted-foreground">Formato: (99) 99999-9999</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cpfCnpj">CPF/CNPJ *</Label>
+                      <CpfCnpjInput
+                        id="cpfCnpj"
+                        value={cpfCnpj}
+                        onChange={(e) => setCpfCnpj(e.target.value)}
+                        required
+                        className="h-12"
+                      />
+                      <p className="text-xs text-muted-foreground">CPF (11 dígitos) ou CNPJ (14 dígitos).</p>
                     </div>
                   </>
                 )}

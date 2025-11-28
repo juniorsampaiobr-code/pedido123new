@@ -13,7 +13,8 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, fullName } = await req.json();
+    // NOVO: Recebendo storeName e cpfCnpj
+    const { userId, fullName, storeName, cpfCnpj } = await req.json();
     
     if (!userId) {
       return new Response(JSON.stringify({ error: 'User ID is required.' }), {
@@ -43,7 +44,8 @@ serve(async (req) => {
     );
 
     let restaurantId: string;
-    const restaurantName = fullName ? `${fullName}'s Restaurante` : 'Novo Restaurante';
+    // Usa o storeName fornecido ou um fallback
+    const finalRestaurantName = storeName || (fullName ? `${fullName}'s Restaurante` : 'Novo Restaurante');
     
     // Define a URL padrão do som (agora que está no diretório public)
     const defaultNotificationSoundUrl = '/default-notification.mp3';
@@ -71,7 +73,7 @@ serve(async (req) => {
       const { data: newRestaurant, error: insertRestaurantError } = await supabaseAdmin
         .from('restaurants')
         .insert({ 
-          name: restaurantName, 
+          name: finalRestaurantName, // USANDO O NOME DA LOJA
           description: 'Seu novo restaurante Pedido 123!',
           owner_user_id: userId, 
           is_active: true,
