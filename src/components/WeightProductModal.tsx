@@ -25,21 +25,18 @@ interface WeightProductModalProps {
 }
 
 const WeightProductModalComponent = ({ isOpen, onClose, product, onAddToCart, isCheckoutBlocked }: WeightProductModalProps) => {
-  // Inicializa com 0.5kg como padrão para produtos pesáveis
-  const [quantity, setQuantity] = useState(0.5); 
-  // Removendo o estado 'notes'
-  // const [notes, setNotes] = useState('');
+  // Inicializa com 0.0kg como padrão para produtos pesáveis
+  const [quantity, setQuantity] = useState(0.0); 
 
   React.useEffect(() => {
     if (isOpen) {
-      setQuantity(0.5);
-      // setNotes(''); // Removendo reset de notes
+      setQuantity(0.0);
     }
   }, [isOpen]);
 
   const handleQuantityChange = (amount: number) => {
     setQuantity(prev => {
-      const newQty = Math.max(0.1, prev + amount);
+      const newQty = Math.max(0.0, prev + amount); // Garante que o mínimo é 0.0
       // Arredonda para 1 casa decimal
       return parseFloat(newQty.toFixed(1));
     });
@@ -79,7 +76,7 @@ const WeightProductModalComponent = ({ isOpen, onClose, product, onAddToCart, is
                 size="icon" 
                 className="h-10 w-10"
                 onClick={() => handleQuantityChange(-0.1)}
-                disabled={quantity <= 0.1 || isCheckoutBlocked}
+                disabled={quantity <= 0.0 || isCheckoutBlocked} // Desabilita em 0.0
               >
                 <Minus className="h-5 w-5" />
               </Button>
@@ -89,7 +86,8 @@ const WeightProductModalComponent = ({ isOpen, onClose, product, onAddToCart, is
                 value={quantity.toFixed(1)}
                 onChange={(e) => {
                   const value = parseFloat(e.target.value);
-                  if (value > 0) {
+                  // Permite 0.0, mas garante que não seja negativo
+                  if (value >= 0) { 
                     setQuantity(parseFloat(value.toFixed(1)));
                   }
                 }}
@@ -107,19 +105,6 @@ const WeightProductModalComponent = ({ isOpen, onClose, product, onAddToCart, is
               </Button>
             </div>
           </div>
-
-          {/* REMOVIDO: Campo de Observações */}
-          {/* <div className="space-y-2">
-            <label htmlFor="notes" className="text-sm font-medium">Observações (Opcional)</label>
-            <Textarea
-              id="notes"
-              placeholder="Ex: Quero 1.2kg, por favor."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              disabled={isCheckoutBlocked}
-            />
-          </div> */}
         </div>
         
         <DialogFooter className="pt-4">
@@ -127,7 +112,7 @@ const WeightProductModalComponent = ({ isOpen, onClose, product, onAddToCart, is
             type="button" 
             className="w-full h-12 text-lg flex items-center justify-between px-6"
             onClick={handleConfirm}
-            disabled={quantity <= 0 || isCheckoutBlocked}
+            disabled={quantity <= 0 || isCheckoutBlocked} // Requer quantidade > 0
           >
             <span className="flex items-center gap-2">
               <ShoppingCart className="h-5 w-5" />
