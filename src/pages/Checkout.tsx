@@ -924,11 +924,11 @@ const Checkout = () => {
             <div className="flex items-center gap-2">
               <Button 
                 variant="outline" 
-                size="icon" 
+                size="sm" 
                 onClick={() => setIsProfileModalOpen(true)}
-                aria-label="Meu Perfil"
+                aria-label="Meu Perfil e Pedidos"
               >
-                <UserIcon className="h-4 w-4" />
+                <UserIcon className="h-4 w-4 mr-2" /> Perfil / Pedidos
               </Button>
               <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-1" /> Sair
