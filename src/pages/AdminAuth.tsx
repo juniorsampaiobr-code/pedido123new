@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
-import { Loader2, Lock, UserPlus } from "lucide-react";
+import { Loader2, Lock, UserPlus, Mail, ArrowLeft } from "lucide-react";
 import { Enums } from "@/integrations/supabase/types";
 import { PhoneInput } from "@/components/PhoneInput";
 import { Separator } from "@/components/ui/separator";
@@ -92,6 +92,7 @@ const AdminAuth = () => {
   const [isAuthLoading, setIsAuthLoading] = useState(true); // Novo estado para carregamento de autenticação/permissão
   const [isFormLoading, setIsFormLoading] = useState(false); // Estado para submissão do formulário
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false); // NOVO ESTADO
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -242,6 +243,36 @@ const AdminAuth = () => {
       setIsFormLoading(false);
     }
   };
+  
+  // NOVO: Função para recuperação de senha (Admin)
+  const handlePasswordRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      toast.error("O Email é obrigatório para recuperação de senha.");
+      return;
+    }
+    
+    setIsFormLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        // Redireciona para a mesma página para que o usuário possa definir a nova senha
+        redirectTo: window.location.origin + window.location.pathname + '#/admin-auth', 
+      });
+      
+      if (error) throw error;
+      
+      toast.success("Email de recuperação enviado!", {
+        description: "Verifique sua caixa de entrada (e spam) para o link de redefinição de senha.",
+        duration: 8000,
+      });
+      setIsForgotPassword(false); // Volta para a tela de login
+      
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao enviar email de recuperação.");
+    } finally {
+      setIsFormLoading(false);
+    }
+  };
 
   if (isAuthLoading) {
     return <LoadingSpinner />;
@@ -257,75 +288,131 @@ const AdminAuth = () => {
         <Card className="shadow-xl border-2">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl font-bold text-center flex items-center justify-center gap-2">
-              {isSignUp ? <UserPlus className="h-6 w-6 text-primary" /> : <Lock className="h-6 w-6 text-destructive" />}
-              {isSignUp ? "Cadastre sua Loja" : "Acesso do Restaurante"}
+              {isForgotPassword ? <Mail className="h-6 w-6 text-primary" /> : isSignUp ? <UserPlus className="h-6 w-6 text-primary" /> : <Lock className="h-6 w-6 text-destructive" />}
+              {isForgotPassword ? "Recuperar Senha" : isSignUp ? "Cadastre sua Loja" : "Acesso do Restaurante"}
             </CardTitle>
             <CardDescription className="text-center">
-              {isSignUp ? "Crie sua conta de administrador para gerenciar sua loja." : "Utilize seu email e senha de administrador para acessar o painel."}
+              {isForgotPassword ? "Digite seu email para receber o link de redefinição." : isSignUp ? "Crie sua conta de administrador para gerenciar sua loja." : "Utilize seu email e senha de administrador para acessar o painel."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form onSubmit={handleEmailAuth} className="space-y-4">
-              {isSignUp && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Nome Completo *</Label>
-                    <Input
-                      id="fullName"
-                      type="text"
-                      placeholder="Seu nome completo"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                      className="h-12"
-                    />
+            
+            {isForgotPassword ? (
+              // Formulário de Recuperação de Senha
+              <form onSubmit={handlePasswordRecovery} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-12"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full"
+                  size="lg"
+                  disabled={isFormLoading}
+                >
+                  {isFormLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
+                  Enviar Link de Recuperação
+                </Button>
+                <div className="text-center">
+                  <Button
+                    variant="link"
+                    type="button"
+                    className="p-0 h-auto"
+                    onClick={() => {
+                      setIsForgotPassword(false);
+                      setEmail('');
+                    }}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-1" /> Voltar para o Login
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              // Formulário de Login/Cadastro
+              <form onSubmit={handleEmailAuth} className="space-y-4">
+                {isSignUp && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName">Nome Completo *</Label>
+                      <Input
+                        id="fullName"
+                        type="text"
+                        placeholder="Seu nome completo"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        required
+                        className="h-12"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Telefone *</Label>
+                      <PhoneInput
+                        id="phone"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                        className="h-12"
+                      />
+                      <p className="text-xs text-muted-foreground">Formato: (99) 99999-9999</p>
+                    </div>
+                  </>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Senha *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="h-12"
+                  />
+                </div>
+                
+                {!isSignUp && (
+                  <div className="text-right">
+                    <Button
+                      variant="link"
+                      type="button"
+                      className="p-0 h-auto text-sm text-muted-foreground hover:text-primary"
+                      onClick={() => setIsForgotPassword(true)}
+                    >
+                      Esqueci minha senha
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Telefone *</Label>
-                    <PhoneInput
-                      id="phone"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      required
-                      className="h-12"
-                    />
-                    <p className="text-xs text-muted-foreground">Formato: (99) 99999-9999</p>
-                  </div>
-                </>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="h-12"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha *</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="h-12"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                disabled={isFormLoading}
-              >
-                {isFormLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : isSignUp ? "Criar Conta Admin" : "Entrar no Painel"}
-              </Button>
-            </form>
+                )}
+                
+                <Button
+                  type="submit"
+                  className="w-full"
+                  size="lg"
+                  disabled={isFormLoading}
+                >
+                  {isFormLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : isSignUp ? "Criar Conta Admin" : "Entrar no Painel"}
+                </Button>
+              </form>
+            )}
             
             <div className="text-center">
               <Button
