@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  
   DialogTitle,
   DialogDescription,
   DialogFooter,
@@ -25,7 +26,7 @@ import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/PhoneInput';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
 import { Tables, TablesUpdate, TablesInsert, Enums } from '@/integrations/supabase/types';
-import { User, Save, Loader2, History, Clock, CreditCard, Package, CheckCircle, XCircle, Check, Euro } from 'lucide-react';
+import { User, Save, Loader2, History, Clock, CreditCard, Package, CheckCircle, XCircle, Check, Euro, Truck } from 'lucide-react';
 import { useEffect } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
