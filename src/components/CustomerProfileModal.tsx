@@ -298,6 +298,9 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
               <History className="h-5 w-5 text-primary" />
               Últimos Pedidos
             </h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              Apenas os 5 pedidos mais recentes são exibidos aqui.
+            </p>
             
             {isLoadingOrders ? (
               <div className="space-y-3">
