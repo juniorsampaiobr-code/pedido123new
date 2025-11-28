@@ -55,13 +55,13 @@ const ORDER_STATUS_MAP: Record<OrderStatus, { label: string, icon: React.Element
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
 
-// Removendo 'email' do schema de validação, pois ele não será editável
+// ATUALIZADO: CPF/CNPJ agora é obrigatório e deve ter 11 ou 14 dígitos
 const profileSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório.'),
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(cleanPhoneNumber).refine(val => val.length >= 10, {
     message: 'O telefone deve ter pelo menos 10 dígitos (incluindo DDD).',
   }),
-  cpf_cnpj: z.string().optional().default('').transform(cleanCpfCnpj).refine(val => val.length === 0 || val.length === 11 || val.length === 14, {
+  cpf_cnpj: z.string().min(1, 'CPF/CNPJ é obrigatório.').transform(cleanCpfCnpj).refine(val => val.length === 11 || val.length === 14, {
     message: 'CPF deve ter 11 dígitos ou CNPJ 14 dígitos.',
   }),
 });
@@ -279,7 +279,7 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
                   name="cpf_cnpj"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>CPF/CNPJ (Opcional)</FormLabel>
+                      <FormLabel>CPF/CNPJ *</FormLabel>
                       <FormControl>
                         <CpfCnpjInput {...field} />
                       </FormControl>
