@@ -26,13 +26,14 @@ import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/PhoneInput';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
 import { Tables, TablesUpdate, TablesInsert, Enums } from '@/integrations/supabase/types';
-import { User, Save, Loader2, History, Clock, CreditCard, Package, CheckCircle, XCircle, Check, Euro, Truck } from 'lucide-react';
+import { User, Save, Loader2, History, Clock, CreditCard, Package, CheckCircle, XCircle, Check, Euro, Truck, Eye } from 'lucide-react';
 import { useEffect } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Link } from 'react-router-dom'; // Importando Link
 
 type Customer = Tables<'customers'>;
 type Order = Tables<'orders'> & { 
@@ -330,7 +331,7 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
                         <p className="text-xs text-muted-foreground truncate">
                           {itemSummary}{remainingItems}
                         </p>
-                        <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t border-dashed border-muted-foreground/30">
+                        <div className="flex justify-between items-center text-xs text-muted-foreground pt-1 border-t border-dashed border-muted-foreground/30">
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             <span>{formattedDate}</span>
@@ -341,6 +342,15 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
                           </div>
                           <span className="font-bold text-foreground">{formatPrice(order.total_amount)}</span>
                         </div>
+                        
+                        {/* NOVO BOTÃO DE VISUALIZAÇÃO (apenas para o pedido mais recente) */}
+                        {orders[0].id === order.id && (
+                            <Link to={`/order-success/${order.id}`} onClick={onClose}>
+                                <Button variant="secondary" size="sm" className="w-full mt-2">
+                                    <Eye className="h-4 w-4 mr-2" /> Ver Pedido
+                                </Button>
+                            </Link>
+                        )}
                       </div>
                     );
                   })
