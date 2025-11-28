@@ -221,7 +221,9 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
           </DialogDescription>
         </DialogHeader>
         
-        <div className="grid md:grid-cols-2 gap-6">
+        {/* Reestruturando o layout para garantir que o formulário e o histórico fiquem em colunas separadas */}
+        <div className="grid md:grid-cols-2 gap-6 pt-4">
+          
           {/* Coluna 1: Formulário de Perfil */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold border-b pb-2">Dados Pessoais</h3>
@@ -279,12 +281,12 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
                     </FormItem>
                   )}
                 />
-                <DialogFooter className="pt-4">
-                  <Button type="submit" disabled={mutation.isPending}>
+                <div className="pt-4">
+                  <Button type="submit" disabled={mutation.isPending} className="w-full">
                     {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                     Salvar Alterações
                   </Button>
-                </DialogFooter>
+                </div>
               </form>
             </Form>
           </div>
@@ -318,17 +320,17 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
                     const remainingItems = order.order_items.length > 2 ? ` +${order.order_items.length - 2} itens` : '';
 
                     return (
-                      <div key={order.id} className="border p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className="flex justify-between items-start mb-1">
+                      <div key={order.id} className="border p-3 rounded-lg hover:bg-muted/50 transition-colors space-y-1">
+                        <div className="flex justify-between items-start">
                           <p className="font-bold text-sm">Pedido #{orderNumber}</p>
-                          <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full text-white", statusInfo.color)}>
+                          <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full text-white flex-shrink-0", statusInfo.color)}>
                             {statusInfo.label}
                           </span>
                         </div>
-                        <p className="text-xs text-muted-foreground mb-2 truncate">
+                        <p className="text-xs text-muted-foreground truncate">
                           {itemSummary}{remainingItems}
                         </p>
-                        <div className="flex justify-between text-xs text-muted-foreground">
+                        <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t border-dashed border-muted-foreground/30">
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             <span>{formattedDate}</span>
@@ -350,7 +352,8 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
           </div>
         </div>
         
-        <DialogFooter className="pt-4 md:col-span-2">
+        {/* O DialogFooter agora só contém o botão Fechar */}
+        <DialogFooter className="pt-4">
           <Button type="button" variant="outline" onClick={onClose}>Fechar</Button>
         </DialogFooter>
       </DialogContent>
