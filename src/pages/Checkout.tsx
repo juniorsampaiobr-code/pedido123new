@@ -54,20 +54,19 @@ const addressSchema = z.object({
 
 type AddressFormValues = z.infer<typeof addressSchema>;
 
-// NOVO SCHEMA SIMPLIFICADO: Aceita string (vazia ou preenchida)
+// ATUALIZADO: Removendo email e tornando cpf_cnpj obrigatório
 const checkoutSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório.'),
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length >= 10, {
     message: 'O telefone deve ter pelo menos 10 dígitos.',
   }),
-  email: z.string().email('Email inválido.').optional().or(z.literal('')),
-  cpf_cnpj: z.string().optional().default('').transform(val => val.replace(/\D/g, '')).refine(val => val.length === 0 || val.length === 11 || val.length === 14, {
+  // email removido
+  cpf_cnpj: z.string().min(1, 'CPF/CNPJ é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length === 11 || val.length === 14, {
     message: 'CPF deve ter 11 dígitos ou CNPJ 14 dígitos.',
   }),
   delivery_option: z.enum(['delivery', 'pickup'], { required_error: 'Selecione uma opção de entrega.' }),
   notes: z.string().optional(),
   payment_method_id: z.string().min(1, 'Selecione um método de pagamento.'),
-  // Agora é apenas uma string opcional. A validação de número e valor será feita manualmente.
   change_for: z.string().optional(), 
 });
 
@@ -320,7 +319,7 @@ const Checkout = () => {
     defaultValues: {
       name: '',
       phone: '',
-      email: '',
+      // email removido
       cpf_cnpj: '',
       delivery_option: 'delivery',
       notes: '',
@@ -403,7 +402,7 @@ const Checkout = () => {
         ...form.getValues(),
         name: customer.name || '',
         phone: customer.phone || '',
-        email: customer.email || '',
+        // email removido
         cpf_cnpj: customer.cpf_cnpj || '',
         change_for: '', // Garante que o campo de troco é resetado para string vazia
       });
@@ -432,7 +431,7 @@ const Checkout = () => {
         ...form.getValues(),
         name: (userMetadata.full_name as string) || '',
         phone: (userMetadata.phone as string) || '',
-        email: user.email || '',
+        // email removido
         cpf_cnpj: (userMetadata.cpf_cnpj as string) || '',
         change_for: '', // Garante que o campo de troco é resetado para string vazia
       });
@@ -474,7 +473,7 @@ const Checkout = () => {
         user_id: user?.id || null,
         name: form.getValues('name'), // Usa o nome atual do formulário principal
         phone: form.getValues('phone'), // Usa o telefone atual do formulário principal
-        email: form.getValues('email') || null,
+        email: user?.email || null, // Usa o email do auth.users (se logado)
         cpf_cnpj: form.getValues('cpf_cnpj') || null,
         address: fullAddress,
         latitude: data.lat,
@@ -575,7 +574,7 @@ const Checkout = () => {
         user_id: user?.id || null,
         name: data.name,
         phone: cleanedPhone,
-        email: data.email || null,
+        email: user?.email || null, // Usa o email do auth.users (se logado)
         cpf_cnpj: cleanedCpfCnpj,
         // Endereço e coordenadas são obtidos do estado/addressForm se for delivery
         address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` : null,
@@ -808,7 +807,7 @@ const Checkout = () => {
           totalAmount: totalAmount,
           restaurantName: restaurant.name,
           clientUrl: clientUrl,
-          customerEmail: data.email || user?.email || 'cliente@anonimo.com',
+          customerEmail: user?.email || 'cliente@anonimo.com', // Usa o email do usuário logado
           customerCpfCnpj: data.cpf_cnpj,
         },
       });
@@ -973,13 +972,9 @@ const Checkout = () => {
                       />
                       {form.formState.errors.phone && <p className="text-destructive text-sm">{form.formState.errors.phone.message}</p>}
                     </div>
+                    {/* REMOVIDO CAMPO EMAIL */}
                     <div className="space-y-2">
-                      <Label htmlFor="email">Email (Opcional)</Label>
-                      <Input id="email" type="email" {...form.register('email')} />
-                      {form.formState.errors.email && <p className="text-destructive text-sm">{form.formState.errors.email.message}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="cpf_cnpj">CPF/CNPJ (Opcional)</Label>
+                      <Label htmlFor="cpf_cnpj">CPF/CNPJ *</Label>
                       <Controller
                         name="cpf_cnpj"
                         control={form.control}
