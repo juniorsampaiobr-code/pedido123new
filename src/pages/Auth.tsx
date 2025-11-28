@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 import { PhoneInput } from "@/components/PhoneInput";
-import { Loader2 } from "lucide-react";
+import { Loader2, Lock, Mail, ArrowLeft } from "lucide-react";
 import { useActiveRestaurantId } from "@/hooks/use-active-restaurant-id";
 import { CpfCnpjInput } from "@/components/CpfCnpjInput"; // Importando CpfCnpjInput
 import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importação corrigida
@@ -26,6 +26,7 @@ const Auth = () => {
   const queryClient = useQueryClient(); // NOVO
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false); // NOVO ESTADO
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -181,6 +182,36 @@ const Auth = () => {
       setIsLoading(false);
     }
   };
+  
+  // NOVO: Função para recuperação de senha
+  const handlePasswordRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      toast.error("O Email é obrigatório para recuperação de senha.");
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        // Redireciona para a mesma página para que o usuário possa definir a nova senha
+        redirectTo: window.location.origin + window.location.pathname + '#/auth', 
+      });
+      
+      if (error) throw error;
+      
+      toast.success("Email de recuperação enviado!", {
+        description: "Verifique sua caixa de entrada (e spam) para o link de redefinição de senha.",
+        duration: 8000,
+      });
+      setIsForgotPassword(false); // Volta para a tela de login
+      
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao enviar email de recuperação.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (isLoadingRestaurantId) {
     return <LoadingSpinner />;
@@ -196,96 +227,152 @@ const Auth = () => {
         <Card className="shadow-xl border-2">
           <CardHeader className="space-y-1">
             <CardTitle className="text-2xl font-bold text-center">
-              {isSignUp ? "Crie sua conta" : "Acesse sua conta"}
+              {isForgotPassword ? "Recuperar Senha" : isSignUp ? "Crie sua conta" : "Acesse sua conta"}
             </CardTitle>
             <CardDescription className="text-center">
-              {isSignUp ? "Preencha os campos para começar" : "Utilize seu email e senha para fazer login"}
+              {isForgotPassword ? "Digite seu email para receber o link de redefinição." : isSignUp ? "Preencha os campos para começar" : "Utilize seu email e senha para fazer login"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form onSubmit={handleEmailAuth} className="space-y-4">
-              {isSignUp && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Nome Completo *</Label>
-                    <Input
-                      id="fullName"
-                      type="text"
-                      placeholder="Seu nome completo"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                      className="h-12"
-                    />
+            
+            {isForgotPassword ? (
+              // Formulário de Recuperação de Senha
+              <form onSubmit={handlePasswordRecovery} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-12"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="w-full"
+                  size="lg"
+                  disabled={isLoading}
+                >
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
+                  Enviar Link de Recuperação
+                </Button>
+                <div className="text-center">
+                  <Button
+                    variant="link"
+                    type="button"
+                    className="p-0 h-auto"
+                    onClick={() => {
+                      setIsForgotPassword(false);
+                      setEmail('');
+                    }}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-1" /> Voltar para o Login
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              // Formulário de Login/Cadastro
+              <form onSubmit={handleEmailAuth} className="space-y-4">
+                {isSignUp && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName">Nome Completo *</Label>
+                      <Input
+                        id="fullName"
+                        type="text"
+                        placeholder="Seu nome completo"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        required
+                        className="h-12"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Telefone *</Label>
+                      <PhoneInput
+                        id="phone"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                        className="h-12"
+                      />
+                      <p className="text-xs text-muted-foreground">Formato: (99) 99999-9999</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cpfCnpj">CPF/CNPJ *</Label>
+                      <CpfCnpjInput
+                        id="cpfCnpj"
+                        value={cpfCnpj}
+                        onChange={(e) => setCpfCnpj(e.target.value)}
+                        required
+                        className="h-12"
+                      />
+                      <p className="text-xs text-muted-foreground">CPF (11 dígitos) ou CNPJ (14 dígitos).</p>
+                    </div>
+                  </>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Senha *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="h-12"
+                  />
+                </div>
+                
+                {!isSignUp && (
+                  <div className="text-right">
+                    <Button
+                      variant="link"
+                      type="button"
+                      className="p-0 h-auto text-sm text-muted-foreground hover:text-primary"
+                      onClick={() => setIsForgotPassword(true)}
+                    >
+                      Esqueci minha senha
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Telefone *</Label>
-                    <PhoneInput
-                      id="phone"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      required
-                      className="h-12"
-                    />
-                    <p className="text-xs text-muted-foreground">Formato: (99) 99999-9999</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cpfCnpj">CPF/CNPJ *</Label>
-                    <CpfCnpjInput
-                      id="cpfCnpj"
-                      value={cpfCnpj}
-                      onChange={(e) => setCpfCnpj(e.target.value)}
-                      required
-                      className="h-12"
-                    />
-                    <p className="text-xs text-muted-foreground">CPF (11 dígitos) ou CNPJ (14 dígitos).</p>
-                  </div>
-                </>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="h-12"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha *</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="h-12"
-                />
-              </div>
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                disabled={isLoading || isLoadingRestaurantId}
-              >
-                {isLoading || isLoadingRestaurantId ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : isSignUp ? "Criar conta" : "Entrar"}
-              </Button>
-            </form>
+                )}
+                
+                <Button
+                  type="submit"
+                  className="w-full"
+                  size="lg"
+                  disabled={isLoading || isLoadingRestaurantId}
+                >
+                  {isLoading || isLoadingRestaurantId ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : isSignUp ? "Criar conta" : "Entrar"}
+                </Button>
 
-            <div className="text-center">
-              <Button
-                variant="link"
-                type="button"
-                className="p-0 h-auto"
-                onClick={() => setIsSignUp(!isSignUp)}
-              >
-                {isSignUp ? "Já tem uma conta? Faça login" : "Não tem uma conta? Crie uma agora"}
-              </Button>
-            </div>
+                <div className="text-center">
+                  <Button
+                    variant="link"
+                    type="button"
+                    className="p-0 h-auto"
+                    onClick={() => setIsSignUp(!isSignUp)}
+                  >
+                    {isSignUp ? "Já tem uma conta? Faça login" : "Não tem uma conta? Crie uma agora"}
+                  </Button>
+                </div>
+              </form>
+            )}
             
           </CardContent>
         </Card>
