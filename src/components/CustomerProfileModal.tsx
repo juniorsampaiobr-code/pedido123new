@@ -26,8 +26,8 @@ import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/PhoneInput';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
 import { Tables, TablesUpdate, TablesInsert, Enums } from '@/integrations/supabase/types';
-import { User, Save, Loader2, History, Clock, CreditCard, Package, CheckCircle, XCircle, Check, Euro, Truck, Eye } from 'lucide-react';
-import { useEffect } from 'react';
+import { User, Save, Loader2, History, Clock, CreditCard, Package, CheckCircle, XCircle, Check, Euro, Truck, Eye, Mail } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -55,12 +55,12 @@ const ORDER_STATUS_MAP: Record<OrderStatus, { label: string, icon: React.Element
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
 
+// Removendo 'email' do schema de validação, pois ele não será editável
 const profileSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório.'),
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(cleanPhoneNumber).refine(val => val.length >= 10, {
     message: 'O telefone deve ter pelo menos 10 dígitos (incluindo DDD).',
   }),
-  email: z.string().email('Email inválido.').optional().or(z.literal('')),
   cpf_cnpj: z.string().optional().default('').transform(cleanCpfCnpj).refine(val => val.length === 0 || val.length === 11 || val.length === 14, {
     message: 'CPF deve ter 11 dígitos ou CNPJ 14 dígitos.',
   }),
@@ -96,13 +96,13 @@ const fetchCustomerOrders = async (customerId: string): Promise<Order[]> => {
 
 export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProfileModalProps) => {
   const queryClient = useQueryClient();
+  const [userEmail, setUserEmail] = useState<string | null>(null); // Estado para armazenar o email do usuário logado
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       name: '',
       phone: '',
-      email: '',
       cpf_cnpj: '',
     },
   });
@@ -117,29 +117,31 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
 
   useEffect(() => {
     const loadData = async () => {
-      if (customer) {
-        // Caso 1: Cliente existe na tabela 'customers'
-        form.reset({
-          name: customer.name || '',
-          phone: customer.phone || '',
-          email: customer.email || '',
-          cpf_cnpj: customer.cpf_cnpj || '',
-        });
-      } else if (isOpen) {
-        // Caso 2: Cliente não existe, mas o modal está aberto (usuário logado)
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        setUserEmail(user.email || null);
+        
+        if (customer) {
+          // Caso 1: Cliente existe na tabela 'customers'
+          form.reset({
+            name: customer.name || '',
+            phone: customer.phone || '',
+            cpf_cnpj: customer.cpf_cnpj || '',
+          });
+        } else if (isOpen) {
+          // Caso 2: Cliente não existe, mas o modal está aberto (usuário logado)
           const userMetadata = user.user_metadata;
           form.reset({
             name: (userMetadata.full_name as string) || '',
             phone: (userMetadata.phone as string) || '',
-            email: user.email || '',
             cpf_cnpj: (userMetadata.cpf_cnpj as string) || '',
           });
-        } else {
-          // Usuário não logado, limpa o formulário
-          form.reset({ name: '', phone: '', email: '', cpf_cnpj: '' });
         }
+      } else {
+        // Usuário não logado, limpa o formulário
+        form.reset({ name: '', phone: '', cpf_cnpj: '' });
+        setUserEmail(null);
       }
     };
     
@@ -159,7 +161,7 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
       const updateData: TablesUpdate<'customers'> = {
         name: data.name,
         phone: data.phone,
-        email: data.email || null,
+        // O email não é mais atualizado aqui
         cpf_cnpj: data.cpf_cnpj || null,
       };
 
@@ -179,6 +181,7 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
             // Campos obrigatórios que não estão no updateData:
             name: data.name,
             phone: data.phone,
+            email: user.data.user?.email || null, // Usa o email do auth.users
         };
         
         const { error } = await supabase
@@ -230,6 +233,20 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
             <h3 className="text-lg font-semibold border-b pb-2">Dados Pessoais</h3>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                
+                {/* Campo de Email (Somente Leitura) */}
+                <div className="space-y-2">
+                    <FormLabel className="flex items-center gap-2">
+                        <Mail className="h-4 w-4" /> Email
+                    </FormLabel>
+                    <Input 
+                        value={userEmail || 'N/A'} 
+                        disabled 
+                        className="bg-muted/50" 
+                    />
+                    <p className="text-xs text-muted-foreground">O email é usado para login e não pode ser alterado aqui.</p>
+                </div>
+                
                 <FormField
                   control={form.control}
                   name="name"
@@ -256,19 +273,7 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email (Opcional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="seu@email.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                
                 <FormField
                   control={form.control}
                   name="cpf_cnpj"
