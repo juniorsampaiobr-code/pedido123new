@@ -39,28 +39,34 @@ const restaurantSchema = z.object({
   name: z.string().min(1, 'O nome do restaurante é obrigatório.'),
   description: z.string().optional(),
   logo_url: z.string().url('URL do logo inválida.').optional().or(z.literal('')),
-  street: z.string().optional(),
-  // TORNANDO OBRIGATÓRIO
+  street: z.string().optional(), // Mantendo opcional, pois é preenchido pela busca
+  // OBRIGATÓRIO
   number: z.string().min(1, 'O número é obrigatório.'),
-  neighborhood: z.string().optional(),
-  city: z.string().optional(),
-  // TORNANDO OBRIGATÓRIO
+  neighborhood: z.string().optional(), // Mantendo opcional
+  city: z.string().optional(), // Mantendo opcional
+  // OBRIGATÓRIO
   zip_code: z.string().min(1, 'O CEP é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length === 8, {
     message: 'O CEP deve ter 8 dígitos.',
   }),
-  // TORNANDO OBRIGATÓRIO E VALIDANDO
+  // OBRIGATÓRIO E VALIDANDO
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(cleanPhoneNumber).refine(val => val.length >= 10, {
     message: 'O telefone deve ter pelo menos 10 dígitos (incluindo DDD).',
   }),
   email: z.string().email('Email inválido.').optional().or(z.literal('')),
   is_active: z.boolean().default(true),
+  // OBRIGATÓRIO: Garante que as coordenadas foram definidas
   latitude: z.preprocess(
     (val) => String(val).replace(',', '.'),
-    z.coerce.number({ invalid_type_error: 'Latitude deve ser um número.' }).optional().nullable(),
+    z.coerce.number({ invalid_type_error: 'Latitude deve ser um número.' }).refine(val => val !== null, {
+      message: 'A localização no mapa é obrigatória. Use o botão "Buscar Endereço".',
+    }),
   ),
+  // OBRIGATÓRIO: Garante que as coordenadas foram definidas
   longitude: z.preprocess(
     (val) => String(val).replace(',', '.'),
-    z.coerce.number({ invalid_type_error: 'Longitude deve ser um número.' }).optional().nullable(),
+    z.coerce.number({ invalid_type_error: 'Longitude deve ser um número.' }).refine(val => val !== null, {
+      message: 'A localização no mapa é obrigatória. Use o botão "Buscar Endereço".',
+    }),
   ),
 });
 
@@ -205,6 +211,10 @@ const Settings = () => {
         setShowMap(true); // Mostra o mapa após obter coordenadas
         toast.success("Endereço e mapa atualizados com sucesso!");
       } else {
+        // Se não encontrar coordenadas, define o mapa para o centro padrão e avisa o usuário
+        form.setValue('latitude', DEFAULT_CENTER[0], { shouldValidate: true });
+        form.setValue('longitude', DEFAULT_CENTER[1], { shouldValidate: true });
+        setShowMap(true);
         toast.warning("Endereço encontrado, mas não foi possível obter as coordenadas exatas. Ajuste o pino no mapa manualmente.");
       }
 
@@ -358,8 +368,8 @@ const Settings = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="latitude" render={({ field }) => (<FormItem><FormLabel>Latitude</FormLabel><FormControl><Input {...field} placeholder="-22.7627908" value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="longitude" render={({ field }) => (<FormItem><FormLabel>Longitude</FormLabel><FormControl><Input {...field} placeholder="-47.408315" value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="latitude" render={({ field }) => (<FormItem><FormLabel>Latitude *</FormLabel><FormControl><Input {...field} placeholder="-22.7627908" value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="longitude" render={({ field }) => (<FormItem><FormLabel>Longitude *</FormLabel><FormControl><Input {...field} placeholder="-47.408315" value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
