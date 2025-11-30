@@ -896,7 +896,7 @@ const Checkout = () => {
   const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isAddressSaved);
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-8">
+    <div className="min-h-screen bg-background py-4 sm:py-8 px-4 sm:px-8">
       {/* Modal de Edição de Perfil do Cliente */}
       <CustomerProfileModal 
         isOpen={isProfileModalOpen}
@@ -913,7 +913,7 @@ const Checkout = () => {
         />
       )}
 
-      <div className="max-w-full lg:max-w-5xl mx-auto"> {/* CORREÇÃO APLICADA AQUI: max-w-full em mobile */}
+      <div className="w-full lg:max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
             {/* NOVO BOTÃO DE VOLTAR */}
