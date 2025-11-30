@@ -12,8 +12,8 @@ import { Loader2, Lock, UserPlus, Mail, ArrowLeft } from "lucide-react";
 import { Enums } from "@/integrations/supabase/types";
 import { PhoneInput } from "@/components/PhoneInput";
 import { Separator } from "@/components/ui/separator";
-import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importando LoadingSpinner
-import { CpfCnpjInput } from "@/components/CpfCnpjInput"; // NOVO: Importando CpfCnpjInput
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { CpfCnpjInput } from "@/components/CpfCnpjInput";
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
@@ -38,28 +38,21 @@ const checkUserRoleAndRestaurant = async (userId: string): Promise<{ role: Enums
   return { role: data.role, restaurantId: data.restaurant_id };
 };
 
-// NOVO: Função para configurar a loja inicial e promover o usuário a admin.
-// Esta função SÓ DEVE SER CHAMADA se o usuário estiver no fluxo de ADMIN.
 const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role'> | null, restaurantId: string | null }> => {
-  // 1. Check current role and restaurant link
   let { role, restaurantId } = await checkUserRoleAndRestaurant(user.id);
 
-  // Se o usuário já tem uma role de admin/moderator e um restaurante, não faz nada.
   if ((role === 'admin' || role === 'moderator') && restaurantId) {
       return { role, restaurantId };
   }
   
-  // Se o usuário tem a role 'user' (cliente), ele não deve prosseguir com o setup de admin.
   if (role === 'user') {
       console.log(`[AdminAuth] User ${user.id} is a customer ('user' role). Blocking admin setup.`);
       return { role: 'user', restaurantId: null };
   }
 
-  // 2. Se não for admin/moderator, ou se for, mas sem restaurantId, chama a Edge Function para garantir o acesso admin.
   console.log(`[AdminAuth] Running setup for user ${user.id}. Current role: ${role}, Restaurant ID: ${restaurantId}`);
   
   const fullName = user.user_metadata.full_name || 'Novo Usuário';
-  // NOVO: Passando o nome da loja e o CPF/CNPJ para a Edge Function
   const storeName = user.user_metadata.store_name || fullName;
   const cpfCnpj = user.user_metadata.cpf_cnpj || null;
   
@@ -67,8 +60,8 @@ const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role
     body: { 
       userId: user.id, 
       fullName: fullName,
-      storeName: storeName, // NOVO
-      cpfCnpj: cpfCnpj, // NOVO
+      storeName: storeName,
+      cpfCnpj: cpfCnpj,
     },
   });
   
@@ -87,7 +80,6 @@ const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role
     throw new Error(errorMessage);
   }
   
-  // Se a Edge Function rodou com sucesso, refetch a role e o restaurantId
   const updatedData = await checkUserRoleAndRestaurant(user.id);
   role = updatedData.role;
   restaurantId = updatedData.restaurantId;
@@ -98,22 +90,21 @@ const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role
 
 const AdminAuth = () => {
   const navigate = useNavigate();
-  const [isAuthLoading, setIsAuthLoading] = useState(true); // Novo estado para carregamento de autenticação/permissão
-  const [isFormLoading, setIsFormLoading] = useState(false); // Estado para submissão do formulário
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isFormLoading, setIsFormLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
-  const [isForgotPassword, setIsForgotPassword] = useState(false); // NOVO ESTADO
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [storeName, setStoreName] = useState(""); // NOVO ESTADO
-  const [cpfCnpj, setCpfCnpj] = useState(""); // NOVO ESTADO
+  const [storeName, setStoreName] = useState("");
+  const [cpfCnpj, setCpfCnpj] = useState("");
   const [session, setSession] = useState<Session | null>(null);
 
   const handleRedirect = async (user: User) => {
     setIsAuthLoading(true);
     try {
-      // 1. Tenta configurar a loja e obter a role atualizada
       const { role, restaurantId } = await setupNewStoreAndRole(user);
       
       if (role === 'admin' || role === 'moderator') {
@@ -121,18 +112,14 @@ const AdminAuth = () => {
             toast.success("Acesso ao painel concedido.");
             navigate("/dashboard", { replace: true });
         } else {
-            // Se a role é admin, mas o restaurantId ainda está faltando (erro na Edge Function)
             throw new Error("Sua conta de administrador não está vinculada a um restaurante. Tente novamente ou contate o suporte.");
         }
       } else {
-        // Se a role for 'user' (cliente) ou null após o setup (o que não deve acontecer se o setup for bem-sucedido)
         toast.error("Acesso negado.", {
           description: "Esta conta não possui permissão de administrador/moderador. Redirecionando para o menu.",
           duration: 5000,
         });
-        // Desloga o usuário para evitar confusão
         await supabase.auth.signOut();
-        // Redireciona para a página inicial
         navigate("/", { replace: true });
       }
     } catch (error) {
@@ -152,22 +139,18 @@ const AdminAuth = () => {
       setSession(session);
       
       if (session?.user) {
-        // Se houver sessão, inicia o processo de verificação de permissões
         handleRedirect(session.user);
       } else {
-        // Nenhuma sessão, mostra o formulário
         setIsAuthLoading(false);
       }
     };
     
     checkSession();
     
-    // Monitora mudanças de estado
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         if (event === 'SIGNED_IN' && session?.user) {
-          // Quando o login/signup é concluído, o handleRedirect é chamado
           handleRedirect(session.user);
         } else if (event === 'SIGNED_OUT') {
           setIsAuthLoading(false);
@@ -221,8 +204,6 @@ const AdminAuth = () => {
         const cleanedPhone = cleanPhoneNumber(phone);
         const cleanedCpfCnpj = cleanCpfCnpj(cpfCnpj);
         
-        // Ao se cadastrar pelo fluxo AdminAuth, garantimos que a Edge Function
-        // será chamada para criar o restaurante e a role 'admin' se necessário.
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -230,8 +211,8 @@ const AdminAuth = () => {
             data: {
               full_name: fullName,
               phone: cleanedPhone,
-              store_name: storeName, // NOVO: Nome da Loja
-              cpf_cnpj: cleanedCpfCnpj, // NOVO: CPF/CNPJ
+              store_name: storeName,
+              cpf_cnpj: cleanedCpfCnpj,
             },
           }
         });
@@ -239,11 +220,10 @@ const AdminAuth = () => {
         if (error) throw error;
         
         if (data.session) {
-          // O onAuthStateChange/handleRedirect será chamado automaticamente
           toast.success("Conta de administrador criada e login efetuado!");
         } else {
           toast.success("Conta criada! Verifique seu email para confirmar.");
-          setIsFormLoading(false); // Se precisar de confirmação, não fica em loading de auth
+          setIsFormLoading(false);
         }
         
       } else {
@@ -255,7 +235,6 @@ const AdminAuth = () => {
         if (error) throw error;
         
         toast.success("Login realizado com sucesso!");
-        // O onAuthStateChange/handleRedirect será chamado automaticamente
       }
     } catch (error: any) {
       if (error.message.includes("Email not confirmed")) {
@@ -267,7 +246,6 @@ const AdminAuth = () => {
     }
   };
   
-  // NOVO: Função para recuperação de senha (Admin)
   const handlePasswordRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
@@ -278,7 +256,6 @@ const AdminAuth = () => {
     setIsFormLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        // Redireciona para a mesma página para que o usuário possa definir a nova senha
         redirectTo: window.location.origin + window.location.pathname + '#/admin-auth', 
       });
       
@@ -288,7 +265,7 @@ const AdminAuth = () => {
         description: "Verifique sua caixa de entrada (e spam) para o link de redefinição de senha.",
         duration: 8000,
       });
-      setIsForgotPassword(false); // Volta para a tela de login
+      setIsForgotPassword(false);
       
     } catch (error: any) {
       toast.error(error.message || "Erro ao enviar email de recuperação.");
@@ -321,7 +298,6 @@ const AdminAuth = () => {
           <CardContent className="space-y-4">
             
             {isForgotPassword ? (
-              // Formulário de Recuperação de Senha
               <form onSubmit={handlePasswordRecovery} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email *</Label>
@@ -359,7 +335,6 @@ const AdminAuth = () => {
                 </div>
               </form>
             ) : (
-              // Formulário de Login/Cadastro
               <form onSubmit={handleEmailAuth} className="space-y-4">
                 {isSignUp && (
                   <>
