@@ -28,6 +28,14 @@ import { MercadoPagoPayment } from '@/components/MercadoPagoPayment';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
 import { ClientLocationMap } from '@/components/ClientLocationMap';
 import { cn } from '@/lib/utils';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'; // CORRIGIDO: Importando componentes do Form
 
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
@@ -957,34 +965,36 @@ const Checkout = () => {
                     }
                   </p>
                 </div>
-                <form onSubmit={form.handleSubmit(onSubmit)} id="checkout-form">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Nome Completo *</Label>
-                      <Input id="name" {...form.register('name')} />
-                      {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
+                <Form {...form}> {/* Adicionando o componente Form */}
+                  <form onSubmit={form.handleSubmit(onSubmit)} id="checkout-form">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="name">Nome Completo *</Label>
+                        <Input id="name" {...form.register('name')} />
+                        {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Telefone *</Label>
+                        <Controller
+                          name="phone"
+                          control={form.control}
+                          render={({ field }) => <PhoneInput id="phone" {...field} />}
+                        />
+                        {form.formState.errors.phone && <p className="text-destructive text-sm">{form.formState.errors.phone.message}</p>}
+                      </div>
+                      {/* REMOVIDO CAMPO EMAIL */}
+                      <div className="space-y-2">
+                        <Label htmlFor="cpf_cnpj">CPF/CNPJ *</Label>
+                        <Controller
+                          name="cpf_cnpj"
+                          control={form.control}
+                          render={({ field }) => <CpfCnpjInput id="cpf_cnpj" {...field} />}
+                        />
+                        {form.formState.errors.cpf_cnpj && <p className="text-destructive text-sm">{form.formState.errors.cpf_cnpj.message}</p>}
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Telefone *</Label>
-                      <Controller
-                        name="phone"
-                        control={form.control}
-                        render={({ field }) => <PhoneInput id="phone" {...field} />}
-                      />
-                      {form.formState.errors.phone && <p className="text-destructive text-sm">{form.formState.errors.phone.message}</p>}
-                    </div>
-                    {/* REMOVIDO CAMPO EMAIL */}
-                    <div className="space-y-2">
-                      <Label htmlFor="cpf_cnpj">CPF/CNPJ *</Label>
-                      <Controller
-                        name="cpf_cnpj"
-                        control={form.control}
-                        render={({ field }) => <CpfCnpjInput id="cpf_cnpj" {...field} />}
-                      />
-                      {form.formState.errors.cpf_cnpj && <p className="text-destructive text-sm">{form.formState.errors.cpf_cnpj.message}</p>}
-                    </div>
-                  </div>
-                </form>
+                  </form>
+                </Form>
               </CardContent>
             </Card>
             
@@ -1039,60 +1049,62 @@ const Checkout = () => {
                     </Alert>
                   )}
                   
-                  <form onSubmit={(e) => { e.preventDefault(); handleSaveAddress(); }} id="address-form" className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2 md:col-span-1">
-                        <Label htmlFor="zip_code">CEP *</Label>
-                        <Controller
-                          name="zip_code"
-                          control={addressForm.control}
-                          render={({ field }) => (
-                            <FormItem className="flex-1 space-y-0">
-                              <FormControl>
-                                <ZipCodeInput 
-                                  placeholder="Digite o CEP"
-                                  {...field}
-                                />
-                              </FormControl>
-                              {/* Removendo FormMessage aqui para evitar duplicação de erro */}
-                            </FormItem>
-                          )}
-                        />
-                        {addressForm.formState.errors.zip_code && <p className="text-destructive text-sm">{addressForm.formState.errors.zip_code.message}</p>}
+                  <Form {...addressForm}> {/* Adicionando o componente Form para o endereço */}
+                    <form onSubmit={(e) => { e.preventDefault(); handleSaveAddress(); }} id="address-form-inner" className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2 md:col-span-1">
+                          <Label htmlFor="zip_code">CEP *</Label>
+                          <Controller
+                            name="zip_code"
+                            control={addressForm.control}
+                            render={({ field }) => (
+                              <FormItem className="flex-1 space-y-0">
+                                <FormControl>
+                                  <ZipCodeInput 
+                                    placeholder="Digite o CEP"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                {/* Removendo FormMessage aqui para evitar duplicação de erro */}
+                              </FormItem>
+                            )}
+                          />
+                          {addressForm.formState.errors.zip_code && <p className="text-destructive text-sm">{addressForm.formState.errors.zip_code.message}</p>}
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor="street">Rua *</Label>
+                          <Input id="street" {...addressForm.register('street')} />
+                          {addressForm.formState.errors.street && <p className="text-destructive text-sm">{addressForm.formState.errors.street.message}</p>}
+                        </div>
                       </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="street">Rua *</Label>
-                        <Input id="street" {...addressForm.register('street')} />
-                        {addressForm.formState.errors.street && <p className="text-destructive text-sm">{addressForm.formState.errors.street.message}</p>}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="number">Número *</Label>
+                          <Input id="number" {...addressForm.register('number')} />
+                          {addressForm.formState.errors.number && <p className="text-destructive text-sm">{addressForm.formState.errors.number.message}</p>}
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label htmlFor="neighborhood">Bairro *</Label>
+                          <Input id="neighborhood" {...addressForm.register('neighborhood')} />
+                          {addressForm.formState.errors.neighborhood && <p className="text-destructive text-sm">{addressForm.formState.errors.neighborhood.message}</p>}
+                        </div>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="number">Número *</Label>
-                        <Input id="number" {...addressForm.register('number')} />
-                        {addressForm.formState.errors.number && <p className="text-destructive text-sm">{addressForm.formState.errors.number.message}</p>}
+                        <Label htmlFor="city">Cidade *</Label>
+                          <Input id="city" {...addressForm.register('city')} />
+                        {addressForm.formState.errors.city && <p className="text-destructive text-sm">{addressForm.formState.errors.city.message}</p>}
                       </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="neighborhood">Bairro *</Label>
-                        <Input id="neighborhood" {...addressForm.register('neighborhood')} />
-                        {addressForm.formState.errors.neighborhood && <p className="text-destructive text-sm">{addressForm.formState.errors.neighborhood.message}</p>}
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="city">Cidade *</Label>
-                        <Input id="city" {...addressForm.register('city')} />
-                      {addressForm.formState.errors.city && <p className="text-destructive text-sm">{addressForm.formState.errors.city.message}</p>}
-                    </div>
-                    
-                    <Button 
-                        type="submit" 
-                        className="w-full h-10 text-base mt-4"
-                        disabled={saveAddressMutation.isPending || isGeocoding} // Não desabilita se delivery_enabled for false
-                    >
-                        {saveAddressMutation.isPending || isGeocoding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                        Salvar Endereço e Calcular Taxa
-                    </Button>
-                  </form>
+                      
+                      <Button 
+                          type="submit" 
+                          className="w-full h-10 text-base mt-4"
+                          disabled={saveAddressMutation.isPending || isGeocoding} // Não desabilita se delivery_enabled for false
+                      >
+                          {saveAddressMutation.isPending || isGeocoding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                          Salvar Endereço e Calcular Taxa
+                      </Button>
+                    </form>
+                  </Form>
                   
                   {isGeocoding && (
                     <Alert className="flex items-center gap-2">
