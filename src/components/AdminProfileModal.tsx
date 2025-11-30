@@ -23,8 +23,9 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/PhoneInput';
+import { CpfCnpjInput } from '@/components/CpfCnpjInput'; // Importando CpfCnpjInput
 import { Tables, TablesUpdate } from '@/integrations/supabase/types';
-import { User, Save, Loader2, Mail, Store, Phone } from 'lucide-react';
+import { User, Save, Loader2, Mail, Store, Phone, CreditCard } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
@@ -39,14 +40,18 @@ interface AdminProfileData {
 }
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
+const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
 
 const profileSchema = z.object({
   full_name: z.string().min(1, 'Nome é obrigatório.'),
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(cleanPhoneNumber).refine(val => val.length >= 10, {
     message: 'O telefone deve ter pelo menos 10 dígitos (incluindo DDD).',
   }),
-  // NOVO CAMPO: Nome da Loja (vem da tabela restaurants)
   store_name: z.string().min(1, 'O nome da loja é obrigatório.'),
+  // NOVO CAMPO: CPF/CNPJ
+  cpf_cnpj: z.string().min(1, 'CPF/CNPJ é obrigatório.').transform(cleanCpfCnpj).refine(val => val.length === 11 || val.length === 14, {
+    message: 'CPF deve ter 11 dígitos ou CNPJ 14 dígitos.',
+  }),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -90,7 +95,8 @@ const fetchAdminProfile = async (userId: string): Promise<AdminProfileData> => {
 
 export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModalProps) => {
   const queryClient = useQueryClient();
-  const [userEmail, setUserEmail] = useState<string | null>(null); // Usando estado local
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userCpfCnpj, setUserCpfCnpj] = useState<string | null>(null); // NOVO: Estado para CPF/CNPJ
 
   const { data: profileData, isLoading } = useQuery<AdminProfileData>({
     queryKey: ['adminProfile', userId],
@@ -99,12 +105,13 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
     staleTime: 0,
   });
   
-  // Efeito para carregar o email do usuário logado
+  // Efeito para carregar o email e CPF/CNPJ do user_metadata
   useEffect(() => {
     if (isOpen) {
-      // Usamos getSession para garantir que a sessão mais recente seja lida
       supabase.auth.getSession().then(({ data: { session } }) => {
         setUserEmail(session?.user?.email || null);
+        // NOVO: Carrega CPF/CNPJ do user_metadata
+        setUserCpfCnpj(session?.user?.user_metadata?.cpf_cnpj as string || null);
       });
     }
   }, [isOpen]);
@@ -115,20 +122,22 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
     defaultValues: {
       full_name: '',
       phone: '',
-      store_name: '', // Novo default
+      store_name: '',
+      cpf_cnpj: '', // Novo default
     },
   });
 
   useEffect(() => {
     if (profileData) {
-      // Preenche o formulário com os dados do perfil e do restaurante
+      // Preenche o formulário com os dados do perfil, restaurante e CPF/CNPJ do estado local
       form.reset({
         full_name: profileData.profile.full_name || '',
         phone: profileData.profile.phone || '',
-        store_name: profileData.restaurant?.name || '', // Preenche com o nome do restaurante
+        store_name: profileData.restaurant?.name || '',
+        cpf_cnpj: userCpfCnpj || '', // Usa o CPF/CNPJ carregado do user_metadata
       });
     }
-  }, [profileData, form]);
+  }, [profileData, form, userCpfCnpj]); // Depende de userCpfCnpj
 
   const mutation = useMutation({
     mutationFn: async (data: ProfileFormValues) => {
@@ -151,7 +160,7 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
       if (profileData?.restaurant?.id) {
         const restaurantUpdateData: TablesUpdate<'restaurants'> = {
           name: data.store_name,
-          phone: data.phone, // SINCRONIZANDO O TELEFONE AQUI
+          phone: data.phone,
         };
         
         const { error: restaurantError } = await supabase
@@ -161,9 +170,22 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
           
         if (restaurantError) throw new Error(`Erro ao atualizar nome/telefone da loja: ${restaurantError.message}`);
       }
+      
+      // 3. Atualizar CPF/CNPJ no user_metadata (onde ele é armazenado para administradores)
+      const { error: authUpdateError } = await supabase.auth.updateUser({
+          data: {
+              cpf_cnpj: data.cpf_cnpj,
+          }
+      });
+      
+      if (authUpdateError) throw new Error(`Erro ao atualizar CPF/CNPJ: ${authUpdateError.message}`);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast.success('Perfil e nome da loja atualizados com sucesso!');
+      
+      // Atualiza o estado local do CPF/CNPJ para refletir a mudança imediatamente
+      setUserCpfCnpj(variables.cpf_cnpj); 
+      
       // Invalida todas as queries que dependem desses dados
       queryClient.invalidateQueries({ queryKey: ['adminProfile'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardRestaurant'] }); 
@@ -214,7 +236,7 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
                 <p className="text-xs text-muted-foreground">O email não pode ser alterado aqui.</p>
               </div>
               
-              {/* Nome da Loja (Novo Campo) */}
+              {/* Nome da Loja */}
               <FormField
                 control={form.control}
                 name="store_name"
@@ -257,6 +279,23 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
                     </FormLabel>
                     <FormControl>
                       <PhoneInput {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {/* NOVO CAMPO: CPF/CNPJ */}
+              <FormField
+                control={form.control}
+                name="cpf_cnpj"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4" /> CPF/CNPJ *
+                    </FormLabel>
+                    <FormControl>
+                      <CpfCnpjInput {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
