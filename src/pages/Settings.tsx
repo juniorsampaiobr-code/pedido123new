@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from "sonner";
-import { Upload, Music, Search, Loader2, Volume2, CheckCircle, XCircle, MapPin } from 'lucide-react';
+import { Upload, Music, Search, Loader2, Volume2, CheckCircle, XCircle, MapPin, Mail, Phone } from 'lucide-react';
 import { TablesUpdate, Tables } from '@/integrations/supabase/types';
 import {
   Form,
@@ -88,9 +88,9 @@ const fetchRestaurantData = async (restaurantId: string): Promise<Restaurant> =>
 const Settings = () => {
   const queryClient = useQueryClient();
   const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
-  // Removendo searchCep e searchNumber, usaremos os campos do formulário
   const [isSearchingCep, setIsSearchingCep] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null); // NOVO: Estado para o email do usuário
 
   // Usar userRestaurantId no queryKey e na função fetch
   const { data: restaurant, isLoading, isError, error } = useQuery<Restaurant>({
@@ -99,6 +99,13 @@ const Settings = () => {
     enabled: !!userRestaurantId, // Só busca se userRestaurantId estiver disponível
     staleTime: 1000 * 60 * 5,
   });
+  
+  // Efeito para carregar o email do usuário logado
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserEmail(session?.user?.email || null);
+    });
+  }, []);
 
   const form = useForm<RestaurantFormValues>({
     resolver: zodResolver(restaurantSchema),
@@ -225,8 +232,8 @@ const Settings = () => {
       toast.dismiss(loadingToast);
       toast.error(`Erro na busca: ${err.message}`);
     } finally {
-      setIsSearchingCep(false);
       toast.dismiss(loadingToast);
+      setIsSearchingCep(false);
     }
   };
 
@@ -300,6 +307,38 @@ const Settings = () => {
                   <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nome do Restaurante *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Descrição</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="logo_url" render={({ field }) => (<FormItem><FormLabel>URL do Logo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  
+                  <div className="pt-4 border-t mt-6">
+                    <h3 className="text-lg font-semibold">Contato e Status</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* NOVO: Email do Usuário (Somente Leitura) */}
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2 text-sm font-medium">
+                          <Mail className="h-4 w-4" /> Email do Administrador
+                      </Label>
+                      <Input value={userEmail || 'N/A'} disabled className="bg-muted/50" />
+                      <p className="text-xs text-muted-foreground">Este é o email de login do administrador.</p>
+                    </div>
+                    
+                    {/* Telefone do Restaurante (Editável) */}
+                    <FormField 
+                      control={form.control} 
+                      name="phone" 
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <Phone className="h-4 w-4" /> Telefone do Restaurante *
+                          </FormLabel>
+                          <FormControl>
+                            <PhoneInput {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} 
+                    />
+                  </div>
                   
                   <div className="pt-4 border-t mt-6">
                     <h3 className="text-lg font-semibold">Endereço e Localização</h3>
@@ -386,22 +425,9 @@ const Settings = () => {
                     <FormField control={form.control} name="longitude" render={({ field }) => (<FormItem><FormLabel>Longitude *</FormLabel><FormControl><Input {...field} placeholder="-47.408315" value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField 
-                      control={form.control} 
-                      name="phone" 
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Telefone *</FormLabel>
-                          <FormControl>
-                            <PhoneInput {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} 
-                    />
-                    <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                  </div>
+                  {/* Removendo o campo de email editável do restaurante, pois o email do admin é o que importa */}
+                  {/* <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} /> */}
+                  
                   <FormField control={form.control} name="is_active" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><FormLabel className="font-normal">Restaurante Ativo</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
                   <Button type="submit" className="w-full h-12 text-lg" disabled={restaurantMutation.isPending || !userRestaurantId}>{restaurantMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}</Button>
                 </form>

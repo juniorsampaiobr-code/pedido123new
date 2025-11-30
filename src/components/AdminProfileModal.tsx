@@ -24,7 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/PhoneInput';
 import { Tables, TablesUpdate } from '@/integrations/supabase/types';
-import { User, Save, Loader2, Mail, Store } from 'lucide-react';
+import { User, Save, Loader2, Mail, Store, Phone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
@@ -138,7 +138,6 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
         phone: data.phone,
       };
 
-      // MUDANÇA AQUI: Usando update em vez de upsert para evitar a violação de RLS de INSERT
       const { error: profileError } = await supabase
         .from('profiles')
         .update(profileUpdateData)
@@ -146,10 +145,11 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
 
       if (profileError) throw new Error(`Erro ao atualizar perfil: ${profileError.message}`);
       
-      // 2. Atualizar Restaurante (store_name -> name)
+      // 2. Atualizar Restaurante (store_name -> name E phone -> phone)
       if (profileData?.restaurant?.id) {
         const restaurantUpdateData: TablesUpdate<'restaurants'> = {
           name: data.store_name,
+          phone: data.phone, // SINCRONIZANDO O TELEFONE AQUI
         };
         
         const { error: restaurantError } = await supabase
@@ -157,13 +157,14 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
           .update(restaurantUpdateData)
           .eq('id', profileData.restaurant.id);
           
-        if (restaurantError) throw new Error(`Erro ao atualizar nome da loja: ${restaurantError.message}`);
+        if (restaurantError) throw new Error(`Erro ao atualizar nome/telefone da loja: ${restaurantError.message}`);
       }
     },
     onSuccess: () => {
       toast.success('Perfil e nome da loja atualizados com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['adminProfile'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardRestaurant'] }); // Invalida o nome do restaurante no layout
+      queryClient.invalidateQueries({ queryKey: ['dashboardRestaurant'] }); 
+      queryClient.invalidateQueries({ queryKey: ['restaurantSettings'] }); // Invalida as configurações para sincronizar o telefone
       onClose();
     },
     onError: (error) => {
@@ -248,7 +249,9 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Telefone *</FormLabel>
+                    <FormLabel className="flex items-center gap-2">
+                        <Phone className="h-4 w-4" /> Telefone *
+                    </FormLabel>
                     <FormControl>
                       <PhoneInput {...field} />
                     </FormControl>
