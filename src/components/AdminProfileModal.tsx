@@ -24,12 +24,19 @@ import {
 import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/PhoneInput';
 import { Tables, TablesUpdate } from '@/integrations/supabase/types';
-import { User, Save, Loader2, Mail } from 'lucide-react';
+import { User, Save, Loader2, Mail, Store } from 'lucide-react';
 import { useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Label } from '@/components/ui/label'; // Importação crítica
+import { Label } from '@/components/ui/label';
 
 type Profile = Tables<'profiles'>;
+type Restaurant = Tables<'restaurants'>;
+
+// Tipo de dados combinados para o fetch
+interface AdminProfileData {
+  profile: Profile;
+  restaurant: Restaurant | null;
+}
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 
@@ -38,6 +45,8 @@ const profileSchema = z.object({
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(cleanPhoneNumber).refine(val => val.length >= 10, {
     message: 'O telefone deve ter pelo menos 10 dígitos (incluindo DDD).',
   }),
+  // NOVO CAMPO: Nome da Loja (vem da tabela restaurants)
+  store_name: z.string().min(1, 'O nome da loja é obrigatório.'),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -48,28 +57,40 @@ interface AdminProfileModalProps {
   userId: string | null;
 }
 
-const fetchAdminProfile = async (userId: string): Promise<Profile> => {
-  const { data, error } = await supabase
+const fetchAdminProfile = async (userId: string): Promise<AdminProfileData> => {
+  // 1. Buscar Perfil
+  const { data: profileData, error: profileError } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', userId)
     .limit(1)
     .single();
 
-  if (error && error.code !== 'PGRST116') {
-    throw new Error(`Erro ao buscar perfil: ${error.message}`);
+  if (profileError && profileError.code !== 'PGRST116') {
+    throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
   }
-  // Se não encontrar, retorna um objeto Profile vazio com o ID do usuário
-  if (!data) {
-    return { id: userId, full_name: null, phone: null, avatar_url: null, created_at: null, updated_at: null };
+  
+  const profile: Profile = profileData || { id: userId, full_name: null, phone: null, avatar_url: null, created_at: null, updated_at: null };
+
+  // 2. Buscar Restaurante (Nome da Loja)
+  const { data: restaurantData, error: restaurantError } = await supabase
+    .from('restaurants')
+    .select('*')
+    .eq('owner_user_id', userId)
+    .limit(1)
+    .single();
+    
+  if (restaurantError && restaurantError.code !== 'PGRST116') {
+    console.warn("Erro ao buscar restaurante vinculado ao usuário:", restaurantError.message);
   }
-  return data;
+
+  return { profile, restaurant: restaurantData || null };
 };
 
 export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModalProps) => {
   const queryClient = useQueryClient();
 
-  const { data: profile, isLoading } = useQuery<Profile>({
+  const { data: profileData, isLoading } = useQuery<AdminProfileData>({
     queryKey: ['adminProfile', userId],
     queryFn: () => fetchAdminProfile(userId!),
     enabled: !!userId && isOpen,
@@ -83,37 +104,54 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
     defaultValues: {
       full_name: '',
       phone: '',
+      store_name: '', // Novo default
     },
   });
 
   useEffect(() => {
-    if (profile) {
+    if (profileData) {
       form.reset({
-        full_name: profile.full_name || '',
-        phone: profile.phone || '',
+        full_name: profileData.profile.full_name || '',
+        phone: profileData.profile.phone || '',
+        store_name: profileData.restaurant?.name || '', // Preenche com o nome do restaurante
       });
     }
-  }, [profile, form]);
+  }, [profileData, form]);
 
   const mutation = useMutation({
     mutationFn: async (data: ProfileFormValues) => {
       if (!userId) throw new Error('ID do usuário não encontrado.');
       
-      const updateData: TablesUpdate<'profiles'> = {
+      // 1. Atualizar Perfil (full_name, phone)
+      const profileUpdateData: TablesUpdate<'profiles'> = {
         full_name: data.full_name,
         phone: data.phone,
       };
 
-      // Usamos upsert para garantir que o perfil seja criado se não existir (embora o trigger deva cuidar disso)
-      const { error } = await supabase
+      const { error: profileError } = await supabase
         .from('profiles')
-        .upsert({ ...updateData, id: userId }, { onConflict: 'id' });
+        .upsert({ ...profileUpdateData, id: userId }, { onConflict: 'id' });
 
-      if (error) throw new Error(error.message);
+      if (profileError) throw new Error(`Erro ao atualizar perfil: ${profileError.message}`);
+      
+      // 2. Atualizar Restaurante (store_name -> name)
+      if (profileData?.restaurant?.id) {
+        const restaurantUpdateData: TablesUpdate<'restaurants'> = {
+          name: data.store_name,
+        };
+        
+        const { error: restaurantError } = await supabase
+          .from('restaurants')
+          .update(restaurantUpdateData)
+          .eq('id', profileData.restaurant.id);
+          
+        if (restaurantError) throw new Error(`Erro ao atualizar nome da loja: ${restaurantError.message}`);
+      }
     },
     onSuccess: () => {
-      toast.success('Perfil atualizado com sucesso!');
+      toast.success('Perfil e nome da loja atualizados com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['adminProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardRestaurant'] }); // Invalida o nome do restaurante no layout
       onClose();
     },
     onError: (error) => {
@@ -134,7 +172,7 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
             Meu Perfil (Admin)
           </DialogTitle>
           <DialogDescription>
-            Atualize seus dados de contato.
+            Atualize seus dados de contato e o nome da sua loja.
           </DialogDescription>
         </DialogHeader>
         
@@ -144,11 +182,14 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-4 w-1/3" />
             <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-4 w-1/3" />
+            <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full mt-6" />
           </div>
         ) : (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
+              {/* Email (Visível, Não Editável) */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-2 text-sm font-medium">
                     <Mail className="h-4 w-4" /> Email
@@ -157,6 +198,24 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
                 <p className="text-xs text-muted-foreground">O email não pode ser alterado aqui.</p>
               </div>
               
+              {/* Nome da Loja (Novo Campo) */}
+              <FormField
+                control={form.control}
+                name="store_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                        <Store className="h-4 w-4" /> Nome da Loja *
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome do seu restaurante" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Nome Completo */}
               <FormField
                 control={form.control}
                 name="full_name"
@@ -170,6 +229,8 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
                   </FormItem>
                 )}
               />
+              
+              {/* Telefone */}
               <FormField
                 control={form.control}
                 name="phone"
