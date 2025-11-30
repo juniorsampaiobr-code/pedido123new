@@ -186,25 +186,25 @@ const Menu = () => {
     );
   }
 
+  // Desestruturação segura após a verificação de erro/loading
   const { restaurant, categories } = menuData;
   
   // 4. Lógica de Filtragem
   const filteredCategories = useMemo(() => {
-    // Se categories for nulo ou indefinido, retorna um array vazio para evitar erros
-    if (!categories) return []; 
-    
+    // Garante que categories é um array antes de usar
+    const allCategories = categories || []; 
     const term = debouncedSearchTerm.toLowerCase().trim();
     
     if (!term) {
       // Se não houver termo de pesquisa, retorna todas as categorias com produtos disponíveis
-      return categories.map(category => ({
+      return allCategories.map(category => ({
         ...category,
         products: category.products.filter(p => p.is_available),
       })).filter(category => category.products.length > 0);
     }
 
     // Filtra produtos e categorias com base no termo
-    return categories.map(category => {
+    return allCategories.map(category => {
       const filteredProducts = category.products.filter(product => 
         product.is_available && 
         (product.name.toLowerCase().includes(term) || 
