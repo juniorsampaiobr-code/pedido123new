@@ -29,6 +29,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MapLocationSection } from '@/components/MapLocationSection';
 import { useOutletContext } from 'react-router-dom';
 import { DashboardContextType } from '@/layouts/DashboardLayout';
+import { geocodeAddress } from '@/utils/location'; // Importando geocodeAddress
 
 type Restaurant = Tables<'restaurants'>;
 
@@ -39,10 +40,14 @@ const restaurantSchema = z.object({
   description: z.string().optional(),
   logo_url: z.string().url('URL do logo inválida.').optional().or(z.literal('')),
   street: z.string().optional(),
-  number: z.string().optional(),
+  // TORNANDO OBRIGATÓRIO
+  number: z.string().min(1, 'O número é obrigatório.'),
   neighborhood: z.string().optional(),
   city: z.string().optional(),
-  zip_code: z.string().optional(),
+  // TORNANDO OBRIGATÓRIO
+  zip_code: z.string().min(1, 'O CEP é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length === 8, {
+    message: 'O CEP deve ter 8 dígitos.',
+  }),
   // TORNANDO OBRIGATÓRIO E VALIDANDO
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(cleanPhoneNumber).refine(val => val.length >= 10, {
     message: 'O telefone deve ter pelo menos 10 dígitos (incluindo DDD).',
@@ -77,8 +82,7 @@ const fetchRestaurantData = async (restaurantId: string): Promise<Restaurant> =>
 const Settings = () => {
   const queryClient = useQueryClient();
   const { userRestaurantId } = useOutletContext<DashboardContextType>(); // Obter restaurantId do contexto
-  const [searchCep, setSearchCep] = useState('');
-  const [searchNumber, setSearchNumber] = useState('');
+  // Removendo searchCep e searchNumber, usaremos os campos do formulário
   const [isSearchingCep, setIsSearchingCep] = useState(false);
   const [showMap, setShowMap] = useState(false);
 
@@ -97,10 +101,10 @@ const Settings = () => {
       description: '',
       logo_url: '',
       street: '',
-      number: '',
+      number: '', // Agora obrigatório
       neighborhood: '',
       city: '',
-      zip_code: '',
+      zip_code: '', // Agora obrigatório
       phone: '', // Valor inicial vazio
       email: '',
       is_active: true,
@@ -154,21 +158,22 @@ const Settings = () => {
     form.setValue('city', address.city || address.localidade || '', { shouldValidate: true });
     form.setValue('zip_code', address.postcode || address.cep || '', { shouldValidate: true });
     
-    // Atualiza o CEP de busca para refletir o CEP encontrado
-    setSearchCep((address.postcode || address.cep || '').replace(/\D/g, ''));
-    setSearchNumber(address.house_number || '');
+    // Não precisamos mais atualizar searchCep/searchNumber
     
   }, [form]);
 
   const handleAddressSearch = async () => {
-    const currentData = form.getValues();
-    const [street, number, neighborhood, city, zipCode] = [currentData.street, currentData.number, currentData.neighborhood, currentData.city, currentData.zip_code];
-    
-    const cleanedCep = searchCep.replace(/\D/g, '');
-    if (cleanedCep.length !== 8 || !searchNumber) {
-      toast.warning("Por favor, digite um CEP válido e o número da casa.");
+    // 1. Valida os campos de CEP e Número no formulário principal
+    const isValid = await form.trigger(['zip_code', 'number']);
+    if (!isValid) {
+      toast.error("Por favor, preencha o CEP e o Número corretamente.");
       return;
     }
+    
+    const currentData = form.getValues();
+    const cleanedCep = currentData.zip_code.replace(/\D/g, '');
+    const number = currentData.number;
+
     setIsSearchingCep(true);
     const loadingToast = toast.loading("Buscando endereço e coordenadas...");
 
@@ -185,21 +190,18 @@ const Settings = () => {
 
       // Update form fields with data from ViaCEP and the provided number
       form.setValue('street', data.logradouro, { shouldValidate: true });
-      form.setValue('number', searchNumber, { shouldValidate: true });
       form.setValue('neighborhood', data.bairro, { shouldValidate: true });
       form.setValue('city', data.localidade, { shouldValidate: true });
-      form.setValue('zip_code', data.cep, { shouldValidate: true });
+      // zip_code e number já estão no formulário
 
       // Step 2: Fetch coordinates using the full address
-      const fullAddress = `${data.logradouro}, ${searchNumber}, ${data.localidade}, ${data.uf}`;
-      const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`;
-      const nominatimResponse = await fetch(nominatimUrl);
-      const nominatimData = await nominatimResponse.json();
+      const fullAddress = `${data.logradouro}, ${number}, ${data.localidade}, ${data.uf}`;
       
-      if (nominatimData.length > 0) {
-        const { lat, lon } = nominatimData[0];
-        form.setValue('latitude', parseFloat(lat), { shouldValidate: true });
-        form.setValue('longitude', parseFloat(lon), { shouldValidate: true });
+      const coords = await geocodeAddress(fullAddress);
+      
+      if (coords) {
+        form.setValue('latitude', coords.lat, { shouldValidate: true });
+        form.setValue('longitude', coords.lng, { shouldValidate: true });
         setShowMap(true); // Mostra o mapa após obter coordenadas
         toast.success("Endereço e mapa atualizados com sucesso!");
       } else {
@@ -234,7 +236,7 @@ const Settings = () => {
         number: data.number,
         neighborhood: data.neighborhood,
         city: data.city,
-        zip_code: data.zip_code,
+        zip_code: data.zip_code.replace(/\D/g, ''), // Garante que o CEP seja salvo limpo
         phone: data.phone, // Incluindo o telefone
         email: data.email,
         is_active: data.is_active,
@@ -293,15 +295,36 @@ const Settings = () => {
                   <div className="space-y-2">
                     <Label>Buscar Endereço por CEP e Número *</Label>
                     <div className="flex gap-2">
-                      <ZipCodeInput 
-                        placeholder="Digite o CEP"
-                        value={searchCep}
-                        onChange={(e) => setSearchCep(e.target.value)}
+                      {/* Usando Controller para CEP e Número para que o Zod possa validar */}
+                      <Controller
+                        name="zip_code"
+                        control={form.control}
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormControl>
+                              <ZipCodeInput 
+                                placeholder="Digite o CEP"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                      <Input 
-                        placeholder="Número"
-                        value={searchNumber}
-                        onChange={(e) => setSearchNumber(e.target.value)}
+                      <Controller
+                        name="number"
+                        control={form.control}
+                        render={({ field }) => (
+                          <FormItem className="w-24">
+                            <FormControl>
+                              <Input 
+                                placeholder="Nº"
+                                {...field}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
                       <Button type="button" onClick={handleAddressSearch} disabled={isSearchingCep}>
                         {isSearchingCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
@@ -314,13 +337,13 @@ const Settings = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <FormField control={form.control} name="street" render={({ field }) => (<FormItem className="md:col-span-2"><FormLabel>Rua</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="number" render={({ field }) => (<FormItem className="md:col-span-1"><FormLabel>Número</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="number" render={({ field }) => (<FormItem className="md:col-span-1"><FormLabel>Número *</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={form.control} name="neighborhood" render={({ field }) => (<FormItem><FormLabel>Bairro</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name="city" render={({ field }) => (<FormItem><FormLabel>Cidade</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
                   </div>
-                  <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP</FormLabel><FormControl><ZipCodeInput {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="zip_code" render={({ field }) => (<FormItem><FormLabel>CEP *</FormLabel><FormControl><ZipCodeInput {...field} disabled /></FormControl><FormMessage /></FormItem>)} />
 
                   <div className="pt-4 border-t">
                     {showMap && (
