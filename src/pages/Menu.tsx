@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, ShoppingCart, Clock, MapPin, Copy, RefreshCw, LogOut, User as UserIcon } from 'lucide-react';
+import { Terminal, ShoppingCart, Clock, MapPin, Copy, RefreshCw, LogOut, User as UserIcon, Phone } from 'lucide-react';
 import { BusinessStatus } from '@/components/BusinessStatus';
 import { StoreClosedWarning } from '@/components/StoreClosedWarning';
 import { getBusinessStatus } from '@/utils/time';
@@ -20,6 +20,7 @@ import { useAuthStatus } from '@/hooks/use-auth-status';
 import { useBusinessHoursRealtime } from '@/hooks/use-business-hours-realtime';
 import { CustomerProfileModal } from '@/components/CustomerProfileModal';
 import { Card } from '@/components/ui/card'; // Added missing import
+import { cn } from '@/lib/utils';
 
 type Restaurant = Tables<'restaurants'>;
 type Category = Tables<'categories'>;
@@ -134,8 +135,6 @@ const Menu = () => {
   // Determina se o checkout deve ser bloqueado
   const isCheckoutBlocked = !isOpen;
 
-  // REMOVENDO FUNÇÃO copyMenuLink
-  
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success("Você saiu da sua conta.");
@@ -199,7 +198,6 @@ const Menu = () => {
               <ShoppingCart className="h-6 w-6 text-primary" />
               <div>
                 <h1 className="text-xl font-bold">{restaurant.name}</h1>
-                {/* NOVO: Descrição do restaurante */}
                 {restaurant.description && (
                   <p className="text-sm text-muted-foreground mt-0.5">{restaurant.description}</p>
                 )}
@@ -231,10 +229,20 @@ const Menu = () => {
             </div>
           </div>
           
-          {/* Restaurant Menu Link */}
-          <div className="mt-3 flex items-center justify-between">
+          {/* Restaurant Info (Status, Address, Phone) */}
+          <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <BusinessStatus restaurant={restaurant} hours={realtimeHours} />
-            {/* REMOVENDO BOTÃO COPIAR LINK */}
+            
+            {/* NOVO: Telefone do Restaurante */}
+            {restaurant.phone && (
+              <a 
+                href={`tel:${restaurant.phone.replace(/\D/g, '')}`} 
+                className="flex items-center text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+              >
+                <Phone className="h-4 w-4 mr-1" />
+                {restaurant.phone}
+              </a>
+            )}
           </div>
         </div>
       </header>
@@ -278,9 +286,6 @@ const Menu = () => {
       {isMobile && (
         <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} isCheckoutBlocked={isCheckoutBlocked} restaurantId={restaurantId} />
       )}
-      
-      {/* Floating action button for mobile */}
-      {/* REMOVENDO BOTÃO FLUTUANTE DE COPIAR LINK */}
     </div>
   );
 };
