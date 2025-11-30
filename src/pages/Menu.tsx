@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, ShoppingCart, Clock, MapPin, Copy, RefreshCw, LogOut, User as UserIcon, Phone } from 'lucide-react';
+import { Terminal, ShoppingCart, Clock, MapPin, Copy, RefreshCw, LogOut, User as UserIcon, Phone, Search } from 'lucide-react';
 import { BusinessStatus } from '@/components/BusinessStatus';
 import { StoreClosedWarning } from '@/components/StoreClosedWarning';
 import { getBusinessStatus } from '@/utils/time';
@@ -21,7 +21,9 @@ import { useBusinessHoursRealtime } from '@/hooks/use-business-hours-realtime';
 import { CustomerProfileModal } from '@/components/CustomerProfileModal';
 import { Card } from '@/components/ui/card'; // Added missing import
 import { cn } from '@/lib/utils';
-import { CategoryNavigation } from '@/components/CategoryNavigation'; // NOVO
+import { CategoryNavigation } from '@/components/CategoryNavigation';
+import { Input } from '@/components/ui/input'; // Importando Input
+import { useDebounce } from '@/hooks/useDebounce'; // Importando useDebounce
 
 type Restaurant = Tables<'restaurants'>;
 type Category = Tables<'categories'>;
@@ -105,7 +107,11 @@ const Menu = () => {
   const { totalItems } = useCart();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { data: user } = useAuthStatus(); // Obtém o status de autenticação
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false); // NOVO ESTADO
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  
+  // NOVO ESTADO DE PESQUISA
+  const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300); // Debounce de 300ms
 
   // 1. Busca dados estáticos do menu (restaurante, categorias, produtos)
   const { data: menuData, isLoading: isLoadingMenu, isError: isErrorMenu, error: errorMenu, refetch } = useQuery<MenuData>({
@@ -182,8 +188,35 @@ const Menu = () => {
 
   const { restaurant, categories } = menuData;
   
-  // Filtra categorias que têm produtos disponíveis
-  const availableCategories = categories.filter(c => c.products.filter(p => p.is_available).length > 0);
+  // 4. Lógica de Filtragem
+  const filteredCategories = useMemo(() => {
+    const term = debouncedSearchTerm.toLowerCase().trim();
+    
+    if (!term) {
+      // Se não houver termo de pesquisa, retorna todas as categorias com produtos disponíveis
+      return categories.map(category => ({
+        ...category,
+        products: category.products.filter(p => p.is_available),
+      })).filter(category => category.products.length > 0);
+    }
+
+    // Filtra produtos e categorias com base no termo
+    return categories.map(category => {
+      const filteredProducts = category.products.filter(product => 
+        product.is_available && 
+        (product.name.toLowerCase().includes(term) || 
+         product.description?.toLowerCase().includes(term))
+      );
+      return {
+        ...category,
+        products: filteredProducts,
+      };
+    }).filter(category => category.products.length > 0);
+    
+  }, [categories, debouncedSearchTerm]);
+  
+  const isSearching = debouncedSearchTerm.length > 0;
+  const availableCategories = filteredCategories; // Usamos o resultado filtrado/disponível
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -248,11 +281,22 @@ const Menu = () => {
               </a>
             )}
           </div>
+          
+          {/* Campo de Pesquisa */}
+          <div className="relative mt-4">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar produto..."
+              className="pl-10 h-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
       </header>
       
-      {/* NOVO: Navegação de Categorias Fixa */}
-      {availableCategories.length > 1 && (
+      {/* Navegação de Categorias Fixa (Oculta durante a pesquisa) */}
+      {!isSearching && availableCategories.length > 1 && (
         <CategoryNavigation categories={availableCategories} />
       )}
 
@@ -260,27 +304,38 @@ const Menu = () => {
         <div className="flex-1 w-full lg:max-w-3xl xl:max-w-4xl">
           {/* Aviso de Loja Fechada */}
           {!isOpen && <StoreClosedWarning todayHours={todayHours} />}
+          
+          {/* Mensagem de Nenhum Resultado */}
+          {isSearching && availableCategories.length === 0 && (
+            <div className="text-center py-12 bg-card rounded-lg border">
+              <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-lg font-semibold">Nenhum produto encontrado.</p>
+              <p className="text-sm text-muted-foreground">Tente um termo de pesquisa diferente.</p>
+            </div>
+          )}
 
           {/* Lista de Categorias e Produtos */}
           <div className="space-y-10">
             {availableCategories.map(category => (
-              <section key={category.id} id={`category-${category.id}`} className="scroll-mt-20">
-                <h2 className="text-3xl font-bold mb-6 border-b pb-2">{category.name}</h2>
-                {/* AJUSTE AQUI: grid-cols-2 para mobile, sm:grid-cols-2 para manter a compatibilidade, lg:grid-cols-3 para desktop */}
+              <section 
+                key={category.id} 
+                // Adiciona o ID apenas se não estiver pesquisando, para evitar conflito com a rolagem
+                id={!isSearching ? `category-${category.id}` : undefined} 
+                className={cn("scroll-mt-20", isSearching && "pt-0")}
+              >
+                <h2 className="text-3xl font-bold mb-6 border-b pb-2">
+                  {isSearching ? 'Resultados da Pesquisa' : category.name}
+                </h2>
                 <div className="grid gap-6 grid-cols-2 lg:grid-cols-3"> 
                   {category.products
-                    .filter(p => p.is_available)
                     .map(product => (
                       <ProductCard 
                         key={product.id} 
                         product={product} 
-                        isCheckoutBlocked={isCheckoutBlocked} // Passando a prop
+                        isCheckoutBlocked={isCheckoutBlocked}
                       />
                     ))}
                 </div>
-                {category.products.filter(p => p.is_available).length === 0 && (
-                  <p className="text-muted-foreground">Nenhum produto disponível nesta categoria.</p>
-                )}
               </section>
             ))}
           </div>
