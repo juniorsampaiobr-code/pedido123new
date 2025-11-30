@@ -913,7 +913,7 @@ const Checkout = () => {
         />
       )}
 
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-full lg:max-w-5xl mx-auto"> {/* CORREÇÃO APLICADA AQUI: max-w-full em mobile */}
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
             {/* NOVO BOTÃO DE VOLTAR */}
