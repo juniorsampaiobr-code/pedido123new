@@ -247,7 +247,7 @@ const Settings = () => {
     mutationFn: async (data: RestaurantFormValues) => {
       if (!userRestaurantId) throw new Error('ID do restaurante não disponível.'); // Usar userRestaurantId
       
-      // Cria um payload que exclui notification_sound_url, garantindo que ele não seja alterado
+      // 1. Atualiza o restaurante
       const updatePayload: TablesUpdate<'restaurants'> = {
         name: data.name,
         description: data.description,
@@ -265,12 +265,24 @@ const Settings = () => {
         // notification_sound_url é omitido
       };
       
-      const { error } = await supabase.from('restaurants').update(updatePayload).eq('id', userRestaurantId); // Usar userRestaurantId
-      if (error) throw error;
+      const { error: restaurantError } = await supabase.from('restaurants').update(updatePayload).eq('id', userRestaurantId); // Usar userRestaurantId
+      if (restaurantError) throw restaurantError;
+      
+      // 2. Atualiza o perfil do administrador com o novo telefone (para sincronização)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+          const profileUpdatePayload: TablesUpdate<'profiles'> = {
+              phone: data.phone,
+          };
+          const { error: profileError } = await supabase.from('profiles').update(profileUpdatePayload).eq('id', user.id);
+          if (profileError) console.warn("Falha ao sincronizar telefone com o perfil:", profileError.message);
+      }
     },
     onSuccess: () => {
       toast.success('Configurações salvas com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['restaurantSettings', userRestaurantId] }); // Usar userRestaurantId
+      // Invalida as queries de restaurante e perfil para sincronizar em todo o painel
+      queryClient.invalidateQueries({ queryKey: ['restaurantSettings', userRestaurantId] }); 
+      queryClient.invalidateQueries({ queryKey: ['adminProfile'] }); // NOVO: Invalida o perfil
     },
     onError: (err) => toast.error(`Erro ao salvar configurações: ${err.message}`),
   });

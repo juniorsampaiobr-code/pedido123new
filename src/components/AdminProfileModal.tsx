@@ -70,6 +70,7 @@ const fetchAdminProfile = async (userId: string): Promise<AdminProfileData> => {
     throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
   }
   
+  // Se o perfil não existir, cria um objeto Profile padrão
   const profile: Profile = profileData || { id: userId, full_name: null, phone: null, avatar_url: null, created_at: null, updated_at: null };
 
   // 2. Buscar Restaurante (Nome da Loja)
@@ -98,7 +99,7 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
     staleTime: 0,
   });
   
-  // Efeito para carregar o email e garantir que ele esteja atualizado
+  // Efeito para carregar o email do usuário logado
   useEffect(() => {
     if (isOpen) {
       // Usamos getSession para garantir que a sessão mais recente seja lida
@@ -120,6 +121,7 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
 
   useEffect(() => {
     if (profileData) {
+      // Preenche o formulário com os dados do perfil e do restaurante
       form.reset({
         full_name: profileData.profile.full_name || '',
         phone: profileData.profile.phone || '',
@@ -162,9 +164,10 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
     },
     onSuccess: () => {
       toast.success('Perfil e nome da loja atualizados com sucesso!');
+      // Invalida todas as queries que dependem desses dados
       queryClient.invalidateQueries({ queryKey: ['adminProfile'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardRestaurant'] }); 
-      queryClient.invalidateQueries({ queryKey: ['restaurantSettings'] }); // Invalida as configurações para sincronizar o telefone
+      queryClient.invalidateQueries({ queryKey: ['restaurantSettings'] }); 
       onClose();
     },
     onError: (error) => {
