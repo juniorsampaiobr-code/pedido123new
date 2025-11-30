@@ -190,6 +190,9 @@ const Menu = () => {
   
   // 4. Lógica de Filtragem
   const filteredCategories = useMemo(() => {
+    // Se categories for nulo ou indefinido, retorna um array vazio para evitar erros
+    if (!categories) return []; 
+    
     const term = debouncedSearchTerm.toLowerCase().trim();
     
     if (!term) {
