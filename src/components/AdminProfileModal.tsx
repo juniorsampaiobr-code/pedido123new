@@ -98,11 +98,13 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
     staleTime: 0,
   });
   
-  // Efeito para carregar o email
+  // Efeito para carregar o email e garantir que ele esteja atualizado
   useEffect(() => {
     if (isOpen) {
-      const user = supabase.auth.currentUser;
-      setUserEmail(user?.email || null);
+      // Usamos getSession para garantir que a sessão mais recente seja lida
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setUserEmail(session?.user?.email || null);
+      });
     }
   }, [isOpen]);
 
