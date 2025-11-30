@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://<USERNAME>.github.io/<REPO_NAME>",
+  "homepage": "https://juniorsampaiobr-code.github.io/pedido123new",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
