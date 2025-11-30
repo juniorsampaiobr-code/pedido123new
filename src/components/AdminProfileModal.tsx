@@ -25,7 +25,7 @@ import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/PhoneInput';
 import { Tables, TablesUpdate } from '@/integrations/supabase/types';
 import { User, Save, Loader2, Mail, Store } from 'lucide-react';
-import { useEffect, useState } from 'react'; // Importando useState
+import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 
@@ -138,9 +138,11 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
         phone: data.phone,
       };
 
+      // MUDANÇA AQUI: Usando update em vez de upsert para evitar a violação de RLS de INSERT
       const { error: profileError } = await supabase
         .from('profiles')
-        .upsert({ ...profileUpdateData, id: userId }, { onConflict: 'id' });
+        .update(profileUpdateData)
+        .eq('id', userId);
 
       if (profileError) throw new Error(`Erro ao atualizar perfil: ${profileError.message}`);
       
