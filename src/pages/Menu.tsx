@@ -21,6 +21,7 @@ import { useBusinessHoursRealtime } from '@/hooks/use-business-hours-realtime';
 import { CustomerProfileModal } from '@/components/CustomerProfileModal';
 import { Card } from '@/components/ui/card'; // Added missing import
 import { cn } from '@/lib/utils';
+import { CategoryNavigation } from '@/components/CategoryNavigation'; // NOVO
 
 type Restaurant = Tables<'restaurants'>;
 type Category = Tables<'categories'>;
@@ -180,6 +181,9 @@ const Menu = () => {
   }
 
   const { restaurant, categories } = menuData;
+  
+  // Filtra categorias que têm produtos disponíveis
+  const availableCategories = categories.filter(c => c.products.filter(p => p.is_available).length > 0);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -246,6 +250,11 @@ const Menu = () => {
           </div>
         </div>
       </header>
+      
+      {/* NOVO: Navegação de Categorias Fixa */}
+      {availableCategories.length > 1 && (
+        <CategoryNavigation categories={availableCategories} />
+      )}
 
       <main className="flex-1 container mx-auto px-4 py-8 flex">
         <div className="flex-1 w-full lg:max-w-3xl xl:max-w-4xl">
@@ -254,7 +263,7 @@ const Menu = () => {
 
           {/* Lista de Categorias e Produtos */}
           <div className="space-y-10">
-            {categories.map(category => (
+            {availableCategories.map(category => (
               <section key={category.id} id={`category-${category.id}`} className="scroll-mt-20">
                 <h2 className="text-3xl font-bold mb-6 border-b pb-2">{category.name}</h2>
                 {/* AJUSTE AQUI: grid-cols-2 para mobile, sm:grid-cols-2 para manter a compatibilidade, lg:grid-cols-3 para desktop */}
