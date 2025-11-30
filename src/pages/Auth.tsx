@@ -12,10 +12,10 @@ import { Session, User } from "@supabase/supabase-js";
 import { PhoneInput } from "@/components/PhoneInput";
 import { Loader2, Lock, Mail, ArrowLeft } from "lucide-react";
 import { useActiveRestaurantId } from "@/hooks/use-active-restaurant-id";
-import { CpfCnpjInput } from "@/components/CpfCnpjInput"; // Importando CpfCnpjInput
-import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importação corrigida
-import { useQueryClient } from "@tanstack/react-query"; // NOVO IMPORT
-import { Controller } from "react-hook-form"; // Importação do Controller
+import { CpfCnpjInput } from "@/components/CpfCnpjInput";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { useQueryClient } from "@tanstack/react-query";
+import { Controller } from "react-hook-form";
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
@@ -23,31 +23,29 @@ const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
 const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const queryClient = useQueryClient(); // NOVO
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
-  const [isForgotPassword, setIsForgotPassword] = useState(false); // NOVO ESTADO
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [cpfCnpj, setCpfCnpj] = useState(""); // Novo estado para CPF/CNPJ
+  const [cpfCnpj, setCpfCnpj] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  
   const { data: activeRestaurantId, isLoading: isLoadingRestaurantId } = useActiveRestaurantId();
-  
   const restaurantIdFromState = location.state?.restaurantId as string | undefined;
 
   const handleRedirect = (user: User, restaurantId: string | undefined) => {
     const from = location.state?.from;
     const finalRestaurantId = restaurantId || activeRestaurantId;
-
+    
     if (from === '/checkout') {
       console.log("User logged in, redirecting to checkout.");
       // Se veio do checkout, redireciona para /checkout, garantindo que o restaurantId seja passado no state
       navigate('/checkout', { 
-        replace: true,
+        replace: true, 
         state: { restaurantId: restaurantIdFromState } // Usa o ID que veio do PreCheckout
       });
     } else if (finalRestaurantId) {
@@ -63,7 +61,7 @@ const Auth = () => {
 
   useEffect(() => {
     if (isLoadingRestaurantId) return;
-
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
@@ -94,6 +92,7 @@ const Auth = () => {
       toast.error("O Nome Completo é obrigatório.");
       return false;
     }
+    
     const cleanedPhone = cleanPhoneNumber(phone);
     if (cleanedPhone.length !== 11) {
       toast.error("O Telefone deve conter 11 dígitos (DDD + 9 dígitos).");
@@ -110,21 +109,23 @@ const Auth = () => {
       toast.error("O Email é obrigatório.");
       return false;
     }
+    
     if (password.length < 6) {
       toast.error("A Senha deve ter pelo menos 6 caracteres.");
       return false;
     }
+    
     return true;
   };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
+    
     if (location.state?.from === '/checkout' && !restaurantIdFromState) {
-        toast.error("Erro: ID do restaurante de origem não encontrado.");
-        setIsLoading(false);
-        return;
+      toast.error("Erro: ID do restaurante de origem não encontrado.");
+      setIsLoading(false);
+      return;
     }
 
     try {
@@ -136,7 +137,7 @@ const Auth = () => {
         
         const cleanedPhone = cleanPhoneNumber(phone);
         const cleanedCpfCnpj = cleanCpfCnpj(cpfCnpj);
-
+        
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -145,13 +146,13 @@ const Auth = () => {
               full_name: fullName,
               phone: cleanedPhone,
               // Salvamos o CPF/CNPJ no user_metadata para ser usado no checkout
-              cpf_cnpj: cleanedCpfCnpj, 
+              cpf_cnpj: cleanedCpfCnpj,
             },
           }
         });
         
         if (error) throw error;
-
+        
         if (data.session) {
           toast.success("Conta criada e login efetuado com sucesso!");
           // NOVO: Invalida a query de status de autenticação
@@ -159,7 +160,6 @@ const Auth = () => {
         } else {
           toast.success("Conta criada! Verifique seu email para confirmar.");
         }
-
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -182,20 +182,22 @@ const Auth = () => {
       setIsLoading(false);
     }
   };
-  
+
   // NOVO: Função para recuperação de senha
   const handlePasswordRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!email.trim()) {
       toast.error("O Email é obrigatório para recuperação de senha.");
       return;
     }
     
     setIsLoading(true);
+    
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         // Redireciona para a mesma página para que o usuário possa definir a nova senha
-        redirectTo: window.location.origin + window.location.pathname + '#/auth', 
+        redirectTo: window.location.origin + window.location.pathname + '#/auth',
       });
       
       if (error) throw error;
@@ -204,8 +206,8 @@ const Auth = () => {
         description: "Verifique sua caixa de entrada (e spam) para o link de redefinição de senha.",
         duration: 8000,
       });
-      setIsForgotPassword(false); // Volta para a tela de login
       
+      setIsForgotPassword(false); // Volta para a tela de login
     } catch (error: any) {
       toast.error(error.message || "Erro ao enviar email de recuperação.");
     } finally {
@@ -360,7 +362,7 @@ const Auth = () => {
                 >
                   {isLoading || isLoadingRestaurantId ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : isSignUp ? "Criar conta" : "Entrar"}
                 </Button>
-
+                
                 <div className="text-center">
                   <Button
                     variant="link"
@@ -373,7 +375,6 @@ const Auth = () => {
                 </div>
               </form>
             )}
-            
           </CardContent>
         </Card>
       </div>

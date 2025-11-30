@@ -44,11 +44,6 @@ const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role
   if ((role === 'admin' || role === 'moderator') && restaurantId) {
       return { role, restaurantId };
   }
-  
-  if (role === 'user') {
-      console.log(`[AdminAuth] User ${user.id} is a customer ('user' role). Blocking admin setup.`);
-      return { role: 'user', restaurantId: null };
-  }
 
   console.log(`[AdminAuth] Running setup for user ${user.id}. Current role: ${role}, Restaurant ID: ${restaurantId}`);
   
@@ -218,7 +213,7 @@ const AdminAuth = () => {
         });
         
         if (error) {
-          // NOVO: Se o erro for 'User already registered', tenta fazer o login
+          // Se o erro for 'User already registered', tenta fazer o login
           if (error.message.includes("User already registered")) {
             toast.warning("Usuário já cadastrado. Tentando fazer login...");
             
