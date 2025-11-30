@@ -25,7 +25,7 @@ import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/PhoneInput';
 import { Tables, TablesUpdate } from '@/integrations/supabase/types';
 import { User, Save, Loader2, Mail, Store } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react'; // Importando useState
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 
@@ -89,6 +89,7 @@ const fetchAdminProfile = async (userId: string): Promise<AdminProfileData> => {
 
 export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModalProps) => {
   const queryClient = useQueryClient();
+  const [userEmail, setUserEmail] = useState<string | null>(null); // Usando estado local
 
   const { data: profileData, isLoading } = useQuery<AdminProfileData>({
     queryKey: ['adminProfile', userId],
@@ -97,7 +98,14 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
     staleTime: 0,
   });
   
-  const userEmail = supabase.auth.currentUser?.email;
+  // Efeito para carregar o email
+  useEffect(() => {
+    if (isOpen) {
+      const user = supabase.auth.currentUser;
+      setUserEmail(user?.email || null);
+    }
+  }, [isOpen]);
+
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
