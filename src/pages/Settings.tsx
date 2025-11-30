@@ -147,6 +147,9 @@ const Settings = () => {
 
   const lat = form.watch('latitude');
   const lng = form.watch('longitude');
+  
+  // NOVO: Verifica se há erro no CEP ou Número
+  const hasAddressSearchError = form.formState.errors.zip_code || form.formState.errors.number;
 
   const DEFAULT_CENTER: [number, number] = [-23.55052, -46.633308]; // São Paulo
 
@@ -303,21 +306,26 @@ const Settings = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label>Buscar Endereço por CEP e Número *</Label>
-                    <div className="flex gap-2">
+                    <Label className={cn(hasAddressSearchError && "text-destructive")}>
+                      Buscar Endereço por CEP e Número *
+                    </Label>
+                    <div className={cn(
+                      "flex gap-2 p-2 rounded-lg border",
+                      hasAddressSearchError ? "border-destructive ring-2 ring-destructive/50" : "border-input"
+                    )}>
                       {/* Usando Controller para CEP e Número para que o Zod possa validar */}
                       <Controller
                         name="zip_code"
                         control={form.control}
                         render={({ field }) => (
-                          <FormItem className="flex-1">
+                          <FormItem className="flex-1 space-y-0">
                             <FormControl>
                               <ZipCodeInput 
                                 placeholder="Digite o CEP"
                                 {...field}
                               />
                             </FormControl>
-                            <FormMessage />
+                            {/* Removendo FormMessage aqui para evitar duplicação de erro */}
                           </FormItem>
                         )}
                       />
@@ -325,14 +333,14 @@ const Settings = () => {
                         name="number"
                         control={form.control}
                         render={({ field }) => (
-                          <FormItem className="w-24">
+                          <FormItem className="w-24 space-y-0">
                             <FormControl>
                               <Input 
                                 placeholder="Nº"
                                 {...field}
                               />
                             </FormControl>
-                            <FormMessage />
+                            {/* Removendo FormMessage aqui para evitar duplicação de erro */}
                           </FormItem>
                         )}
                       />
@@ -340,6 +348,12 @@ const Settings = () => {
                         {isSearchingCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                       </Button>
                     </div>
+                    {/* Exibindo a mensagem de erro abaixo do bloco */}
+                    {(form.formState.errors.zip_code || form.formState.errors.number) && (
+                        <p className="text-destructive text-sm mt-1">
+                            {form.formState.errors.zip_code?.message || form.formState.errors.number?.message}
+                        </p>
+                    )}
                     <p className="text-xs text-muted-foreground">
                       Coloque o CEP e nº do estabelecimento e para melhor precisão mova o alfinete no mapa e salve as configurações
                     </p>
