@@ -38,7 +38,7 @@ const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const restaurantSchema = z.object({
   name: z.string().min(1, 'O nome do restaurante é obrigatório.'),
   description: z.string().optional(),
-  logo_url: z.string().url('URL do logo inválida.').optional().or(z.literal('')),
+  // logo_url removido do schema
   street: z.string().optional(), // Mantendo opcional, pois é preenchido pela busca
   // OBRIGATÓRIO
   number: z.string().min(1, 'O número é obrigatório.'),
@@ -112,7 +112,7 @@ const Settings = () => {
     defaultValues: {
       name: '',
       description: '',
-      logo_url: '',
+      // logo_url removido do defaultValues
       street: '',
       number: '', // Agora obrigatório
       neighborhood: '',
@@ -132,7 +132,7 @@ const Settings = () => {
       form.reset({
         name: restaurant.name || '',
         description: restaurant.description || '',
-        logo_url: restaurant.logo_url || '',
+        // logo_url removido do reset
         street: restaurant.street || '',
         number: restaurant.number || '',
         neighborhood: restaurant.neighborhood || '',
@@ -251,7 +251,7 @@ const Settings = () => {
       const updatePayload: TablesUpdate<'restaurants'> = {
         name: data.name,
         description: data.description,
-        logo_url: data.logo_url,
+        logo_url: null, // Definindo logo_url como null ao salvar, já que o campo foi removido
         street: data.street,
         number: data.number,
         neighborhood: data.neighborhood,
@@ -306,14 +306,15 @@ const Settings = () => {
                 <form onSubmit={form.handleSubmit((data) => restaurantMutation.mutate(data))} className="space-y-6">
                   <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nome do Restaurante *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                   <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Descrição</FormLabel><FormControl><Textarea {...field} rows={3} /></FormControl><FormMessage /></FormItem>)} />
-                  <FormField control={form.control} name="logo_url" render={({ field }) => (<FormItem><FormLabel>URL do Logo</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                  
+                  {/* CAMPO LOGO_URL REMOVIDO */}
                   
                   <div className="pt-4 border-t mt-6">
                     <h3 className="text-lg font-semibold">Contato e Status</h3>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* NOVO: Email do Usuário (Somente Leitura) */}
+                    {/* Email do Usuário (Somente Leitura) */}
                     <div className="space-y-2">
                       <Label className="flex items-center gap-2 text-sm font-medium">
                           <Mail className="h-4 w-4" /> Email do Administrador
@@ -425,9 +426,6 @@ const Settings = () => {
                     <FormField control={form.control} name="longitude" render={({ field }) => (<FormItem><FormLabel>Longitude *</FormLabel><FormControl><Input {...field} placeholder="-47.408315" value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                   </div>
 
-                  {/* Removendo o campo de email editável do restaurante, pois o email do admin é o que importa */}
-                  {/* <FormField control={form.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} /> */}
-                  
                   <FormField control={form.control} name="is_active" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><FormLabel className="font-normal">Restaurante Ativo</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
                   <Button type="submit" className="w-full h-12 text-lg" disabled={restaurantMutation.isPending || !userRestaurantId}>{restaurantMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}</Button>
                 </form>
