@@ -195,9 +195,12 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
+      // CORREÇÃO: Redireciona para a página de recuperação de senha
+      const baseUrl = window.location.origin + window.location.pathname;
+      const redirectToUrl = `${baseUrl}#/password-recovery`;
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        // Redireciona para a mesma página para que o usuário possa definir a nova senha
-        redirectTo: window.location.origin + window.location.pathname + '#/auth',
+        redirectTo: redirectToUrl,
       });
       
       if (error) throw error;
