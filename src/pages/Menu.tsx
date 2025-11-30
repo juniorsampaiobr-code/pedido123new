@@ -257,7 +257,8 @@ const Menu = () => {
             {categories.map(category => (
               <section key={category.id} id={`category-${category.id}`} className="scroll-mt-20">
                 <h2 className="text-3xl font-bold mb-6 border-b pb-2">{category.name}</h2>
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {/* AJUSTE AQUI: grid-cols-2 para mobile, sm:grid-cols-2 para manter a compatibilidade, lg:grid-cols-3 para desktop */}
+                <div className="grid gap-6 grid-cols-2 lg:grid-cols-3"> 
                   {category.products
                     .filter(p => p.is_available)
                     .map(product => (
