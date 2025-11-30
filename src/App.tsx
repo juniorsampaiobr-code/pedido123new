@@ -26,6 +26,7 @@ const PaymentRedirect = lazy(() => import("./pages/PaymentRedirect"));
 const PreCheckout = lazy(() => import("./pages/PreCheckout"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const DashboardLayout = lazy(() => import("./layouts/DashboardLayout"));
+const PasswordRecovery = lazy(() => import("./pages/PasswordRecovery")); // NOVO
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,8 @@ function App() {
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/admin-auth" element={<AdminAuth />} />
+                  {/* NOVO: Rota para recuperação de senha */}
+                  <Route path="/password-recovery" element={<PasswordRecovery />} /> 
                   {/* Rota do Menu agora requer o ID do restaurante */}
                   <Route path="/menu/:restaurantId" element={<Menu />} />
                   <Route path="/pre-checkout" element={<PreCheckout />} />

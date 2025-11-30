@@ -268,8 +268,9 @@ const AdminAuth = () => {
     
     setIsFormLoading(true);
     try {
+      // ATUALIZADO: Redireciona para a nova página de recuperação
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + window.location.pathname + '#/admin-auth', 
+        redirectTo: window.location.origin + window.location.pathname + '#/password-recovery', 
       });
       
       if (error) throw error;
