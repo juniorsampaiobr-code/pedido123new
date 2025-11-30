@@ -936,8 +936,9 @@ const Checkout = () => {
           )}
         </div>
         
+        {/* Ajuste de Layout: Em telas pequenas, as colunas se empilham (padrão do grid) */}
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Coluna 1 & 2: Formulário de Checkout */}
+          {/* Coluna 1 & 2: Formulário de Checkout (Ocupa 100% em mobile, 2/3 em desktop) */}
           <div className="lg:col-span-2 space-y-6">
             
             <Card>
@@ -987,7 +988,6 @@ const Checkout = () => {
               </CardContent>
             </Card>
             
-            {/* Opção de Entrega */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
@@ -1046,7 +1046,17 @@ const Checkout = () => {
                         <Controller
                           name="zip_code"
                           control={addressForm.control}
-                          render={({ field }) => <ZipCodeInput id="zip_code" {...field} />}
+                          render={({ field }) => (
+                            <FormItem className="flex-1 space-y-0">
+                              <FormControl>
+                                <ZipCodeInput 
+                                  placeholder="Digite o CEP"
+                                  {...field}
+                                />
+                              </FormControl>
+                              {/* Removendo FormMessage aqui para evitar duplicação de erro */}
+                            </FormItem>
+                          )}
                         />
                         {addressForm.formState.errors.zip_code && <p className="text-destructive text-sm">{addressForm.formState.errors.zip_code.message}</p>}
                       </div>
@@ -1227,7 +1237,7 @@ const Checkout = () => {
             </Card>
           </div>
 
-          {/* Coluna 3: Resumo do Pedido */}
+          {/* Coluna 3: Resumo do Pedido (Ocupa 100% em mobile, 1/3 em desktop) */}
           <div className="lg:col-span-1 space-y-6 sticky top-4 self-start">
             <Card className="shadow-lg">
               <CardHeader>

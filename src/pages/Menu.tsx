@@ -248,7 +248,7 @@ const Menu = () => {
       </header>
 
       <main className="flex-1 container mx-auto px-4 py-8 flex">
-        <div className="flex-1 max-w-full lg:max-w-3xl xl:max-w-4xl">
+        <div className="flex-1 w-full lg:max-w-3xl xl:max-w-4xl">
           {/* Aviso de Loja Fechada */}
           {!isOpen && <StoreClosedWarning todayHours={todayHours} />}
 
