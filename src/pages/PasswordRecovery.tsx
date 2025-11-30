@@ -9,9 +9,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 
+// Função auxiliar para extrair parâmetros de uma string de hash (ex: #access_token=...&type=...)
+const extractTokensFromHash = (hash: string) => {
+  // Remove o primeiro '#' e divide a string em partes
+  const parts = hash.substring(1).split('#');
+  
+  // A parte que contém os tokens é geralmente a segunda parte (após o segundo #)
+  const tokenString = parts.length > 1 ? parts[1] : parts[0];
+  
+  const params = new URLSearchParams(tokenString);
+  
+  return {
+    accessToken: params.get('access_token'),
+    refreshToken: params.get('refresh_token'),
+    type: params.get('type'),
+  };
+};
+
 const PasswordRecovery = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  // Não usaremos useSearchParams diretamente, mas manteremos a importação por convenção
   const [isProcessing, setIsProcessing] = useState(true);
   const [isSessionSet, setIsSessionSet] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -20,9 +37,7 @@ const PasswordRecovery = () => {
 
   // 1. Tenta capturar os tokens da URL e definir a sessão
   useEffect(() => {
-    const accessToken = searchParams.get('access_token');
-    const refreshToken = searchParams.get('refresh_token');
-    const type = searchParams.get('type');
+    const { accessToken, refreshToken, type } = extractTokensFromHash(window.location.hash);
 
     if (accessToken && refreshToken && type === 'recovery') {
       const setSession = async () => {
@@ -38,8 +53,9 @@ const PasswordRecovery = () => {
           setIsSessionSet(true);
           toast.success("Sessão de recuperação ativada. Defina sua nova senha.");
           
-          // Limpa os parâmetros da URL para evitar re-processamento
-          navigate(window.location.pathname, { replace: true }); 
+          // Limpa os parâmetros da URL (remove o segundo hash e os tokens)
+          // Redireciona para a rota limpa: /#/password-recovery
+          navigate('/password-recovery', { replace: true }); 
 
         } catch (error: any) {
           console.error("Erro ao definir sessão:", error);
@@ -51,7 +67,7 @@ const PasswordRecovery = () => {
       };
       setSession();
     } else {
-      // Se não houver tokens, verifica se o usuário já está logado (pode ter vindo de um link antigo)
+      // Se não houver tokens na URL, verifica se o usuário já está logado
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
           setIsSessionSet(true);
@@ -60,7 +76,7 @@ const PasswordRecovery = () => {
         setIsProcessing(false);
       });
     }
-  }, [searchParams, navigate]);
+  }, [navigate]);
 
   // 2. Lógica de atualização de senha
   const handlePasswordUpdate = async (e: React.FormEvent) => {
