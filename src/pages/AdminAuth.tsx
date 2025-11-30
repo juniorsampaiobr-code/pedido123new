@@ -217,7 +217,25 @@ const AdminAuth = () => {
           }
         });
         
-        if (error) throw error;
+        if (error) {
+          // NOVO: Se o erro for 'User already registered', tenta fazer o login
+          if (error.message.includes("User already registered")) {
+            toast.warning("Usuário já cadastrado. Tentando fazer login...");
+            
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+              email,
+              password,
+            });
+            
+            if (signInError) throw signInError;
+            
+            toast.success("Login realizado com sucesso!");
+            // O onAuthStateChange/handleRedirect será chamado automaticamente
+            return;
+          }
+          
+          throw error;
+        }
         
         if (data.session) {
           toast.success("Conta de administrador criada e login efetuado!");
@@ -298,6 +316,7 @@ const AdminAuth = () => {
           <CardContent className="space-y-4">
             
             {isForgotPassword ? (
+              // Formulário de Recuperação de Senha
               <form onSubmit={handlePasswordRecovery} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email *</Label>
@@ -335,6 +354,7 @@ const AdminAuth = () => {
                 </div>
               </form>
             ) : (
+              // Formulário de Login/Cadastro
               <form onSubmit={handleEmailAuth} className="space-y-4">
                 {isSignUp && (
                   <>
