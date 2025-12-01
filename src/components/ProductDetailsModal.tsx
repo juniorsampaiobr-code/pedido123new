@@ -65,15 +65,7 @@ const ProductDetailsModalComponent = ({ isOpen, onClose, product, onAddToCart, i
             alt={product.name}
             className="w-full h-48 object-cover"
           />
-          {/* Ícone de fechar: Garantindo que seja o 'X' e com estilo adequado */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="absolute top-2 right-2 bg-background/80 hover:bg-background"
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          {/* REMOVIDO: O botão de fechar customizado. O DialogContent padrão já fornece o 'X' no canto superior direito. */}
         </div>
         
         <div className="p-6 space-y-4">
@@ -129,7 +121,6 @@ const ProductDetailsModalComponent = ({ isOpen, onClose, product, onAddToCart, i
             </div>
           </div>
 
-          {/* CAMPO DE OBSERVAÇÕES REMOVIDO */}
           
           <DialogFooter className="pt-4">
             <Button 
