@@ -26,12 +26,13 @@ interface ProductDetailsModalProps {
 
 const ProductDetailsModalComponent = ({ isOpen, onClose, product, onAddToCart, isCheckoutBlocked }: ProductDetailsModalProps) => {
   const [quantity, setQuantity] = useState(product.is_price_by_weight ? 0.5 : 1);
-  const [notes, setNotes] = useState('');
+  // O estado 'notes' é mantido, mas será sempre passado como string vazia
+  const notes = ''; 
 
   React.useEffect(() => {
     if (isOpen) {
       setQuantity(product.is_price_by_weight ? 0.5 : 1);
-      setNotes('');
+      // setNotes(''); // Removido, pois notes não é mais usado
     }
   }, [isOpen, product.is_price_by_weight]);
 
@@ -46,7 +47,8 @@ const ProductDetailsModalComponent = ({ isOpen, onClose, product, onAddToCart, i
 
   const handleConfirm = () => {
     if (quantity <= 0) return;
-    onAddToCart(quantity, notes);
+    // Passa string vazia para notes
+    onAddToCart(quantity, ''); 
     onClose();
   };
 
@@ -63,6 +65,7 @@ const ProductDetailsModalComponent = ({ isOpen, onClose, product, onAddToCart, i
             alt={product.name}
             className="w-full h-48 object-cover"
           />
+          {/* Ícone de fechar: Garantindo que seja o 'X' e com estilo adequado */}
           <Button 
             variant="ghost" 
             size="icon" 
@@ -126,17 +129,7 @@ const ProductDetailsModalComponent = ({ isOpen, onClose, product, onAddToCart, i
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label htmlFor="notes" className="text-sm font-medium">Observações (Opcional)</label>
-            <Textarea
-              id="notes"
-              placeholder="Ex: Sem cebola, molho extra..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              disabled={isCheckoutBlocked}
-            />
-          </div>
+          {/* CAMPO DE OBSERVAÇÕES REMOVIDO */}
           
           <DialogFooter className="pt-4">
             <Button 
