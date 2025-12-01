@@ -201,6 +201,9 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSele
   const statusInfo = ORDER_STATUS_MAP[order.status || 'pending'];
   const customerName = order.customer?.name || 'Cliente Desconhecido';
   const orderNumber = order.id ? order.id.slice(-4) : 'N/A';
+  
+  // NOVO: Verifica se o pedido está aguardando pagamento
+  const isPendingPayment = order.status === 'pending_payment';
 
   return (
     <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col relative">
@@ -221,12 +224,19 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSele
           <p className="text-2xl font-extrabold text-primary">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total_amount)}</p>
         </div>
         <div className="flex justify-end pt-2 border-t gap-2">
-          {(order.status === 'pending' || order.status === 'pending_payment') && (
+          {/* Condição para mostrar Aceitar/Recusar: Apenas se for 'pending' E NÃO for 'pending_payment' */}
+          {order.status === 'pending' && !isPendingPayment && (
             <>
               <Button variant="destructive" size="sm" onClick={() => onDecline(order.id)}><X className="h-4 w-4 mr-1" /> Recusar</Button>
               <Button variant="default" size="sm" onClick={() => onAccept(order.id)}><Check className="h-4 w-4 mr-1" /> Aceitar</Button>
             </>
           )}
+          
+          {/* Se for 'pending_payment', podemos mostrar uma mensagem ou apenas os botões de detalhes/impressão */}
+          {isPendingPayment && (
+            <Badge variant="secondary" className="bg-gray-100 text-gray-600">Aguardando Pagamento</Badge>
+          )}
+          
           <Button variant="outline" size="sm" onClick={() => onViewDetails(order)}>Detalhes</Button>
           <Button variant="outline" size="icon" onClick={() => onPrint(order)}>
             <Printer className="h-4 w-4" />
@@ -286,6 +296,9 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: Enums<'order_status'> }) => {
+      // CORREÇÃO: Se o status for 'pending_payment', não deve ser aceito/recusado aqui.
+      // A lógica de aceitar/recusar só deve ser chamada para 'pending'.
+      // Se for 'pending', muda para 'preparing'.
       const statusToSet = newStatus === 'pending' ? 'preparing' : newStatus; 
       const { error } = await supabase.from('orders').update({ status: statusToSet }).eq('id', orderId);
       if (error) throw new Error(error.message);
@@ -311,10 +324,22 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
   });
 
   const handleAccept = (orderId: string) => {
-    updateStatusMutation.mutate({ orderId, newStatus: 'preparing' as Enums<'order_status'> });
+    // Garante que só aceita se o status for 'pending' (não 'pending_payment')
+    const order = orders.find(o => o.id === orderId);
+    if (order && order.status === 'pending') {
+        updateStatusMutation.mutate({ orderId, newStatus: 'preparing' as Enums<'order_status'> });
+    } else {
+        toast.error("Ação inválida. O pedido não está no status Pendente.");
+    }
   };
   const handleDecline = (orderId: string) => {
-    updateStatusMutation.mutate({ orderId, newStatus: 'cancelled' });
+    // Garante que só recusa se o status for 'pending' (não 'pending_payment')
+    const order = orders.find(o => o.id === orderId);
+    if (order && order.status === 'pending') {
+        updateStatusMutation.mutate({ orderId, newStatus: 'cancelled' });
+    } else {
+        toast.error("Ação inválida. O pedido não está no status Pendente.");
+    }
   };
   const handleViewDetails = (order: Order) => {
     onViewDetails(order);
@@ -381,7 +406,7 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
             onDelete={handleDelete}
             isSelected={selectedOrders.includes(order.id)}
             onSelect={handleSelectOrder}
-            onPrint={onPrint}
+            onPrint={handlePrintOrder}
           />
         ))}
       </div>
@@ -486,6 +511,7 @@ const Orders = () => {
         if (error) throw new Error(error.message);
         return 'deleted';
       } else {
+        // Se a ação for 'pending_payment', não deve ser permitido em massa, mas vamos permitir a mudança de status
         const statusToSet = action === 'pending' ? 'preparing' : action;
         const { error } = await supabase.from('orders').update({ status: statusToSet }).in('id', orderIds);
         if (error) throw new Error(error.message);
