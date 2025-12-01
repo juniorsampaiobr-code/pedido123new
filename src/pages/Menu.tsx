@@ -23,7 +23,7 @@ import { Card } from '@/components/ui/card'; // Added missing import
 import { cn } from '@/lib/utils';
 import { CategoryNavigation } from '@/components/CategoryNavigation';
 import { Input } from '@/components/ui/input'; // Importando Input
-import { useDebounce } from '@/hooks/useDebounce'; // Importando useDebounce
+// import { useDebounce } from '@/hooks/useDebounce'; // Removendo useDebounce
 
 type Restaurant = Tables<'restaurants'>;
 type Category = Tables<'categories'>;
@@ -109,9 +109,9 @@ const Menu = () => {
   const { data: user } = useAuthStatus(); // Obtém o status de autenticação
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   
-  // NOVO ESTADO DE PESQUISA
+  // NOVO ESTADO DE PESQUISA (MANTIDO, mas sem debounce)
   const [searchTerm, setSearchTerm] = useState('');
-  const debouncedSearchTerm = useDebounce(searchTerm, 300); // Debounce de 300ms
+  // const debouncedSearchTerm = useDebounce(searchTerm, 300); // REMOVIDO
 
   // 1. Busca dados estáticos do menu (restaurante, categorias, produtos)
   const { data: menuData, isLoading: isLoadingMenu, isError: isErrorMenu, error: errorMenu, refetch } = useQuery<MenuData>({
@@ -190,11 +190,11 @@ const Menu = () => {
   const restaurant = menuData.restaurant;
   const categories = menuData.categories;
   
-  // 4. Lógica de Filtragem
+  // 4. Lógica de Filtragem (AGORA USANDO searchTerm DIRETAMENTE)
   const filteredCategories = useMemo(() => {
     // Garante que categories é um array antes de usar
     const allCategories = categories || []; 
-    const term = debouncedSearchTerm.toLowerCase().trim();
+    const term = searchTerm.toLowerCase().trim();
     
     if (!term) {
       // Se não houver termo de pesquisa, retorna todas as categorias com produtos disponíveis
@@ -217,9 +217,9 @@ const Menu = () => {
       };
     }).filter(category => category.products.length > 0);
     
-  }, [categories, debouncedSearchTerm]);
+  }, [categories, searchTerm]); // Dependência alterada
   
-  const isSearching = debouncedSearchTerm.length > 0;
+  const isSearching = searchTerm.length > 0;
   const availableCategories = filteredCategories; // Usamos o resultado filtrado/disponível
 
   return (
