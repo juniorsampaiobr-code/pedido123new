@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, ShoppingCart, Clock, MapPin, Copy, RefreshCw, LogOut, User as UserIcon, Phone, Search, CheckCircle } from 'lucide-react';
+import { Terminal, ShoppingCart, Clock, MapPin, Copy, RefreshCw, LogOut, User as UserIcon, Phone, Search } from 'lucide-react';
 import { BusinessStatus } from '@/components/BusinessStatus';
 import { StoreClosedWarning } from '@/components/StoreClosedWarning';
 import { getBusinessStatus } from '@/utils/time';
@@ -19,10 +19,10 @@ import { useParams } from 'react-router-dom';
 import { useAuthStatus } from '@/hooks/use-auth-status';
 import { useBusinessHoursRealtime } from '@/hooks/use-business-hours-realtime';
 import { CustomerProfileModal } from '@/components/CustomerProfileModal';
-import { Card } from '@/components/ui/card'; // Added missing import
+import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { CategoryNavigation } from '@/components/CategoryNavigation';
-import { Input } from '@/components/ui/input'; // Importando Input
+import { Input } from '@/components/ui/input';
 
 type Restaurant = Tables<'restaurants'>;
 type Category = Tables<'categories'>;
@@ -101,41 +101,69 @@ const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
 };
 
 const Menu = () => {
-  const { restaurantId } = useParams<{ restaurantId: string }>(); // Obtém o ID da URL
+  const { restaurantId } = useParams<{ restaurantId: string }>();
   const isMobile = useIsMobile();
   const { totalItems } = useCart();
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const { data: user } = useAuthStatus(); // Obtém o status de autenticação
+  const { data: user } = useAuthStatus();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  
-  // NOVO ESTADO DE PESQUISA
   const [searchTerm, setSearchTerm] = useState('');
 
   // 1. Busca dados estáticos do menu (restaurante, categorias, produtos)
   const { data: menuData, isLoading: isLoadingMenu, isError: isErrorMenu, error: errorMenu, refetch } = useQuery<MenuData>({
-    queryKey: ['menuData', restaurantId], // Adiciona restaurantId na chave
+    queryKey: ['menuData', restaurantId],
     queryFn: () => fetchMenuData(restaurantId!),
-    enabled: !!restaurantId, // Reativado
-    staleTime: 1000 * 60 * 1, // 1 minuto
+    enabled: !!restaurantId,
+    staleTime: 1000 * 60 * 1,
   });
   
   // 2. Busca horários em tempo real
-  const { hours: realtimeHours, isLoading: isLoadingHours, isError: isErrorHours } = useBusinessHoursRealtime(restaurantId); // Reativado
+  const { hours: realtimeHours, isLoading: isLoadingHours } = useBusinessHoursRealtime(restaurantId);
 
   // 3. Busca dados do cliente logado
-  const { data: customer, isLoading: isLoadingCustomer } = useQuery<Customer | null>({
+  const { data: customer } = useQuery<Customer | null>({
     queryKey: ['menuCustomerData', user?.id],
     queryFn: () => fetchCustomerData(user!.id),
-    enabled: !!user, // Reativado
+    enabled: !!user,
     staleTime: 0,
   });
 
+  // 4. Lógica de Status de Negócio (usando useMemo)
   const { isOpen, todayHours } = useMemo(() => {
-    if (realtimeHours) {
+    if (realtimeHours && realtimeHours.length > 0) {
       return getBusinessStatus(realtimeHours);
     }
+    // Fallback se não houver horários configurados
     return { isOpen: true, todayHours: 'Horário não configurado' };
   }, [realtimeHours]);
+  
+  // 5. Lógica de Filtragem (useMemo que causava o erro 310)
+  const filteredCategories = useMemo(() => {
+    const categories = menuData?.categories || [];
+    const term = searchTerm.toLowerCase().trim();
+    
+    if (!term) {
+      // Retorna todas as categorias com produtos disponíveis
+      return categories.map(category => ({
+        ...category,
+        products: category.products.filter(p => p.is_available),
+      })).filter(category => category.products.length > 0);
+    }
+
+    // Filtra produtos e categorias com base no termo
+    return categories.map(category => {
+      const filteredProducts = category.products.filter(product => 
+        product.is_available && 
+        (product.name.toLowerCase().includes(term) || 
+         product.description?.toLowerCase().includes(term))
+      );
+      return {
+        ...category,
+        products: filteredProducts,
+      };
+    }).filter(category => category.products.length > 0);
+    
+  }, [menuData?.categories, searchTerm]); // Dependências simplificadas
   
   // Determina se o checkout deve ser bloqueado
   const isCheckoutBlocked = !isOpen;
@@ -186,39 +214,9 @@ const Menu = () => {
 
   // Acessamos os dados aqui, após a verificação de carregamento e erro
   const restaurant = menuData.restaurant;
-  const categories = menuData.categories;
-  
-  // 4. Lógica de Filtragem
-  const filteredCategories = useMemo(() => {
-    // Garante que categories é um array antes de usar
-    const allCategories = categories || []; 
-    const term = searchTerm.toLowerCase().trim();
-    
-    if (!term) {
-      // Se não houver termo de pesquisa, retorna todas as categorias com produtos disponíveis
-      return allCategories.map(category => ({
-        ...category,
-        products: category.products.filter(p => p.is_available),
-      })).filter(category => category.products.length > 0);
-    }
-
-    // Filtra produtos e categorias com base no termo
-    return allCategories.map(category => {
-      const filteredProducts = category.products.filter(product => 
-        product.is_available && 
-        (product.name.toLowerCase().includes(term) || 
-         product.description?.toLowerCase().includes(term))
-      );
-      return {
-        ...category,
-        products: filteredProducts,
-      };
-    }).filter(category => category.products.length > 0);
-    
-  }, [categories, searchTerm]);
+  const availableCategories = filteredCategories; // Usamos o resultado filtrado/disponível
   
   const isSearching = searchTerm.length > 0;
-  const availableCategories = filteredCategories; // Usamos o resultado filtrado/disponível
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
