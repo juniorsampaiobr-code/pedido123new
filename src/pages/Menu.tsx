@@ -278,7 +278,7 @@ const Menu = () => {
           </div>
           
           {/* Campo de Pesquisa */}
-          <div className="relative mt-4">
+          <div className="relative mt-4 mb-4"> {/* Adicionando mb-4 para separar da navegação */}
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar produto..."
@@ -287,14 +287,14 @@ const Menu = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          
+          {/* Navegação de Categorias Fixa (AGORA DENTRO DO HEADER) */}
+          {!isSearching && availableCategories.length > 1 && (
+            <CategoryNavigation categories={availableCategories} />
+          )}
         </div>
       </header>
       
-      {/* Navegação de Categorias Fixa (Oculta durante a pesquisa) */}
-      {!isSearching && availableCategories.length > 1 && (
-        <CategoryNavigation categories={availableCategories} />
-      )}
-
       <main className="flex-1 container mx-auto px-4 py-8 flex">
         <div className="flex-1 w-full lg:max-w-3xl xl:max-w-4xl">
           {/* Aviso de Loja Fechada */}
@@ -317,7 +317,7 @@ const Menu = () => {
                 // Aplica o ID para rolagem
                 id={`category-${category.id}`} 
                 // Ajustando para 120px para compensar o cabeçalho fixo
-                className={cn("scroll-mt-[120px]", isSearching && "pt-0")} 
+                className={cn("scroll-mt-[200px]", isSearching && "pt-0")} // Aumentando o offset para 200px para garantir que o título apareça
               >
                 <h2 className="text-3xl font-bold mb-6 border-b pb-2">
                   {isSearching ? 'Resultados da Pesquisa' : category.name}

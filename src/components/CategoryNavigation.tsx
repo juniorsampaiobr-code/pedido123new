@@ -42,7 +42,8 @@ export const CategoryNavigation = ({ categories }: CategoryNavigationProps) => {
       },
       {
         // Ajusta a área de intersecção para o topo da tela, compensando o header fixo
-        rootMargin: '-100px 0px -50% 0px', 
+        // O valor de -200px é usado para corresponder ao scroll-mt-[200px] no Menu.tsx
+        rootMargin: '-200px 0px -50% 0px', 
         threshold: 0,
       }
     );
@@ -66,7 +67,7 @@ export const CategoryNavigation = ({ categories }: CategoryNavigationProps) => {
 
 
   return (
-    <div className="sticky top-16 z-20 bg-card border-b shadow-md">
+    <div className="w-full border-t shadow-md">
       <ScrollArea className="w-full whitespace-nowrap">
         <div className="flex space-x-2 p-3 container mx-auto px-4">
           {categories.map((category) => (
