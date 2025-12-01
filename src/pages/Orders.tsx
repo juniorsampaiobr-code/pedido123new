@@ -406,7 +406,7 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
             onDelete={handleDelete}
             isSelected={selectedOrders.includes(order.id)}
             onSelect={handleSelectOrder}
-            onPrint={onPrint} {/* CORRIGIDO: Passando onPrint como prop */}
+            onPrint={onPrint}
           />
         ))}
       </div>
@@ -637,7 +637,7 @@ const Orders = () => {
                   selectedOrders={selectedOrders}
                   setSelectedOrders={setSelectedOrders}
                   totalOrdersInView={selectedOrders.length}
-                  onPrint={handlePrintOrder} {/* CORRIGIDO: Passando a função aqui */}
+                  onPrint={handlePrintOrder}
                 />
               </TabsContent>
             ))}
