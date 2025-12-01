@@ -4,22 +4,8 @@ import { Tables } from '@/integrations/supabase/types';
 
 type PaymentSettings = Tables<'payment_settings'>;
 
-const fetchMercadoPagoPublicKey = async (): Promise<string | null> => {
-  // 1. Get restaurant ID
-  const { data: restaurantData, error: restaurantError } = await supabase
-    .from('restaurants')
-    .select('id')
-    .limit(1)
-    .single();
-
-  if (restaurantError || !restaurantData) {
-    console.error("Failed to fetch restaurant ID for payment settings.");
-    return null;
-  }
-
-  const restaurantId = restaurantData.id;
-
-  // 2. Get payment settings
+const fetchMercadoPagoPublicKey = async (restaurantId: string): Promise<string | null> => {
+  // 1. Get payment settings for the specific restaurant ID
   const { data: settings, error: settingsError } = await supabase
     .from('payment_settings')
     .select('mercado_pago_public_key')
@@ -34,10 +20,11 @@ const fetchMercadoPagoPublicKey = async (): Promise<string | null> => {
   return settings?.mercado_pago_public_key || null;
 };
 
-export const useMercadoPagoPublicKey = () => {
+export const useMercadoPagoPublicKey = (restaurantId: string | undefined) => {
   return useQuery<string | null>({
-    queryKey: ['mercadoPagoPublicKey'],
-    queryFn: fetchMercadoPagoPublicKey,
+    queryKey: ['mercadoPagoPublicKey', restaurantId],
+    queryFn: () => fetchMercadoPagoPublicKey(restaurantId!),
+    enabled: !!restaurantId, // Só executa se o ID do restaurante estiver disponível
     staleTime: Infinity, // Key should only change manually via settings
   });
 };

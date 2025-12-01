@@ -142,7 +142,13 @@ const Checkout = () => {
   const queryClient = useQueryClient();
   const { items, totalAmount: cartSubtotal, clearCart } = useCart();
   const { data: user, isLoading: isLoadingAuth } = useAuthStatus();
-  const { data: mpPublicKey } = useMercadoPagoPublicKey();
+  
+  // ATUALIZADO: Passando restaurantId para o hook
+  const [restaurantIdFromState] = useState(location.state?.restaurantId as string | undefined);
+  const restaurantIdFromQuery = searchParams.get('restaurantId') as string | undefined;
+  const restaurantId = restaurantIdFromState || restaurantIdFromQuery;
+  
+  const { data: mpPublicKey } = useMercadoPagoPublicKey(restaurantId); // USANDO restaurantId AQUI
   
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
@@ -158,12 +164,6 @@ const Checkout = () => {
   // NOVO ESTADO: Rastreia se o endereço foi salvo/validado
   const [isAddressSaved, setIsAddressSaved] = useState(false);
   
-  // NOVO: Obtém o ID do restaurante do estado de navegação OU dos query params (fallback)
-  const restaurantIdFromState = location.state?.restaurantId as string | undefined;
-  const restaurantIdFromQuery = searchParams.get('restaurantId') as string | undefined;
-  const restaurantId = restaurantIdFromState || restaurantIdFromQuery;
-
-
   // DEBUG: Loga o status do usuário
   useEffect(() => {
       console.log("LOG: Checkout - User Status:", user ? `Logged in as ${user.email}` : 'Anonymous');
@@ -1168,7 +1168,8 @@ const Checkout = () => {
                   render={({ field }) => (
                     <RadioGroup onValueChange={field.onChange} value={field.value} className="space-y-3">
                       {paymentMethods?.map(method => {
-                        const isMpOnline = method.name?.includes('online') && !mpPublicKey;
+                        // CORRIGIDO: Verifica se mpPublicKey é nulo ou vazio
+                        const isMpOnline = method.name?.includes('online') && (!mpPublicKey || mpPublicKey.trim() === '');
                         
                         return (
                           <Label 
