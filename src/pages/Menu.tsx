@@ -316,8 +316,8 @@ const Menu = () => {
                 key={category.id} 
                 // Aplica o ID para rolagem
                 id={`category-${category.id}`} 
-                // Remove a classe scroll-mt-20 que estava causando conflito
-                className={cn("scroll-mt-[100px]", isSearching && "pt-0")} 
+                // Ajustando para 120px para compensar o cabeçalho fixo
+                className={cn("scroll-mt-[120px]", isSearching && "pt-0")} 
               >
                 <h2 className="text-3xl font-bold mb-6 border-b pb-2">
                   {isSearching ? 'Resultados da Pesquisa' : category.name}
