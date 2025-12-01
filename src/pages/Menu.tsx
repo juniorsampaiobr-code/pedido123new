@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables, Enums } from '@/integrations/supabase/types';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, ShoppingCart, Clock, MapPin, Copy, RefreshCw, LogOut, User as UserIcon, Phone, Search } from 'lucide-react';
+import { Terminal, ShoppingCart, Clock, MapPin, Copy, RefreshCw, LogOut, User as UserIcon, Phone, Search, CheckCircle } from 'lucide-react';
 import { BusinessStatus } from '@/components/BusinessStatus';
 import { StoreClosedWarning } from '@/components/StoreClosedWarning';
 import { getBusinessStatus } from '@/utils/time';
@@ -101,49 +101,50 @@ const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
 };
 
 const Menu = () => {
-  const { restaurantId } = useParams<{ restaurantId: string }>(); // Hook 1
-  const isMobile = useIsMobile(); // Hook 2
-  const { totalItems } = useCart(); // Hook 3
-  const [isCartOpen, setIsCartOpen] = useState(false); // Hook 4
-  const { data: user } = useAuthStatus(); // Hook 5
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false); // Hook 6
+  const { restaurantId } = useParams<{ restaurantId: string }>(); // Obtém o ID da URL
+  const isMobile = useIsMobile();
+  const { totalItems } = useCart();
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const { data: user } = useAuthStatus(); // Obtém o status de autenticação
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   
   // NOVO ESTADO DE PESQUISA
-  const [searchTerm, setSearchTerm] = useState(''); // Hook 7
+  const [searchTerm, setSearchTerm] = useState('');
 
   // 1. Busca dados estáticos do menu (restaurante, categorias, produtos)
-  // Desabilitando temporariamente para isolar o erro
   const { data: menuData, isLoading: isLoadingMenu, isError: isErrorMenu, error: errorMenu, refetch } = useQuery<MenuData>({
     queryKey: ['menuData', restaurantId], // Adiciona restaurantId na chave
     queryFn: () => fetchMenuData(restaurantId!),
-    enabled: false, // DESABILITADO TEMPORARIAMENTE
+    enabled: !!restaurantId, // Reativado
     staleTime: 1000 * 60 * 1, // 1 minuto
   });
   
   // 2. Busca horários em tempo real
-  // Desabilitando temporariamente para isolar o erro
-  const { hours: realtimeHours, isLoading: isLoadingHours, isError: isErrorHours } = useBusinessHoursRealtime(restaurantId);
+  const { hours: realtimeHours, isLoading: isLoadingHours, isError: isErrorHours } = useBusinessHoursRealtime(restaurantId); // Reativado
 
   // 3. Busca dados do cliente logado
-  // Desabilitando temporariamente para isolar o erro
   const { data: customer, isLoading: isLoadingCustomer } = useQuery<Customer | null>({
     queryKey: ['menuCustomerData', user?.id],
     queryFn: () => fetchCustomerData(user!.id),
-    enabled: false, // DESABILITADO TEMPORARIAMENTE
+    enabled: !!user, // Reativado
     staleTime: 0,
   });
 
-  // Usando valores mockados para evitar erros de desestruturação
-  const { isOpen, todayHours } = { isOpen: true, todayHours: '09:00 - 18:00' };
-  const isCheckoutBlocked = !isOpen;
-  const restaurant = { name: 'Restaurante Teste', description: 'Menu de Teste', phone: '11999999999' } as Restaurant;
-  const categories = [] as (Category & { products: Product[] })[];
-  const filteredCategories = [] as (Category & { products: Product[] })[];
+  const { isOpen, todayHours } = useMemo(() => {
+    if (realtimeHours) {
+      return getBusinessStatus(realtimeHours);
+    }
+    return { isOpen: true, todayHours: 'Horário não configurado' };
+  }, [realtimeHours]);
   
+  // Determina se o checkout deve ser bloqueado
+  const isCheckoutBlocked = !isOpen;
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success("Você saiu da sua conta.");
-    window.location.reload();
+    // Redireciona para a página de autenticação do cliente
+    window.location.reload(); // Força o recarregamento para limpar o estado do cliente
   };
 
   if (!restaurantId) {
@@ -160,14 +161,64 @@ const Menu = () => {
     );
   }
 
-  // Se o erro 310 ainda ocorrer aqui, o problema está em um dos 7 hooks no topo.
-  // Se não ocorrer, o problema está em um dos hooks desabilitados (useQuery ou useBusinessHoursRealtime).
-  if (false) { // Mantendo o LoadingSpinner original para evitar quebras
+  if (isLoadingMenu || isLoadingHours) {
     return <LoadingSpinner />;
   }
 
+  if (isErrorMenu || !menuData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="max-w-lg w-full text-center">
+          <Alert variant="destructive">
+            <Terminal className="h-4 w-4" />
+            <AlertTitle>Erro ao carregar cardápio</AlertTitle>
+            <AlertDescription>
+              {errorMenu instanceof Error ? errorMenu.message : "Ocorreu um erro desconhecido ao buscar os dados do restaurante."}
+            </AlertDescription>
+            <Button onClick={() => refetch()} className="mt-3" variant="secondary" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" /> Tentar Novamente
+            </Button>
+          </Alert>
+        </Card>
+      </div>
+    );
+  }
+
+  // Acessamos os dados aqui, após a verificação de carregamento e erro
+  const restaurant = menuData.restaurant;
+  const categories = menuData.categories;
+  
+  // 4. Lógica de Filtragem
+  const filteredCategories = useMemo(() => {
+    // Garante que categories é um array antes de usar
+    const allCategories = categories || []; 
+    const term = searchTerm.toLowerCase().trim();
+    
+    if (!term) {
+      // Se não houver termo de pesquisa, retorna todas as categorias com produtos disponíveis
+      return allCategories.map(category => ({
+        ...category,
+        products: category.products.filter(p => p.is_available),
+      })).filter(category => category.products.length > 0);
+    }
+
+    // Filtra produtos e categorias com base no termo
+    return allCategories.map(category => {
+      const filteredProducts = category.products.filter(product => 
+        product.is_available && 
+        (product.name.toLowerCase().includes(term) || 
+         product.description?.toLowerCase().includes(term))
+      );
+      return {
+        ...category,
+        products: filteredProducts,
+      };
+    }).filter(category => category.products.length > 0);
+    
+  }, [categories, searchTerm]);
+  
   const isSearching = searchTerm.length > 0;
-  const availableCategories = filteredCategories;
+  const availableCategories = filteredCategories; // Usamos o resultado filtrado/disponível
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -219,23 +270,7 @@ const Menu = () => {
           
           {/* Restaurant Info (Status, Address, Phone) */}
           <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            {/* Usando mock para BusinessStatus */}
-            <div className="space-y-3 text-center">
-                <div className="flex items-center justify-center text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
-                    <span className="truncate max-w-full">Endereço de Teste</span>
-                </div>
-                <div className="flex items-center justify-center text-sm font-medium">
-                    <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-                        <CheckCircle className="h-4 w-4" />
-                        <span>Aberto Agora</span>
-                    </div>
-                    <div className="ml-4 flex items-center text-muted-foreground">
-                        <Clock className="h-4 w-4 mr-1" />
-                        <span>{todayHours}</span>
-                    </div>
-                </div>
-            </div>
+            <BusinessStatus restaurant={restaurant} hours={realtimeHours} />
             
             {/* NOVO: Telefone do Restaurante */}
             {restaurant.phone && (
