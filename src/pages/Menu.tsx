@@ -186,8 +186,9 @@ const Menu = () => {
     );
   }
 
-  // Desestruturação segura após a verificação de erro/loading
-  const { restaurant, categories } = menuData;
+  // Acessamos os dados aqui, após a verificação de carregamento e erro
+  const restaurant = menuData.restaurant;
+  const categories = menuData.categories;
   
   // 4. Lógica de Filtragem
   const filteredCategories = useMemo(() => {
