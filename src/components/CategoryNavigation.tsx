@@ -16,14 +16,10 @@ export const CategoryNavigation = ({ categories }: CategoryNavigationProps) => {
   const handleScrollToCategory = useCallback((categoryId: string) => {
     const element = document.getElementById(`category-${categoryId}`);
     if (element) {
-      // Calcula o offset para compensar o cabeçalho fixo (aprox. 100px)
-      const headerOffset = 100; 
-      const elementPosition = element.getBoundingClientRect().top + window.scrollY;
-      const offsetPosition = elementPosition - headerOffset;
-
-      window.scrollTo({
-        top: offsetPosition,
+      // Usamos scrollIntoView que respeita o scroll-margin-top definido na seção
+      element.scrollIntoView({
         behavior: 'smooth',
+        block: 'start', // Rola para o início do elemento
       });
       
       // Atualiza o estado ativo imediatamente após o clique

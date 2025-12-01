@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, Enums } from '@/integrations/supabase/types';
@@ -128,29 +128,26 @@ const Menu = () => {
     staleTime: 0,
   });
 
-  // 4. Lógica de Status de Negócio (usando useMemo)
+  // 4. Lógica de Status de Negócio
   const { isOpen, todayHours } = useMemo(() => {
     if (realtimeHours && realtimeHours.length > 0) {
       return getBusinessStatus(realtimeHours);
     }
-    // Fallback se não houver horários configurados
     return { isOpen: true, todayHours: 'Horário não configurado' };
   }, [realtimeHours]);
   
-  // 5. Lógica de Filtragem (useMemo que causava o erro 310)
+  // 5. Lógica de Filtragem
   const filteredCategories = useMemo(() => {
     const categories = menuData?.categories || [];
     const term = searchTerm.toLowerCase().trim();
     
     if (!term) {
-      // Retorna todas as categorias com produtos disponíveis
       return categories.map(category => ({
         ...category,
         products: category.products.filter(p => p.is_available),
       })).filter(category => category.products.length > 0);
     }
 
-    // Filtra produtos e categorias com base no termo
     return categories.map(category => {
       const filteredProducts = category.products.filter(product => 
         product.is_available && 
@@ -163,7 +160,7 @@ const Menu = () => {
       };
     }).filter(category => category.products.length > 0);
     
-  }, [menuData?.categories, searchTerm]); // Dependências simplificadas
+  }, [menuData?.categories, searchTerm]);
   
   // Determina se o checkout deve ser bloqueado
   const isCheckoutBlocked = !isOpen;
@@ -171,8 +168,7 @@ const Menu = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success("Você saiu da sua conta.");
-    // Redireciona para a página de autenticação do cliente
-    window.location.reload(); // Força o recarregamento para limpar o estado do cliente
+    window.location.reload();
   };
 
   if (!restaurantId) {
@@ -212,9 +208,8 @@ const Menu = () => {
     );
   }
 
-  // Acessamos os dados aqui, após a verificação de carregamento e erro
   const restaurant = menuData.restaurant;
-  const availableCategories = filteredCategories; // Usamos o resultado filtrado/disponível
+  const availableCategories = filteredCategories;
   
   const isSearching = searchTerm.length > 0;
 
@@ -319,9 +314,10 @@ const Menu = () => {
             {availableCategories.map(category => (
               <section 
                 key={category.id} 
-                // Adiciona o ID apenas se não estiver pesquisando, para evitar conflito com a rolagem
-                id={!isSearching ? `category-${category.id}` : undefined} 
-                className={cn("scroll-mt-20", isSearching && "pt-0")}
+                // Aplica o ID para rolagem
+                id={`category-${category.id}`} 
+                // Remove a classe scroll-mt-20 que estava causando conflito
+                className={cn("scroll-mt-[100px]", isSearching && "pt-0")} 
               >
                 <h2 className="text-3xl font-bold mb-6 border-b pb-2">
                   {isSearching ? 'Resultados da Pesquisa' : category.name}
