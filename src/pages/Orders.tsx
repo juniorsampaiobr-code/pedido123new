@@ -406,7 +406,7 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
             onDelete={handleDelete}
             isSelected={selectedOrders.includes(order.id)}
             onSelect={handleSelectOrder}
-            onPrint={handlePrintOrder}
+            onPrint={onPrint} {/* CORRIGIDO: Passando onPrint como prop */}
           />
         ))}
       </div>
@@ -451,7 +451,7 @@ const Orders = () => {
     return data;
   };
 
-  // Função para imprimir pedido
+  // Função para imprimir pedido (Definida no componente Orders)
   const handlePrintOrder = async (order: Order) => {
     try {
       // 1. Buscar itens do pedido
@@ -637,7 +637,7 @@ const Orders = () => {
                   selectedOrders={selectedOrders}
                   setSelectedOrders={setSelectedOrders}
                   totalOrdersInView={selectedOrders.length}
-                  onPrint={handlePrintOrder}
+                  onPrint={handlePrintOrder} {/* CORRIGIDO: Passando a função aqui */}
                 />
               </TabsContent>
             ))}
