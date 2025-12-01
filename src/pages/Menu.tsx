@@ -23,7 +23,6 @@ import { Card } from '@/components/ui/card'; // Added missing import
 import { cn } from '@/lib/utils';
 import { CategoryNavigation } from '@/components/CategoryNavigation';
 import { Input } from '@/components/ui/input'; // Importando Input
-// import { useDebounce } from '@/hooks/useDebounce'; // Removendo useDebounce
 
 type Restaurant = Tables<'restaurants'>;
 type Category = Tables<'categories'>;
@@ -109,9 +108,8 @@ const Menu = () => {
   const { data: user } = useAuthStatus(); // Obtém o status de autenticação
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   
-  // NOVO ESTADO DE PESQUISA (MANTIDO, mas sem debounce)
+  // NOVO ESTADO DE PESQUISA
   const [searchTerm, setSearchTerm] = useState('');
-  // const debouncedSearchTerm = useDebounce(searchTerm, 300); // REMOVIDO
 
   // 1. Busca dados estáticos do menu (restaurante, categorias, produtos)
   const { data: menuData, isLoading: isLoadingMenu, isError: isErrorMenu, error: errorMenu, refetch } = useQuery<MenuData>({
