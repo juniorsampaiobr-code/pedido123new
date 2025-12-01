@@ -16,8 +16,8 @@ export const CategoryNavigation = ({ categories }: CategoryNavigationProps) => {
   const handleScrollToCategory = useCallback((categoryId: string) => {
     const element = document.getElementById(`category-${categoryId}`);
     if (element) {
-      // Rola suavemente para o elemento, ajustando o offset para o cabeçalho fixo
-      const headerOffset = 120; // Altura aproximada do header + navegação
+      // Calcula o offset para compensar o cabeçalho fixo (aprox. 100px)
+      const headerOffset = 100; 
       const elementPosition = element.getBoundingClientRect().top + window.scrollY;
       const offsetPosition = elementPosition - headerOffset;
 
@@ -25,12 +25,15 @@ export const CategoryNavigation = ({ categories }: CategoryNavigationProps) => {
         top: offsetPosition,
         behavior: 'smooth',
       });
+      
+      // Atualiza o estado ativo imediatamente após o clique
       setActiveCategory(categoryId);
     }
   }, []);
   
   // Efeito para detectar a categoria visível e atualizar o estado ativo
   useEffect(() => {
+    // Define o rootMargin para compensar a altura do cabeçalho fixo (aprox. 100px)
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach(entry => {
@@ -42,7 +45,8 @@ export const CategoryNavigation = ({ categories }: CategoryNavigationProps) => {
         });
       },
       {
-        rootMargin: '-120px 0px -50% 0px', // Ajusta a área de intersecção para o topo da tela
+        // Ajusta a área de intersecção para o topo da tela, compensando o header fixo
+        rootMargin: '-100px 0px -50% 0px', 
         threshold: 0,
       }
     );
