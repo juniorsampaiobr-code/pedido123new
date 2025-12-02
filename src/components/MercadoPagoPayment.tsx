@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { initMercadoPago } from '@mercadopago/sdk-react'; // Removendo Wallet
+import { initMercadoPago } from '@mercadopago/sdk-react';
 import { useMercadoPagoPublicKey } from '@/hooks/use-mercado-pago-settings';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ export const MercadoPagoPayment = ({ preferenceId, initPoint, onClose }: Mercado
     // Se o initPoint estiver disponível, redireciona imediatamente
     if (initPoint) {
         console.log("Redirecionando para o Mercado Pago:", initPoint);
+        // Redireciona o usuário
         window.location.href = initPoint;
     }
     
@@ -49,7 +50,8 @@ export const MercadoPagoPayment = ({ preferenceId, initPoint, onClose }: Mercado
     );
   }
   
-  // Se chegarmos aqui, significa que estamos esperando o redirecionamento
+  // Se chegarmos aqui, significa que a chave pública foi carregada, e estamos esperando o redirecionamento
+  // (que deve ter sido iniciado no useEffect se initPoint estiver presente)
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
