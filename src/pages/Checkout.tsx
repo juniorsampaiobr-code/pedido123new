@@ -27,6 +27,7 @@ import { CustomerProfileModal } from '@/components/CustomerProfileModal';
 import { MercadoPagoPayment } from '@/components/MercadoPagoPayment';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
 import { ClientLocationMap } from '@/components/ClientLocationMap';
+import { OnlinePaymentWarningModal } from '@/components/OnlinePaymentWarningModal'; // NOVO IMPORT
 import { cn } from '@/lib/utils';
 import {
   Form,
@@ -35,7 +36,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form'; // CORRIGIDO: Importando componentes do Form
+} from '@/components/ui/form';
 
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
@@ -163,6 +164,11 @@ const Checkout = () => {
   
   // NOVO ESTADO: Rastreia se o endereço foi salvo/validado
   const [isAddressSaved, setIsAddressSaved] = useState(false);
+  
+  // NOVO ESTADO: Controla o modal de aviso de pagamento online
+  const [isOnlineWarningModalOpen, setIsOnlineWarningModalOpen] = useState(false);
+  // NOVO ESTADO: Armazena o ID do método de pagamento online selecionado
+  const [pendingOnlinePaymentId, setPendingOnlinePaymentId] = useState<string | null>(null);
   
   // DEBUG: Loga o status do usuário
   useEffect(() => {
@@ -845,6 +851,29 @@ const Checkout = () => {
     toast.success("Você saiu da sua conta.");
     navigate('/auth', { replace: true });
   };
+  
+  // NOVO: Função para lidar com a mudança de método de pagamento
+  const handlePaymentMethodChange = (newMethodId: string, isOnline: boolean, isMpConfigured: boolean) => {
+    if (isOnline && isMpConfigured) {
+      // 1. Armazena o ID pendente
+      setPendingOnlinePaymentId(newMethodId);
+      // 2. Abre o modal de aviso
+      setIsOnlineWarningModalOpen(true);
+    } else {
+      // Se não for online ou não estiver configurado, define o valor diretamente
+      form.setValue('payment_method_id', newMethodId, { shouldValidate: true });
+      setPendingOnlinePaymentId(null);
+    }
+  };
+  
+  // NOVO: Função para confirmar o aviso e definir o valor
+  const handleOnlineWarningConfirm = () => {
+    if (pendingOnlinePaymentId) {
+      form.setValue('payment_method_id', pendingOnlinePaymentId, { shouldValidate: true });
+    }
+    setIsOnlineWarningModalOpen(false);
+    setPendingOnlinePaymentId(null);
+  };
 
   // --- Renderização ---
 
@@ -902,6 +931,12 @@ const Checkout = () => {
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         customer={customer}
+      />
+      
+      {/* NOVO MODAL DE AVISO DE PAGAMENTO ONLINE */}
+      <OnlinePaymentWarningModal
+        isOpen={isOnlineWarningModalOpen}
+        onConfirm={handleOnlineWarningConfirm}
       />
       
       {/* Componente de Pagamento Mercado Pago (abre o modal/redirect) */}
@@ -1162,24 +1197,27 @@ const Checkout = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {/* NOVO AVISO: Informando sobre o fluxo do Pix */}
-                {isOnlinePayment && (
-                    <Alert variant="default" className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 text-blue-700">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Atenção ao Pagamento Online</AlertTitle>
-                        <AlertDescription className="text-xs">
-                            Se você escolher PIX, o Mercado Pago exibirá o QR Code. Após pagar, você pode precisar clicar em "Voltar ao site" para finalizar o pedido.
-                        </AlertDescription>
-                    </Alert>
-                )}
+                {/* REMOVIDO O AVISO FIXO */}
                 <Controller
                   name="payment_method_id"
                   control={form.control}
                   render={({ field }) => (
-                    <RadioGroup onValueChange={field.onChange} value={field.value} className="space-y-3">
+                    <RadioGroup 
+                      onValueChange={(newMethodId) => {
+                        const method = paymentMethods?.find(m => m.id === newMethodId);
+                        const isOnline = method?.name?.includes('online');
+                        const isMpConfigured = !!mpPublicKey && mpPublicKey.trim() !== '';
+                        
+                        handlePaymentMethodChange(newMethodId, !!isOnline, isMpConfigured);
+                      }} 
+                      value={field.value} 
+                      className="space-y-3"
+                    >
                       {paymentMethods?.map(method => {
+                        const isMpOnline = method.name?.includes('online');
                         // CORRIGIDO: Verifica se mpPublicKey é nulo ou vazio
-                        const isMpOnline = method.name?.includes('online') && (!mpPublicKey || mpPublicKey.trim() === '');
+                        const isMpConfigured = !!mpPublicKey && mpPublicKey.trim() !== '';
+                        const isDisabled = isMpOnline && !isMpConfigured;
                         
                         return (
                           <Label 
@@ -1187,15 +1225,15 @@ const Checkout = () => {
                             htmlFor={method.id} 
                             className={cn(
                               "flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer",
-                              isMpOnline && "opacity-50 cursor-not-allowed"
+                              isDisabled && "opacity-50 cursor-not-allowed"
                             )}
                           >
                             <div className="flex items-center space-x-3">
-                              <RadioGroupItem value={method.id} id={method.id} disabled={isMpOnline} />
+                              <RadioGroupItem value={method.id} id={method.id} disabled={isDisabled} />
                               <div>
                                 <p className="font-medium" translate="no">{method.name}</p>
                                 <p className="text-xs text-muted-foreground">{method.description}</p>
-                                {isMpOnline && (
+                                {isDisabled && (
                                   <p className="text-xs text-destructive mt-1">Pagamento online indisponível (Chave Pública não configurada).</p>
                                 )}
                               </div>
