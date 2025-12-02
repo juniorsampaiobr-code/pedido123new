@@ -1162,6 +1162,16 @@ const Checkout = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                {/* NOVO AVISO: Informando sobre o fluxo do Pix */}
+                {isOnlinePayment && (
+                    <Alert variant="default" className="mb-4 bg-blue-50 dark:bg-blue-900/20 border-blue-200 text-blue-700">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Atenção ao Pagamento Online</AlertTitle>
+                        <AlertDescription className="text-xs">
+                            Se você escolher PIX, o Mercado Pago exibirá o QR Code. Após pagar, você pode precisar clicar em "Voltar ao site" para finalizar o pedido.
+                        </AlertDescription>
+                    </Alert>
+                )}
                 <Controller
                   name="payment_method_id"
                   control={form.control}
