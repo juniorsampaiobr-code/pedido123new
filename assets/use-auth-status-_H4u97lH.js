@@ -1,1 +1,0 @@
-import{b as u}from"./tanstack-Ch7Ewlpa.js";import{s as a}from"./client-3S0ugJ5L.js";const r=()=>u({queryKey:["authStatus"],queryFn:async()=>{const{data:{session:t}}=await a.auth.getSession();return(t==null?void 0:t.user)||null},staleTime:1/0});export{r as u};
