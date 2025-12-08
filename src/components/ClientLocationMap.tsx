@@ -15,8 +15,8 @@ const ClientLocationMapComponent = ({ latitude, longitude, address, className }:
   const markerPosition: [number, number] = useMemo(() => [latitude, longitude], [latitude, longitude]);
   const mapCenter: [number, number] = useMemo(() => [latitude, longitude], [latitude, longitude]);
 
-  // Chave única para forçar re-renderização do mapa quando as coordenadas mudarem
-  const mapKey = useMemo(() => `client-location-${latitude.toFixed(6)}-${longitude.toFixed(6)}`, [latitude, longitude]);
+  // Removendo mapKey, pois LazyMap agora lida com a atualização de props
+  // const mapKey = useMemo(() => `client-location-${latitude.toFixed(6)}-${longitude.toFixed(6)}`, [latitude, longitude]);
 
   return (
     <Card className={cn("w-full", className)}>
@@ -30,7 +30,6 @@ const ClientLocationMapComponent = ({ latitude, longitude, address, className }:
       <CardContent className="p-0">
         <div className="h-64 w-full rounded-b-lg overflow-hidden">
           <LazyMap
-            key={mapKey}
             center={mapCenter}
             markerPosition={markerPosition}
             onMarkerDragEnd={() => {}} // Não permitimos arrastar neste contexto

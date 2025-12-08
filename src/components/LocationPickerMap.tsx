@@ -18,7 +18,8 @@ const LocationPickerMap = ({ initialLat, initialLng, onLocationChange }: Locatio
     onLocationChange(lat, lng);
   }, [onLocationChange]);
 
-  const mapKey = useMemo(() => `picker-${initialLat}-${initialLng}`, [initialLat, initialLng]);
+  // Removendo mapKey, pois LazyMap agora lida com a atualização de props
+  // const mapKey = useMemo(() => `picker-${initialLat}-${initialLng}`, [initialLat, initialLng]);
 
   return (
     <Card>
@@ -31,7 +32,6 @@ const LocationPickerMap = ({ initialLat, initialLng, onLocationChange }: Locatio
       <CardContent className="space-y-4">
         <div className="h-80 w-full rounded-lg overflow-hidden border">
           <LazyMap 
-            key={mapKey}
             center={currentPosition}
             markerPosition={currentPosition}
             onMarkerDragEnd={handleDragEnd}

@@ -10,7 +10,6 @@ import { Tables } from '@/integrations/supabase/types';
 type Restaurant = Tables<'restaurants'>;
 
 interface MapLocationSectionProps {
-  mapKey: string;
   markerPosition: [number, number];
   onLocationChange: (lat: number, lng: number) => void;
   updateAddressFields: (address: any) => void;
@@ -18,7 +17,6 @@ interface MapLocationSectionProps {
 }
 
 const MapLocationSectionComponent = ({
-  mapKey,
   markerPosition,
   onLocationChange,
   updateAddressFields,
@@ -33,6 +31,11 @@ const MapLocationSectionComponent = ({
     const [lat, lng] = markerPosition;
     
     try {
+      // Usando a API de Geocodificação Reversa do Google Maps (se a chave for válida)
+      // Se a chave do Google Maps estiver configurada, podemos usar o serviço do Google.
+      // No entanto, para manter a simplicidade e evitar dependências complexas de SDK no frontend,
+      // vamos manter a chamada ao Nominatim (OpenStreetMap) para a geocodificação reversa,
+      // pois ela é gratuita e já está implementada, mas o mapa será do Google.
       const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
       
       const response = await fetch(nominatimUrl);
@@ -76,7 +79,6 @@ const MapLocationSectionComponent = ({
       <CardContent className="space-y-4">
         <div className="h-80 w-full rounded-lg overflow-hidden border">
           <LazyMap 
-            key={mapKey}
             center={markerPosition}
             markerPosition={markerPosition}
             onMarkerDragEnd={onLocationChange}
