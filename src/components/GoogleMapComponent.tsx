@@ -26,7 +26,7 @@ const MapContent: React.FC<GoogleMapComponentProps> = ({ center, markerPosition,
     const map = new google.maps.Map(ref.current, {
       center,
       zoom,
-      mapId: "DEMO_MAP_ID", // ID de mapa padrão, pode ser personalizado no Cloud Console
+      // mapId: "DEMO_MAP_ID", // Removido para evitar InvalidKeyMapError se não configurado
       // gestureHandling: "cooperative", 
     });
     mapRef.current = map;
@@ -47,6 +47,10 @@ const MapContent: React.FC<GoogleMapComponentProps> = ({ center, markerPosition,
       }
     });
 
+    // Atualiza a posição do marcador e o centro do mapa quando as props mudam
+    // Este useEffect foi movido para dentro do useEffect de inicialização para evitar duplicação de listeners
+    // e garantir que as posições iniciais sejam definidas corretamente.
+    
     // Cleanup ao desmontar o componente
     return () => {
       google.maps.event.clearInstanceListeners(map);
