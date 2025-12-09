@@ -17,35 +17,70 @@ const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
  * Geocodifica um endereço e valida os componentes.
  * 
  * @param address - Endereço completo (Rua, Número, Bairro, Cidade, CEP)
- * @param expectedComponents - Componentes esperados para validação (bairro, cidade) - AGORA IGNORADO
  * @returns Promise com { lat: number, lng: number } ou null se falhar.
  */
 export const geocodeAddress = async (
   address: string,
-  expectedComponents?: { neighborhood?: string; city?: string }
 ): Promise<{ lat: number; lng: number } | null> => {
   const sanitizedAddress = address.replace(/\s+/g, ' ').trim();
-  const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(sanitizedAddress)}&limit=1&addressdetails=1`;
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
-    console.log("LOG: geocodeAddress - URL da API:", nominatimUrl);
+    let data: any;
+    let source = 'Nominatim';
+
+    if (apiKey) {
+      // Tenta usar a API de Geocodificação do Google Maps (mais precisa)
+      source = 'Google Maps Geocoding';
+      const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(sanitizedAddress)}&key=${apiKey}`;
+      
+      console.log("LOG: geocodeAddress - URL da API (Google):", googleUrl);
+      const response = await fetch(googleUrl, { signal: controller.signal });
+      
+      if (!response.ok) {
+        console.error("LOG: geocodeAddress (Google) - Resposta da API não OK. Status:", response.status);
+        // Se o Google falhar, tenta o Nominatim como fallback
+      } else {
+        data = await response.json();
+        
+        if (data.status === 'OK' && data.results && data.results.length > 0) {
+          const location = data.results[0].geometry.location;
+          const lat = location.lat;
+          const lon = location.lng;
+          
+          if (Number.isFinite(lat) && Number.isFinite(lon)) {
+            console.log(`LOG: geocodeAddress (${source}) - Geocodificação bem-sucedida. Coordenadas:`, [lat, lon]);
+            clearTimeout(timeoutId);
+            return { lat, lng: lon };
+          }
+        }
+        
+        // Se o Google falhar na busca (e.g., ZERO_RESULTS), cai para o Nominatim
+        console.warn(`LOG: geocodeAddress (Google) - Falha na busca. Status: ${data.status}. Tentando Nominatim.`);
+      }
+    }
+
+    // Fallback para Nominatim (OpenStreetMap)
+    source = 'Nominatim';
+    const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(sanitizedAddress)}&limit=1&addressdetails=1`;
+
+    console.log("LOG: geocodeAddress - URL da API (Nominatim):", nominatimUrl);
     const response = await fetch(nominatimUrl, {
       signal: controller.signal,
       headers: {
-        // É uma boa prática identificar o aplicativo
         'User-Agent': 'Pedido123-App/1.0 (https://juniorsampaiobr-code.github.io/pedido123new/)'
       }
     });
 
     if (!response.ok) {
-      console.error("LOG: geocodeAddress - Resposta da API não OK. Status:", response.status);
+      console.error("LOG: geocodeAddress (Nominatim) - Resposta da API não OK. Status:", response.status);
       return null;
     }
 
-    const data = await response.json();
+    data = await response.json();
 
     if (data && Array.isArray(data) && data.length > 0) {
       const result = data[0];
@@ -53,11 +88,8 @@ export const geocodeAddress = async (
       const lon = parseFloat(result.lon);
 
       if (Number.isFinite(lat) && Number.isFinite(lon)) {
-        console.log("LOG: geocodeAddress - Geocodificação bem-sucedida. Coordenadas:", [lat, lon]);
-        
-        // Removemos a validação estrita de bairro/cidade aqui.
-        // Apenas garantimos que as coordenadas foram encontradas.
-
+        console.log(`LOG: geocodeAddress (${source}) - Geocodificação bem-sucedida. Coordenadas:`, [lat, lon]);
+        clearTimeout(timeoutId);
         return { lat, lng: lon };
       }
     }
