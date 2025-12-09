@@ -35,7 +35,20 @@ export const geocodeAddress = async (
     if (apiKey) {
       // Tenta usar a API de Geocodificação do Google Maps (mais precisa)
       source = 'Google Maps Geocoding';
-      const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(sanitizedAddress)}&key=${apiKey}`;
+      
+      // 1. Remove o CEP da string de busca para o Google Maps (melhora a precisão)
+      // O CEP é o último componente após a última vírgula, se for numérico.
+      const parts = sanitizedAddress.split(',').map(p => p.trim());
+      const lastPart = parts[parts.length - 1];
+      const isZipCode = /^\d{5}-?\d{3}$/.test(lastPart.replace(/\s/g, ''));
+      
+      let googleAddress = sanitizedAddress;
+      if (isZipCode && parts.length > 1) {
+          googleAddress = parts.slice(0, parts.length - 1).join(', ');
+      }
+      
+      // 2. Adiciona o parâmetro de região (Brasil)
+      const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(googleAddress)}&region=br&key=${apiKey}`;
       
       console.log("LOG: geocodeAddress - URL da API (Google):", googleUrl);
       const response = await fetch(googleUrl, { signal: controller.signal });
