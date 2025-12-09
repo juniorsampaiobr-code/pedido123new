@@ -26,6 +26,9 @@ jobs:
 
       - name: Build project
         run: npm run build
+        env:
+          # Injeta a chave de API do Google Maps usando o Secret do GitHub
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
 
       # Passo de Deploy que cria/atualiza a branch gh-pages
       - name: Deploy to GitHub Pages
