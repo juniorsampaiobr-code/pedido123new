@@ -46,6 +46,10 @@ export const geocodeAddress = async (
       } else {
         data = await response.json();
         
+        if (data.status === 'REQUEST_DENIED') {
+            console.error("LOG: Google Maps Geocoding API retornou REQUEST_DENIED. Verifique se a 'Geocoding API' está ativada e se as restrições da chave estão corretas.");
+        }
+        
         if (data.status === 'OK' && data.results && data.results.length > 0) {
           const location = data.results[0].geometry.location;
           const lat = location.lat;
@@ -58,7 +62,7 @@ export const geocodeAddress = async (
           }
         }
         
-        // Se o Google falhar na busca (e.g., ZERO_RESULTS), cai para o Nominatim
+        // Se o Google falhar na busca (e.g., ZERO_RESULTS ou REQUEST_DENIED), cai para o Nominatim
         console.warn(`LOG: geocodeAddress (Google) - Falha na busca. Status: ${data.status}. Tentando Nominatim.`);
       }
     }
