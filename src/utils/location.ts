@@ -39,11 +39,14 @@ export const geocodeAddress = async (
       // 1. Remove o CEP da string de busca para o Google Maps (melhora a precisão)
       // O CEP é o último componente após a última vírgula, se for numérico.
       const parts = sanitizedAddress.split(',').map(p => p.trim());
+      
+      // Verifica se o último componente parece ser um CEP (5 dígitos + '-' + 3 dígitos)
       const lastPart = parts[parts.length - 1];
       const isZipCode = /^\d{5}-?\d{3}$/.test(lastPart.replace(/\s/g, ''));
       
       let googleAddress = sanitizedAddress;
       if (isZipCode && parts.length > 1) {
+          // Remove o CEP da string de busca
           googleAddress = parts.slice(0, parts.length - 1).join(', ');
       }
       
