@@ -474,7 +474,7 @@ const Checkout = () => {
   
   // 4. Mutação para salvar APENAS o endereço (chamada pelo botão Salvar Endereço)
   const saveAddressMutation = useMutation({
-    mutationFn: async (data: AddressFormValues & { lat: number, lng: number, fee: number, time: [number, number] | null }): Promise<Customer> => {
+    mutationFn: async (data: AddressFormValues & { lat: number, lng: number, fee: number, time: [number, number] | null, isValid: boolean }): Promise<Customer> => {
       const userAuth = await supabase.auth.getUser();
       const userId = userAuth.data.user?.id;
       
@@ -1206,6 +1206,7 @@ const Checkout = () => {
                       onValueChange={(newMethodId) => {
                         const method = paymentMethods?.find(m => m.id === newMethodId);
                         const isOnline = method?.name?.includes('online');
+                        // CORREÇÃO: Verifica se mpPublicKey é nulo ou vazio
                         const isMpConfigured = !!mpPublicKey && mpPublicKey.trim() !== '';
                         
                         handlePaymentMethodChange(newMethodId, !!isOnline, isMpConfigured);
