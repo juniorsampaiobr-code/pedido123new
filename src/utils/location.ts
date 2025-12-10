@@ -47,8 +47,8 @@ export const geocodeAddress = async (
           googleAddress = parts.slice(0, parts.length - 1).join(', ');
       }
       
-      // 2. Adiciona o parâmetro de região (Brasil)
-      const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(googleAddress)}&region=br&key=${apiKey}`;
+      // 2. Adiciona o parâmetro de componentes (país: Brasil)
+      const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(googleAddress)}&components=country:BR&key=${apiKey}`;
       
       console.log("LOG: geocodeAddress - URL da API (Google):", googleUrl);
       const response = await fetch(googleUrl, { signal: controller.signal });
