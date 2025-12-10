@@ -13,7 +13,13 @@ interface GoogleMapComponentProps {
 }
 
 // Componente interno que renderiza o mapa e o marcador
-const MapContent: React.FC<GoogleMapComponentProps> = ({ center, markerPosition, onMarkerDragEnd, zoom, className }) => {
+const MapContent: React.FC<GoogleMapComponentProps> = ({ 
+  center, 
+  markerPosition, 
+  onMarkerDragEnd, 
+  zoom,
+  className 
+}) => {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markerRef = useRef<google.maps.Marker | null>(null);
@@ -26,9 +32,8 @@ const MapContent: React.FC<GoogleMapComponentProps> = ({ center, markerPosition,
     const map = new google.maps.Map(ref.current, {
       center,
       zoom,
-      // mapId: "DEMO_MAP_ID", // Removido para evitar InvalidKeyMapError se não configurado
-      // gestureHandling: "cooperative", 
     });
+    
     mapRef.current = map;
 
     // Cria o marcador
@@ -37,6 +42,7 @@ const MapContent: React.FC<GoogleMapComponentProps> = ({ center, markerPosition,
       map,
       draggable: true,
     });
+    
     markerRef.current = marker;
 
     // Listener para o evento de arrastar o marcador
@@ -47,10 +53,6 @@ const MapContent: React.FC<GoogleMapComponentProps> = ({ center, markerPosition,
       }
     });
 
-    // Atualiza a posição do marcador e o centro do mapa quando as props mudam
-    // Este useEffect foi movido para dentro do useEffect de inicialização para evitar duplicação de listeners
-    // e garantir que as posições iniciais sejam definidas corretamente.
-    
     // Cleanup ao desmontar o componente
     return () => {
       google.maps.event.clearInstanceListeners(map);
@@ -67,7 +69,7 @@ const MapContent: React.FC<GoogleMapComponentProps> = ({ center, markerPosition,
       mapRef.current.setCenter(newPosition);
       mapRef.current.setZoom(zoom);
     }
-  }, [markerPosition, zoom]);
+  }, [markerPosition, zoom, center]);
 
   return <div ref={ref} className={className} style={{ height: '100%', width: '100%' }} />;
 };
