@@ -30,10 +30,10 @@ const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const restaurantSchema = z.object({
   name: z.string().min(1, 'O nome do restaurante é obrigatório.'),
   description: z.string().optional(),
-  street: z.string().optional(),
+  street: z.string().min(1, 'A rua é obrigatória.'), // TORNADO OBRIGATÓRIO
   number: z.string().min(1, 'O número é obrigatório.'),
-  neighborhood: z.string().optional(),
-  city: z.string().optional(),
+  neighborhood: z.string().min(1, 'O bairro é obrigatório.'), // TORNADO OBRIGATÓRIO
+  city: z.string().min(1, 'A cidade é obrigatória.'), // TORNADO OBRIGATÓRIO
   zip_code: z.string().min(1, 'O CEP é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length === 8, {
     message: 'O CEP deve ter 8 dígitos.',
   }),
