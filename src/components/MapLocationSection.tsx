@@ -1,10 +1,7 @@
-import { memo, useCallback, useMemo, useState, useEffect } from 'react';
+import { memo, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { MapPin, Loader2, RefreshCw } from 'lucide-react';
-import { toast } from 'sonner';
+import { MapPin } from 'lucide-react';
 import { LazyMap } from './LazyMap';
-import { geocodeAddress } from '@/utils/location';
 import { Tables } from '@/integrations/supabase/types';
 
 type Restaurant = Tables<'restaurants'>;
@@ -20,51 +17,6 @@ const MapLocationSectionComponent = ({
   onLocationChange, 
   restaurant,
 }: MapLocationSectionProps) => {
-  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
-  
-  const handleReverseGeocode = useCallback(async () => {
-    setIsReverseGeocoding(true);
-    const loadingToast = toast.loading("Buscando endereço a partir do mapa...");
-    
-    const [lat, lng] = markerPosition;
-    
-    try {
-      // Usando a API de Geocodificação Reversa do Google Maps (se a chave for válida)
-      // Se a chave do Google Maps estiver configurada, podemos usar o serviço do Google.
-      // No entanto, para manter a simplicidade e evitar dependências complexas de SDK no frontend,
-      // vamos manter a chamada ao Nominatim (OpenStreetMap) para a geocodificação reversa,
-      // pois ela é gratuita e já está implementada, mas o mapa será do Google.
-      const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
-      const response = await fetch(nominatimUrl);
-      
-      if (!response.ok) throw new Error("Falha na geocodificação reversa.");
-      
-      const data = await response.json();
-      
-      if (data.address) {
-        // Atualiza os campos do formulário com os dados do endereço
-        const addressFieldsToUpdate = {
-          street: data.address.road || data.address.pedestrian || '',
-          number: data.address.house_number || '',
-          neighborhood: data.address.neighbourhood || data.address.suburb || '',
-          city: data.address.city || data.address.town || data.address.village || '',
-          zip_code: data.address.postcode || '',
-        };
-        
-        // Aqui você pode adicionar uma função de callback para atualizar os campos do formulário
-        // Por enquanto, vamos apenas mostrar uma mensagem
-        toast.success("Endereço atualizado com base na localização do mapa!");
-      } else {
-        toast.warning("Não foi possível encontrar um endereço detalhado para esta localização.");
-      }
-    } catch (error: any) {
-      toast.error(`Erro na busca reversa: ${error.message}`);
-    } finally {
-      setIsReverseGeocoding(false);
-      toast.dismiss(loadingToast);
-    }
-  }, [markerPosition]);
-
   const fullAddress = useMemo(() => {
     return [
       restaurant.street,
@@ -93,22 +45,9 @@ const MapLocationSectionComponent = ({
           />
         </div>
         <div className="flex justify-between items-center">
-          <p className="text-sm text-muted-foreground max-w-[70%] truncate">
+          <p className="text-sm text-muted-foreground max-w-[100%] truncate">
             Endereço atual: {fullAddress || 'N/A'}
           </p>
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={handleReverseGeocode}
-            disabled={isReverseGeocoding}
-          >
-            {isReverseGeocoding ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
-            Atualizar Endereço
-          </Button>
         </div>
       </CardContent>
     </Card>
