@@ -22,6 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MapLocationSection } from '@/components/MapLocationSection';
 import { useOutletContext } from 'react-router-dom';
 import { DashboardContextType } from '@/layouts/DashboardLayout';
+import { geocodeAddress } from '@/utils/location'; // Importando geocodeAddress
 
 type Restaurant = Tables<'restaurants'>;
 
@@ -30,10 +31,10 @@ const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const restaurantSchema = z.object({
   name: z.string().min(1, 'O nome do restaurante é obrigatório.'),
   description: z.string().optional(),
-  street: z.string().min(1, 'A rua é obrigatória.'), // TORNADO OBRIGATÓRIO
+  street: z.string().min(1, 'A rua é obrigatória.'),
   number: z.string().min(1, 'O número é obrigatório.'),
-  neighborhood: z.string().min(1, 'O bairro é obrigatório.'), // TORNADO OBRIGATÓRIO
-  city: z.string().min(1, 'A cidade é obrigatória.'), // TORNADO OBRIGATÓRIO
+  neighborhood: z.string().min(1, 'O bairro é obrigatório.'),
+  city: z.string().min(1, 'A cidade é obrigatória.'),
   zip_code: z.string().min(1, 'O CEP é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length === 8, {
     message: 'O CEP deve ter 8 dígitos.',
   }),
@@ -51,7 +52,7 @@ const restaurantSchema = z.object({
   longitude: z.preprocess(
     (val) => String(val).replace(',', '.'),
     z.coerce.number({ invalid_type_error: 'Longitude deve ser um número.' }).refine(val => val !== null, {
-      message: 'A localização no mapa é obrigatória. Mova o pino no mapa para definir a localização.',
+      message: 'A localização no mapa é obrigatória. Mova o pino no pino para definir a localização.',
     }),
   ),
 });
@@ -75,6 +76,7 @@ const Settings = () => {
   const { userRestaurantId } = useOutletContext<DashboardContextType>();
   const [showMap, setShowMap] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isGeocoding, setIsGeocoding] = useState(false); // Novo estado para geocodificação
 
   const { data: restaurant, isLoading, isError, error } = useQuery<Restaurant>({
     queryKey: ['restaurantSettings', userRestaurantId],
@@ -134,6 +136,10 @@ const Settings = () => {
 
   const lat = form.watch('latitude');
   const lng = form.watch('longitude');
+  
+  // Observa os campos de endereço para acionar a geocodificação
+  const addressFields = form.watch(['street', 'number', 'neighborhood', 'city', 'zip_code']);
+  const [street, number, neighborhood, city, zip_code] = addressFields;
 
   const DEFAULT_CENTER: [number, number] = [-23.55052, -46.633308]; // São Paulo
 
@@ -148,6 +154,55 @@ const Settings = () => {
     form.setValue('latitude', newLat, { shouldValidate: true });
     form.setValue('longitude', newLng, { shouldValidate: true });
   }, [form]);
+  
+  // NOVO: Função para geocodificar o endereço e atualizar o mapa
+  const geocodeAndSetMap = useCallback(async () => {
+    // Verifica se todos os campos obrigatórios estão preenchidos
+    if (!street || !number || !neighborhood || !city || zip_code.replace(/\D/g, '').length !== 8) {
+      return;
+    }
+    
+    const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${zip_code}`;
+    
+    // Evita geocodificar se já estiver processando
+    if (isGeocoding) return;
+    
+    setIsGeocoding(true);
+    const loadingToast = toast.loading("Buscando coordenadas do endereço...");
+
+    try {
+      const coords = await geocodeAddress(fullAddress);
+      
+      if (coords) {
+        // Atualiza os campos de latitude e longitude do formulário
+        form.setValue('latitude', coords.lat, { shouldValidate: true });
+        form.setValue('longitude', coords.lng, { shouldValidate: true });
+        toast.success("Localização do mapa atualizada!");
+      } else {
+        // Se falhar, mantém as coordenadas atuais (ou DEFAULT_CENTER)
+        toast.warning("Não foi possível encontrar o endereço no mapa. Verifique os campos.");
+      }
+    } catch (e) {
+      console.error("Geocoding error:", e);
+      toast.error("Erro ao buscar coordenadas.");
+    } finally {
+      setIsGeocoding(false);
+      toast.dismiss(loadingToast);
+    }
+  }, [street, number, neighborhood, city, zip_code, form, isGeocoding]);
+  
+  // NOVO: Efeito para acionar a geocodificação quando os campos de endereço mudam
+  useEffect(() => {
+    // Aciona a geocodificação com um pequeno debounce (ex: 500ms)
+    const handler = setTimeout(() => {
+      geocodeAndSetMap();
+    }, 500);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [geocodeAndSetMap]);
+
 
   const restaurantMutation = useMutation({
     mutationFn: async (data: RestaurantFormValues) => {
@@ -167,6 +222,8 @@ const Settings = () => {
         is_active: data.is_active,
         latitude: data.latitude,
         longitude: data.longitude,
+        // O campo 'address' é redundante, mas garantimos que os campos individuais estão salvos
+        address: `${data.street}, ${data.number}, ${data.neighborhood}, ${data.city}, ${data.zip_code}`,
       };
 
       const { error: restaurantError } = await supabase
@@ -364,7 +421,6 @@ const Settings = () => {
                   <div className="pt-4 border-t">
                     {showMap && (
                       <MapLocationSection
-                        mapKey={mapKey}
                         markerPosition={markerPosition}
                         onLocationChange={handleMapLocationChange}
                         restaurant={restaurant}
@@ -380,7 +436,7 @@ const Settings = () => {
                         <FormItem>
                           <FormLabel>Latitude *</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="-22.7627908" value={field.value ?? ''} />
+                            <Input {...field} placeholder="-22.7627908" value={field.value ?? ''} disabled={isGeocoding} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -393,7 +449,7 @@ const Settings = () => {
                         <FormItem>
                           <FormLabel>Longitude *</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="-47.408315" value={field.value ?? ''} />
+                            <Input {...field} placeholder="-47.408315" value={field.value ?? ''} disabled={isGeocoding} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -417,8 +473,8 @@ const Settings = () => {
                     )}
                   />
                   
-                  <Button type="submit" className="w-full h-12 text-lg" disabled={restaurantMutation.isPending || !userRestaurantId}>
-                    {restaurantMutation.isPending ? 'Salvando...' : 'Salvar Configurações'}
+                  <Button type="submit" className="w-full h-12 text-lg" disabled={restaurantMutation.isPending || !userRestaurantId || isGeocoding}>
+                    {restaurantMutation.isPending || isGeocoding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Salvar Configurações'}
                   </Button>
                 </form>
               </Form>
