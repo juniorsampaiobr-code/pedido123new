@@ -22,7 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MapLocationSection } from '@/components/MapLocationSection';
 import { useOutletContext } from 'react-router-dom';
 import { DashboardContextType } from '@/layouts/DashboardLayout';
-import { geocodeAddress } from '@/utils/location'; // Importando geocodeAddress
+import { geocodeAddress } from '@/utils/location';
 
 type Restaurant = Tables<'restaurants'>;
 
@@ -76,7 +76,10 @@ const Settings = () => {
   const { userRestaurantId } = useOutletContext<DashboardContextType>();
   const [showMap, setShowMap] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [isGeocoding, setIsGeocoding] = useState(false); // Novo estado para geocodificação
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  
+  // NOVO ESTADO: Armazena o último endereço que foi geocodificado com sucesso
+  const [lastGeocodedAddress, setLastGeocodedAddress] = useState<string | null>(null);
 
   const { data: restaurant, isLoading, isError, error } = useQuery<Restaurant>({
     queryKey: ['restaurantSettings', userRestaurantId],
@@ -112,6 +115,9 @@ const Settings = () => {
 
   useEffect(() => {
     if (restaurant) {
+      const initialZipCode = restaurant.zip_code || '';
+      const initialAddress = `${restaurant.street || ''}, ${restaurant.number || ''}, ${restaurant.neighborhood || ''}, ${restaurant.city || ''}, ${initialZipCode}`;
+      
       form.reset({
         name: restaurant.name || '',
         description: restaurant.description || '',
@@ -119,13 +125,16 @@ const Settings = () => {
         number: restaurant.number || '',
         neighborhood: restaurant.neighborhood || '',
         city: restaurant.city || '',
-        zip_code: restaurant.zip_code || '',
+        zip_code: initialZipCode,
         phone: restaurant.phone || '',
         email: restaurant.email || '',
         is_active: restaurant.is_active ?? true,
         latitude: restaurant.latitude ?? null,
         longitude: restaurant.longitude ?? null,
       });
+      
+      // Define o endereço inicial como o último geocodificado para evitar loop na inicialização
+      setLastGeocodedAddress(initialAddress);
       
       // Mostra o mapa apenas após carregar os dados
       if (restaurant.latitude && restaurant.longitude) {
@@ -137,9 +146,18 @@ const Settings = () => {
   const lat = form.watch('latitude');
   const lng = form.watch('longitude');
   
-  // Observa os campos de endereço para acionar a geocodificação
+  // Observa os campos de endereço
   const addressFields = form.watch(['street', 'number', 'neighborhood', 'city', 'zip_code']);
   const [street, number, neighborhood, city, zip_code] = addressFields;
+  
+  const currentFullAddress = useMemo(() => {
+    const cleanedZip = zip_code.replace(/\D/g, '');
+    if (!street || !number || !neighborhood || !city || cleanedZip.length !== 8) {
+      return null;
+    }
+    return `${street}, ${number}, ${neighborhood}, ${city}, ${cleanedZip}`;
+  }, [street, number, neighborhood, city, zip_code]);
+
 
   const DEFAULT_CENTER: [number, number] = [-23.55052, -46.633308]; // São Paulo
 
@@ -151,35 +169,30 @@ const Settings = () => {
   }, [lat, lng]);
 
   const handleMapLocationChange = useCallback((newLat: number, newLng: number) => {
+    // Quando o usuário arrasta o pino, atualizamos as coordenadas
     form.setValue('latitude', newLat, { shouldValidate: true });
     form.setValue('longitude', newLng, { shouldValidate: true });
+    
+    // IMPORTANTE: Não atualizamos lastGeocodedAddress aqui, pois a mudança veio do mapa, não do texto.
   }, [form]);
   
-  // NOVO: Função para geocodificar o endereço e atualizar o mapa
-  const geocodeAndSetMap = useCallback(async () => {
-    // Verifica se todos os campos obrigatórios estão preenchidos
-    if (!street || !number || !neighborhood || !city || zip_code.replace(/\D/g, '').length !== 8) {
-      return;
-    }
-    
-    const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${zip_code}`;
-    
-    // Evita geocodificar se já estiver processando
-    if (isGeocoding) return;
+  // Função para geocodificar o endereço e atualizar o mapa
+  const geocodeAndSetMap = useCallback(async (address: string) => {
+    if (isGeocoding || address === lastGeocodedAddress) return;
     
     setIsGeocoding(true);
     const loadingToast = toast.loading("Buscando coordenadas do endereço...");
 
     try {
-      const coords = await geocodeAddress(fullAddress);
+      const coords = await geocodeAddress(address);
       
       if (coords) {
         // Atualiza os campos de latitude e longitude do formulário
         form.setValue('latitude', coords.lat, { shouldValidate: true });
         form.setValue('longitude', coords.lng, { shouldValidate: true });
+        setLastGeocodedAddress(address); // Marca o endereço como geocodificado
         toast.success("Localização do mapa atualizada!");
       } else {
-        // Se falhar, mantém as coordenadas atuais (ou DEFAULT_CENTER)
         toast.warning("Não foi possível encontrar o endereço no mapa. Verifique os campos.");
       }
     } catch (e) {
@@ -189,19 +202,24 @@ const Settings = () => {
       setIsGeocoding(false);
       toast.dismiss(loadingToast);
     }
-  }, [street, number, neighborhood, city, zip_code, form, isGeocoding]);
+  }, [isGeocoding, lastGeocodedAddress, form]);
   
-  // NOVO: Efeito para acionar a geocodificação quando os campos de endereço mudam
+  // Efeito para acionar a geocodificação quando os campos de endereço mudam
   useEffect(() => {
-    // Aciona a geocodificação com um pequeno debounce (ex: 500ms)
-    const handler = setTimeout(() => {
-      geocodeAndSetMap();
-    }, 500);
+    if (!currentFullAddress) return;
+    
+    // Verifica se o endereço mudou desde a última geocodificação
+    if (currentFullAddress !== lastGeocodedAddress) {
+      // Aciona a geocodificação com um pequeno debounce (ex: 500ms)
+      const handler = setTimeout(() => {
+        geocodeAndSetMap(currentFullAddress);
+      }, 500);
 
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [geocodeAndSetMap]);
+      return () => {
+        clearTimeout(handler);
+      };
+    }
+  }, [currentFullAddress, lastGeocodedAddress, geocodeAndSetMap]);
 
 
   const restaurantMutation = useMutation({
