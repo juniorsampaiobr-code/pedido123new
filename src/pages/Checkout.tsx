@@ -780,6 +780,7 @@ const Checkout = () => {
     // addressFields: [zip_code, street, number, city, neighborhood]
     const [zip_code, street, number, city, neighborhood] = addressFields;
     
+    // Garante que todos os campos necessários para o endereço completo estão preenchidos
     if (street && number && neighborhood && city && zip_code) {
       // Formato: Rua, Número - Bairro, Cidade, CEP
       return `${street}, ${number} - ${neighborhood}, ${city}, ${zip_code}`;
@@ -1083,7 +1084,7 @@ const Checkout = () => {
                   )}
                   
                   {/* Mapa do Cliente após salvar o endereço */}
-                  {isAddressSaved && customerCoords && (
+                  {isAddressSaved && customerCoords && displayAddress && (
                     <div className="mt-6">
                       <ClientLocationMap 
                         latitude={customerCoords[0]} 
