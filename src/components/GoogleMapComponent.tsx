@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from 'react';
-import { Wrapper, Status } from "@googlemaps/react-wrapper";
 import { LoadingSpinner } from './LoadingSpinner';
 import { toast } from 'sonner';
 
@@ -13,7 +12,7 @@ interface GoogleMapComponentProps {
 }
 
 // Componente interno que renderiza o mapa e o marcador
-const MapContent: React.FC<GoogleMapComponentProps> = ({ 
+export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = ({ 
   center, 
   markerPosition, 
   onMarkerDragEnd, 
@@ -26,12 +25,19 @@ const MapContent: React.FC<GoogleMapComponentProps> = ({
 
   // Inicializa o mapa e o marcador
   useEffect(() => {
-    if (!ref.current) return;
+    if (!ref.current || typeof google === 'undefined' || !google.maps) {
+      // Se o SDK não estiver carregado (o que não deve acontecer se o Wrapper no App.tsx funcionar)
+      return;
+    }
 
     // Cria o mapa
     const map = new google.maps.Map(ref.current, {
       center,
       zoom,
+      // Desabilita controles desnecessários para uma experiência mais limpa
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
     });
     
     mapRef.current = map;
@@ -55,9 +61,13 @@ const MapContent: React.FC<GoogleMapComponentProps> = ({
 
     // Cleanup ao desmontar o componente
     return () => {
-      google.maps.event.clearInstanceListeners(map);
-      google.maps.event.clearInstanceListeners(marker);
-      marker.setMap(null);
+      if (mapRef.current) {
+        google.maps.event.clearInstanceListeners(mapRef.current);
+      }
+      if (markerRef.current) {
+        google.maps.event.clearInstanceListeners(markerRef.current);
+        markerRef.current.setMap(null);
+      }
     };
   }, []); // useEffect vazio roda apenas uma vez na montagem
 
@@ -72,33 +82,4 @@ const MapContent: React.FC<GoogleMapComponentProps> = ({
   }, [markerPosition, zoom, center]);
 
   return <div ref={ref} className={className} style={{ height: '100%', width: '100%' }} />;
-};
-
-// Função de renderização do status
-const render = (status: Status) => {
-  if (status === Status.LOADING) return <LoadingSpinner />;
-  if (status === Status.FAILURE) {
-    toast.error("Falha ao carregar o Google Maps. Verifique a chave de API.");
-    return <div className="flex items-center justify-center h-full text-destructive">Erro ao carregar o mapa.</div>;
-  }
-  return null;
-};
-
-// Componente Wrapper principal que carrega o SDK
-export const GoogleMapComponent: React.FC<GoogleMapComponentProps> = (props) => {
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
-  
-  if (!apiKey) {
-    return (
-      <div className="flex items-center justify-center h-full text-destructive">
-        Erro: Chave VITE_GOOGLE_MAPS_API_KEY não configurada.
-      </div>
-    );
-  }
-
-  return (
-    <Wrapper apiKey={apiKey} render={render} libraries={["places"]}>
-      <MapContent {...props} />
-    </Wrapper>
-  );
 };
