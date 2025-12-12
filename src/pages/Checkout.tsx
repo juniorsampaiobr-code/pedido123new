@@ -415,14 +415,20 @@ const Checkout = () => {
   // 4. Mutação para salvar APENAS o endereço (chamada pelo botão Salvar Endereço)
   const saveAddressMutation = useMutation({
     mutationFn: async (data: AddressFormValues): Promise<{ customer: Customer | null, feeResult: { coords: { lat: number, lng: number } | null, fee: number, time: [number, number] | null, isValid: boolean } }> => {
+      console.log('=== INICIANDO SALVAMENTO DE ENDEREÇO ===');
+      console.log('Dados do endereço:', data);
       // --- 1. Geocodificação e Cálculo de Taxa (Movido para dentro da mutação) ---
       setIsGeocoding(true);
       // Usando os campos individuais para construir o fullAddress
       const fullAddress = `${data.street}, ${data.number}, ${data.neighborhood}, ${data.city}, ${data.zip_code}`;
+      console.log('Endereço completo:', fullAddress);
+      console.log('Iniciando geocodificação...');
       const feeResult = await calculateFee(data.zip_code, data.street, data.number, data.city, data.neighborhood);
       setIsGeocoding(false);
+      console.log('Resultado da geocodificação:', feeResult);
 
       if (!feeResult.isValid) {
+        console.error('Endereço inválido ou fora da área de entrega');
         throw new Error(restaurant?.delivery_enabled === false ? "O endereço está errado ou incompleto, revise todos os campos." : "Endereço fora da área de entrega.");
       }
 
@@ -443,9 +449,18 @@ const Checkout = () => {
       const cleanedPhone = contactPhone.replace(/\D/g, '');
       const cleanedCpfCnpj = contactCpfCnpj.replace(/\D/g, '');
 
-      if (!contactName || cleanedPhone.length < 10 || (cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14)) {
-          throw new Error("Preencha Nome, Telefone (10+ dígitos) e CPF/CNPJ (11 ou 14 dígitos) nos Seus Dados antes de salvar o endereço.");
+      console.log('=== VALIDAÇÃO DE CONTATO ===');
+      console.log('Nome:', contactName);
+      console.log('Telefone limpo:', cleanedPhone, 'Comprimento:', cleanedPhone.length);
+      console.log('CPF/CNPJ limpo:', cleanedCpfCnpj, 'Comprimento:', cleanedCpfCnpj.length);
+
+      if (!contactName || cleanedPhone.length < 10 || !cleanedCpfCnpj || (cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14)) {
+          const errorMsg = "Preencha Nome, Telefone (10+ dígitos) e CPF/CNPJ (11 ou 14 dígitos) nos Seus Dados antes de salvar o endereço.";
+          console.error('ERRO DE VALIDAÇÃO:', errorMsg);
+          throw new Error(errorMsg);
       }
+
+      console.log('Validação de contato passou!');
 
       if (!customer?.id && !userId) {
         // Cliente anônimo: não salvamos o endereço no DB, apenas validamos
@@ -545,9 +560,12 @@ const Checkout = () => {
 
   // Função para lidar com o salvamento do endereço
   const handleSaveAddress = (data: AddressFormValues) => {
+    console.log('=== handleSaveAddress CHAMADO ===');
+    console.log('Dados recebidos:', data);
     // A validação do addressForm já foi feita pelo handleSubmit
     // Agora, precisamos garantir que os campos de contato também estão válidos
     form.trigger(['name', 'phone', 'cpf_cnpj']).then(isContactValid => {
+        console.log('Validação de contato (form.trigger):', isContactValid);
         if (isContactValid) {
             saveAddressMutation.mutate(data);
         } else {
