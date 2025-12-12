@@ -248,7 +248,7 @@ const Checkout = () => {
         return { coords, fee: 0, time: null, isValid: false };
       }
     } else {
-      return { coords: null, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
+      return { coords, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
     }
   }, [restaurant, restaurantCoords, deliveryZones]);
 
@@ -578,13 +578,15 @@ const Checkout = () => {
         zip_code: addressForm.getValues('zip_code') || null,
       };
 
+      let selectColumns = '*'; // Seleção padrão
+
       if (user) {
         if (customer) {
           const { data: updatedCustomer, error: updateError } = await supabase
             .from('customers')
             .update(customerPayload as TablesUpdate<'customers'>)
             .eq('id', customer.id)
-            .select('*') // Simplificando o select
+            .select(selectColumns) // Simplificando o select
             .single();
           if (updateError) throw updateError;
           return updatedCustomer as Customer;
@@ -592,7 +594,7 @@ const Checkout = () => {
           const { data: newCustomer, error: insertError } = await supabase
             .from('customers')
             .insert(customerPayload)
-            .select('*') // Simplificando o select
+            .select(selectColumns) // Simplificando o select
             .single();
           if (insertError) throw insertError;
           return newCustomer as Customer;
@@ -602,7 +604,7 @@ const Checkout = () => {
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(customerPayload)
-          .select('*') // Simplificando o select
+          .select(selectColumns) // Simplificando o select
           .single();
         if (insertError) throw insertError;
         return newCustomer as Customer;
