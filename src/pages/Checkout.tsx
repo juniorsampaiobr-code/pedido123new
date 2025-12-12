@@ -457,10 +457,19 @@ const Checkout = () => {
         return { customer: mockCustomer, feeResult };
       }
 
+      // Validação de contato antes de salvar no DB (para usuários logados ou clientes existentes)
+      const contactName = form.getValues('name');
+      const contactPhone = form.getValues('phone');
+      const contactCpfCnpj = form.getValues('cpf_cnpj');
+      
+      if (!contactName || !contactPhone || !contactCpfCnpj) {
+          throw new Error("Preencha Nome, Telefone e CPF/CNPJ nos Seus Dados antes de salvar o endereço.");
+      }
+
       const customerContactData = {
-        name: form.getValues('name'),
-        phone: form.getValues('phone'),
-        cpf_cnpj: form.getValues('cpf_cnpj') || null,
+        name: contactName,
+        phone: contactPhone.replace(/\D/g, ''),
+        cpf_cnpj: contactCpfCnpj.replace(/\D/g, '') || null,
       };
 
       const addressPayload: TablesInsert<'customers'> = {
@@ -529,8 +538,15 @@ const Checkout = () => {
 
   // Função para lidar com o salvamento do endereço
   const handleSaveAddress = (data: AddressFormValues) => {
-    // A validação já foi feita pelo handleSubmit
-    saveAddressMutation.mutate(data);
+    // A validação do addressForm já foi feita pelo handleSubmit
+    // Agora, precisamos garantir que os campos de contato também estão válidos
+    form.trigger(['name', 'phone', 'cpf_cnpj']).then(isContactValid => {
+        if (isContactValid) {
+            saveAddressMutation.mutate(data);
+        } else {
+            toast.error("Preencha Nome, Telefone e CPF/CNPJ nos Seus Dados antes de salvar o endereço.");
+        }
+    });
   };
 
   const createCustomerMutation = useMutation({
@@ -582,6 +598,7 @@ const Checkout = () => {
           return newCustomer as Customer;
         }
       } else {
+        // Cliente anônimo: usa a nova política de RLS que permite user_id NULL
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(customerPayload)
