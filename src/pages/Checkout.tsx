@@ -40,7 +40,7 @@ import {
 
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
-type Customer = Tables<'customers'>;
+type Customer = Tables<'customers'> & { street: string | null, number: string | null, neighborhood: string | null, city: string | null, zip_code: string | null }; // Adicionando campos de endereço
 type DeliveryZone = Tables<'delivery_zones'>;
 type PaymentMethod = Tables<'payment_methods'>;
 type CartItem = {
@@ -122,16 +122,17 @@ const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[
   return data;
 };
 
+// ATUALIZADO: Buscando colunas de endereço individuais
 const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
   const { data, error } = await supabase
     .from('customers')
-    .select('*')
+    .select('*, street, number, neighborhood, city, zip_code')
     .eq('user_id', userId)
     .limit(1)
     .single();
 
   if (error && error.code !== 'PGRST116') throw new Error(error.message);
-  return data || null;
+  return data as Customer || null;
 };
 
 // --- Componente Principal ---
@@ -351,9 +352,10 @@ const Checkout = () => {
       });
       
       // Se o cliente tem endereço salvo, preenche o formulário de endereço
-      if (customer.address && customer.latitude && customer.longitude) {
-          // Tenta extrair os campos do endereço salvo
-          const zip_code = customer.zip_code || customer.address.match(/\d{5}-?\d{3}$/)?.[0]?.replace(/\D/g, '') || '';
+      // NOVO: Verifica se as colunas individuais de endereço estão preenchidas
+      if (customer.latitude && customer.longitude && customer.street && customer.number && customer.zip_code) {
+          
+          const zip_code = customer.zip_code || '';
           const street = customer.street || '';
           const number = customer.number || '';
           const neighborhood = customer.neighborhood || '';
@@ -486,7 +488,7 @@ const Checkout = () => {
       
       if (!customer?.id && !userId) {
         // Cliente anônimo: não salvamos o endereço no DB, apenas validamos
-        const mockCustomer: Customer = { id: 'anonymous', user_id: null, name: form.getValues('name'), phone: form.getValues('phone'), email: user?.email || null, address: fullAddress, created_at: '', updated_at: '', latitude: feeResult.coords.lat, longitude: feeResult.coords.lng, cpf_cnpj: form.getValues('cpf_cnpj') };
+        const mockCustomer: Customer = { id: 'anonymous', user_id: null, name: form.getValues('name'), phone: form.getValues('phone'), email: user?.email || null, address: fullAddress, created_at: '', updated_at: '', latitude: feeResult.coords.lat, longitude: feeResult.coords.lng, cpf_cnpj: form.getValues('cpf_cnpj'), street: data.street, number: data.number, neighborhood: data.neighborhood, city: data.city, zip_code: data.zip_code };
         return { customer: mockCustomer, feeResult };
       }
       
@@ -519,19 +521,19 @@ const Checkout = () => {
           .from('customers')
           .update(addressPayload as TablesUpdate<'customers'>)
           .eq('id', customer.id)
-          .select()
+          .select('*, street, number, neighborhood, city, zip_code') // Seleciona os campos individuais
           .single();
         if (updateError) throw updateError;
-        savedCustomer = updatedCustomer;
+        savedCustomer = updatedCustomer as Customer;
       } else if (userId) {
         // Cria novo cliente (se logado, mas sem registro em 'customers')
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(addressPayload)
-          .select()
+          .select('*, street, number, neighborhood, city, zip_code') // Seleciona os campos individuais
           .single();
         if (insertError) throw insertError;
-        savedCustomer = newCustomer;
+        savedCustomer = newCustomer as Customer;
       } else {
         // Este caso deve ser coberto pelo bloco 'Cliente anônimo' acima, mas por segurança
         throw new Error('Não foi possível identificar o cliente para salvar.');
@@ -612,6 +614,12 @@ const Checkout = () => {
         address: fullAddress, 
         latitude: customerCoords ? customerCoords[0] : null,
         longitude: customerCoords ? customerCoords[1] : null,
+        // Adicionando campos individuais para consistência
+        street: addressForm.getValues('street') || null,
+        number: addressForm.getValues('number') || null,
+        neighborhood: addressForm.getValues('neighborhood') || null,
+        city: addressForm.getValues('city') || null,
+        zip_code: addressForm.getValues('zip_code') || null,
       };
 
       if (user) {
@@ -620,27 +628,27 @@ const Checkout = () => {
             .from('customers')
             .update(customerPayload as TablesUpdate<'customers'>)
             .eq('id', customer.id)
-            .select()
+            .select('*, street, number, neighborhood, city, zip_code')
             .single();
           if (updateError) throw updateError;
-          return updatedCustomer;
+          return updatedCustomer as Customer;
         } else {
           const { data: newCustomer, error: insertError } = await supabase
             .from('customers')
             .insert(customerPayload)
-            .select()
+            .select('*, street, number, neighborhood, city, zip_code')
             .single();
           if (insertError) throw insertError;
-          return newCustomer;
+          return newCustomer as Customer;
         }
       } else {
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(customerPayload)
-          .select()
+          .select('*, street, number, neighborhood, city, zip_code')
           .single();
         if (insertError) throw insertError;
-        return newCustomer;
+        return newCustomer as Customer;
       }
     },
     onSuccess: () => {
