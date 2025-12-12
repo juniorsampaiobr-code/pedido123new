@@ -160,7 +160,8 @@ const Checkout = () => {
   const [mpPreferenceId, setMpPreferenceId] = useState<string | null>(null);
   const [mpInitPoint, setMpInitPoint] = useState<string | null>(null);
   
-  const [isAddressSaved, setIsAddressSaved] = useState(false);
+  // Sempre inicia como false para forçar o salvamento do endereço
+  const [isAddressSaved, setIsAddressSaved] = useState(false); 
   
   const [isOnlineWarningModalOpen, setIsOnlineWarningModalOpen] = useState(false);
   const [pendingOnlinePaymentId, setPendingOnlinePaymentId] = useState<string | null>(null);
@@ -313,30 +314,24 @@ const Checkout = () => {
   
   // 1. Preencher formulário com dados do cliente logado ou do user_metadata
   useEffect(() => {
+    // Limpa o estado de endereço e coordenadas a cada carregamento/re-render
+    setIsAddressSaved(false);
+    setCustomerCoords(null);
+    setDeliveryFee(0);
+    setDeliveryTime(null);
+    setIsDeliveryAreaValid(true);
+    
+    // Limpa os campos de endereço
+    addressForm.reset({
+      zip_code: '',
+      street: '',
+      number: '',
+      neighborhood: '',
+      city: '',
+    });
+    
     if (customer) {
-      let street = '';
-      let number = '';
-      let neighborhood = '';
-      let city = '';
-      let zip_code = '';
-
-      if (customer.address) {
-        const parts = customer.address.split(', ').map(p => p.trim());
-        
-        if (parts.length >= 5) {
-          street = parts[0];
-          number = parts[1];
-          neighborhood = parts[2];
-          city = parts[3];
-          zip_code = parts[4];
-        } else if (parts.length >= 4) {
-          street = parts[0];
-          neighborhood = parts[1];
-          city = parts[2];
-          zip_code = parts[3];
-        }
-      }
-
+      // Preenche APENAS dados de contato do cliente existente
       form.reset({
         ...form.getValues(),
         name: customer.name || '',
@@ -344,33 +339,8 @@ const Checkout = () => {
         cpf_cnpj: customer.cpf_cnpj || '',
         change_for: '',
       });
-      
-      addressForm.reset({
-        zip_code: zip_code,
-        street: street,
-        number: number,
-        neighborhood: neighborhood,
-        city: city,
-      });
-      
-      if (customer.address && customer.latitude && customer.longitude) {
-          setCustomerCoords([customer.latitude, customer.longitude]);
-          setIsAddressSaved(true);
-          // Tenta calcular a taxa de entrega imediatamente se o endereço for válido
-          calculateFee(zip_code, street, number, city, neighborhood, customer.latitude, customer.longitude).then(feeResult => {
-              if (feeResult.isValid) {
-                  setDeliveryFee(feeResult.fee);
-                  setDeliveryTime(feeResult.time);
-                  setIsDeliveryAreaValid(true);
-              } else {
-                  setDeliveryFee(0);
-                  setDeliveryTime(null);
-                  setIsDeliveryAreaValid(false);
-              }
-          });
-      }
-
     } else if (user && !isLoadingCustomer) {
+      // Preenche APENAS dados de contato do user_metadata (para novos clientes)
       const userMetadata = user.user_metadata;
       
       form.reset({
@@ -381,7 +351,7 @@ const Checkout = () => {
         change_for: '',
       });
     }
-  }, [customer, form, user, isLoadingCustomer, addressForm, calculateFee]);
+  }, [customer, form, user, isLoadingCustomer, addressForm]); // Dependências ajustadas
 
   // Se a opção de entrega mudar para 'pickup', o endereço é considerado salvo
   useEffect(() => {
@@ -393,6 +363,7 @@ const Checkout = () => {
       setIsAddressSaved(true);
       setDeliveryTime(DEFAULT_PICKUP_TIME);
     } else {
+      // Se voltar para delivery, reseta o status de salvo
       setIsAddressSaved(false);
       setDeliveryTime(null);
     }
@@ -447,12 +418,16 @@ const Checkout = () => {
         return { customer: mockCustomer, feeResult };
       }
       
-      const addressPayload: TablesInsert<'customers'> = {
-        user_id: user?.id || null,
+      const customerContactData = {
         name: form.getValues('name'),
         phone: form.getValues('phone'),
-        email: user?.email || null,
         cpf_cnpj: form.getValues('cpf_cnpj') || null,
+      };
+      
+      const addressPayload: TablesInsert<'customers'> = {
+        user_id: user?.id || null,
+        ...customerContactData,
+        email: user?.email || null,
         address: fullAddress,
         latitude: feeResult.coords.lat,
         longitude: feeResult.coords.lng,
@@ -461,6 +436,7 @@ const Checkout = () => {
       let savedCustomer: Customer;
 
       if (customer?.id) {
+        // Atualiza cliente existente (incluindo endereço)
         const { data: updatedCustomer, error: updateError } = await supabase
           .from('customers')
           .update(addressPayload as TablesUpdate<'customers'>)
@@ -470,6 +446,7 @@ const Checkout = () => {
         if (updateError) throw updateError;
         savedCustomer = updatedCustomer;
       } else if (userId) {
+        // Cria novo cliente (se logado, mas sem registro em 'customers')
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(addressPayload)
@@ -538,18 +515,20 @@ const Checkout = () => {
       const cleanedPhone = data.phone.replace(/\D/g, '');
       const cleanedCpfCnpj = data.cpf_cnpj?.replace(/\D/g, '') || null;
       
-      const customerPayload: TablesInsert<'customers'> = {
-        user_id: user?.id || null,
-        name: data.name,
-        phone: cleanedPhone,
-        email: user?.email || null,
-        cpf_cnpj: cleanedCpfCnpj,
-        address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` : null,
-        latitude: customerCoords ? customerCoords[0] : null,
-        longitude: customerCoords ? customerCoords[1] : null,
-      };
-
+      // Se o cliente estiver logado, atualizamos os dados de contato no DB
       if (user) {
+        const customerPayload: TablesInsert<'customers'> = {
+          user_id: user.id,
+          name: data.name,
+          phone: cleanedPhone,
+          email: user.email || null,
+          cpf_cnpj: cleanedCpfCnpj,
+          // Endereço e coordenadas são atualizados apenas na mutação saveAddressMutation
+          address: customer?.address || null, 
+          latitude: customer?.latitude || null,
+          longitude: customer?.longitude || null,
+        };
+        
         if (customer) {
           const { data: updatedCustomer, error: updateError } = await supabase
             .from('customers')
@@ -569,6 +548,18 @@ const Checkout = () => {
           return newCustomer;
         }
       } else {
+        // Cliente anônimo: cria um registro temporário (sem user_id)
+        const customerPayload: TablesInsert<'customers'> = {
+          user_id: null,
+          name: data.name,
+          phone: cleanedPhone,
+          email: null,
+          cpf_cnpj: cleanedCpfCnpj,
+          address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` : null,
+          latitude: customerCoords ? customerCoords[0] : null,
+          longitude: customerCoords ? customerCoords[1] : null,
+        };
+        
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(customerPayload)
@@ -614,6 +605,7 @@ const Checkout = () => {
         status: isOnlinePayment ? 'pending_payment' : 'pending',
         total_amount: totalAmount,
         delivery_fee: deliveryFee,
+        // O endereço de entrega é construído a partir dos campos do addressForm
         delivery_address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` : null,
         notes: data.notes,
         payment_method_id: data.payment_method_id,
