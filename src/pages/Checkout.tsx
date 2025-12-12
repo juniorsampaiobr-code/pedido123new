@@ -312,7 +312,7 @@ const Checkout = () => {
   // Watchers para o formulário de endereço
   const addressFields = addressForm.watch(['zip_code', 'street', 'number', 'city', 'neighborhood']);
   
-  // 1. Preencher formulário com dados do cliente logado ou do user_metadata
+  // 1. Preencher formulário com dados de contato (sem endereço)
   useEffect(() => {
     // Limpa o estado de endereço e coordenadas a cada carregamento/re-render
     setIsAddressSaved(false);
@@ -515,20 +515,23 @@ const Checkout = () => {
       const cleanedPhone = data.phone.replace(/\D/g, '');
       const cleanedCpfCnpj = data.cpf_cnpj?.replace(/\D/g, '') || null;
       
-      // Se o cliente estiver logado, atualizamos os dados de contato no DB
-      if (user) {
-        const customerPayload: TablesInsert<'customers'> = {
-          user_id: user.id,
-          name: data.name,
-          phone: cleanedPhone,
-          email: user.email || null,
-          cpf_cnpj: cleanedCpfCnpj,
-          // Endereço e coordenadas são atualizados apenas na mutação saveAddressMutation
-          address: customer?.address || null, 
-          latitude: customer?.latitude || null,
-          longitude: customer?.longitude || null,
-        };
+      // Construindo o endereço completo a partir dos campos do addressForm
+      const fullAddress = deliveryOption === 'delivery' 
+        ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` 
+        : null;
         
+      const customerPayload: TablesInsert<'customers'> = {
+        user_id: user?.id || null,
+        name: data.name,
+        phone: cleanedPhone,
+        email: user?.email || null,
+        cpf_cnpj: cleanedCpfCnpj,
+        address: fullAddress, 
+        latitude: customerCoords ? customerCoords[0] : null,
+        longitude: customerCoords ? customerCoords[1] : null,
+      };
+
+      if (user) {
         if (customer) {
           const { data: updatedCustomer, error: updateError } = await supabase
             .from('customers')
@@ -548,18 +551,6 @@ const Checkout = () => {
           return newCustomer;
         }
       } else {
-        // Cliente anônimo: cria um registro temporário (sem user_id)
-        const customerPayload: TablesInsert<'customers'> = {
-          user_id: null,
-          name: data.name,
-          phone: cleanedPhone,
-          email: null,
-          cpf_cnpj: cleanedCpfCnpj,
-          address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` : null,
-          latitude: customerCoords ? customerCoords[0] : null,
-          longitude: customerCoords ? customerCoords[1] : null,
-        };
-        
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(customerPayload)
@@ -599,14 +590,18 @@ const Checkout = () => {
           maxTime = fallbackTime[1];
       }
       
+      // Construindo o endereço de entrega para o pedido
+      const deliveryAddress = deliveryOption === 'delivery' 
+        ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` 
+        : null;
+        
       const orderPayload: TablesInsert<'orders'> = {
         restaurant_id: restaurant.id,
         customer_id: customerId,
         status: isOnlinePayment ? 'pending_payment' : 'pending',
         total_amount: totalAmount,
         delivery_fee: deliveryFee,
-        // O endereço de entrega é construído a partir dos campos do addressForm
-        delivery_address: deliveryOption === 'delivery' ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` : null,
+        delivery_address: deliveryAddress,
         notes: data.notes,
         payment_method_id: data.payment_method_id,
         change_for: changeForValue,
@@ -779,6 +774,18 @@ const Checkout = () => {
     setIsOnlineWarningModalOpen(false);
     setPendingOnlinePaymentId(null);
   };
+  
+  // Variável para o endereço de exibição no mapa
+  const displayAddress = useMemo(() => {
+    // addressFields: [zip_code, street, number, city, neighborhood]
+    const [zip_code, street, number, city, neighborhood] = addressFields;
+    
+    if (street && number && neighborhood && city && zip_code) {
+      // Formato: Rua, Número - Bairro, Cidade, CEP
+      return `${street}, ${number} - ${neighborhood}, ${city}, ${zip_code}`;
+    }
+    return '';
+  }, [addressFields]);
 
   // --- Renderização ---
 
@@ -1081,7 +1088,7 @@ const Checkout = () => {
                       <ClientLocationMap 
                         latitude={customerCoords[0]} 
                         longitude={customerCoords[1]} 
-                        address={`${addressFields[1]}, ${addressFields[2]} - ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}`} 
+                        address={displayAddress} 
                       />
                     </div>
                   )}
