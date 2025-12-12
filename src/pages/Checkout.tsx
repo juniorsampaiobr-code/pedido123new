@@ -454,7 +454,7 @@ const Checkout = () => {
           user_id: null,
           name: contactName,
           phone: cleanedPhone,
-          email: user?.email || null,
+          email: null, // Explicitamente null para anônimos
           address: fullAddress,
           created_at: '',
           updated_at: '',
@@ -559,11 +559,6 @@ const Checkout = () => {
       const userId = userAuth.data.user?.id;
       const cleanedPhone = data.phone.replace(/\D/g, '');
       const cleanedCpfCnpj = data.cpf_cnpj?.replace(/\D/g, '') || null;
-      
-      // Validação final antes de enviar
-      if (!data.name || cleanedPhone.length < 10 || (cleanedCpfCnpj && cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14)) {
-          throw new Error("Dados de contato incompletos ou inválidos.");
-      }
 
       // Construindo o endereço completo a partir dos campos do addressForm
       const fullAddress = deliveryOption === 'delivery' ? 
@@ -586,6 +581,11 @@ const Checkout = () => {
         city: addressForm.getValues('city') || null,
         zip_code: addressForm.getValues('zip_code') || null,
       };
+      
+      // Se for anônimo, garante que o email é null
+      if (!user) {
+          customerPayload.email = null;
+      }
 
       if (user) {
         if (customer) {
