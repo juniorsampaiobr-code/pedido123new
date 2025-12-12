@@ -528,15 +528,9 @@ const Checkout = () => {
   });
 
   // Função para lidar com o salvamento do endereço
-  const handleSaveAddress = async () => {
-    const isValid = await addressForm.trigger();
-    if (!isValid) {
-      toast.error('Por favor, corrija os erros no formulário de endereço.');
-      return;
-    }
-    
-    const addressData = addressForm.getValues();
-    saveAddressMutation.mutate(addressData);
+  const handleSaveAddress = (data: AddressFormValues) => {
+    // A validação já foi feita pelo handleSubmit
+    saveAddressMutation.mutate(data);
   };
 
   const createCustomerMutation = useMutation({
@@ -1016,10 +1010,7 @@ const Checkout = () => {
                   )}
 
                   <Form {...addressForm}>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      handleSaveAddress();
-                    }} id="address-form-inner" className="space-y-4">
+                    <form onSubmit={addressForm.handleSubmit(handleSaveAddress)} id="address-form-inner" className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2 md:col-span-1">
                           <Label htmlFor="zip_code">CEP *</Label>
