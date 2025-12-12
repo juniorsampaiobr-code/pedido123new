@@ -248,7 +248,7 @@ const Checkout = () => {
         return { coords, fee: 0, time: null, isValid: false };
       }
     } else {
-      return { coords, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
+      return { coords: null, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
     }
   }, [restaurant, restaurantCoords, deliveryZones]);
 
@@ -434,20 +434,33 @@ const Checkout = () => {
       const userAuth = await supabase.auth.getUser();
       const userId = userAuth.data.user?.id;
 
+      // Validação de contato antes de salvar no DB (para usuários logados ou clientes existentes)
+      const contactName = form.getValues('name');
+      const contactPhone = form.getValues('phone');
+      const contactCpfCnpj = form.getValues('cpf_cnpj');
+      
+      // NOVO: Validação explícita dos valores limpos
+      const cleanedPhone = contactPhone.replace(/\D/g, '');
+      const cleanedCpfCnpj = contactCpfCnpj.replace(/\D/g, '');
+
+      if (!contactName || cleanedPhone.length < 10 || (cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14)) {
+          throw new Error("Preencha Nome, Telefone (10+ dígitos) e CPF/CNPJ (11 ou 14 dígitos) nos Seus Dados antes de salvar o endereço.");
+      }
+
       if (!customer?.id && !userId) {
         // Cliente anônimo: não salvamos o endereço no DB, apenas validamos
         const mockCustomer: Customer = {
           id: 'anonymous',
           user_id: null,
-          name: form.getValues('name'),
-          phone: form.getValues('phone'),
+          name: contactName,
+          phone: cleanedPhone,
           email: user?.email || null,
           address: fullAddress,
           created_at: '',
           updated_at: '',
           latitude: feeResult.coords.lat,
           longitude: feeResult.coords.lng,
-          cpf_cnpj: form.getValues('cpf_cnpj'),
+          cpf_cnpj: cleanedCpfCnpj,
           street: data.street,
           number: data.number,
           neighborhood: data.neighborhood,
@@ -457,19 +470,10 @@ const Checkout = () => {
         return { customer: mockCustomer, feeResult };
       }
 
-      // Validação de contato antes de salvar no DB (para usuários logados ou clientes existentes)
-      const contactName = form.getValues('name');
-      const contactPhone = form.getValues('phone');
-      const contactCpfCnpj = form.getValues('cpf_cnpj');
-      
-      if (!contactName || !contactPhone || !contactCpfCnpj) {
-          throw new Error("Preencha Nome, Telefone e CPF/CNPJ nos Seus Dados antes de salvar o endereço.");
-      }
-
       const customerContactData = {
         name: contactName,
-        phone: contactPhone.replace(/\D/g, ''),
-        cpf_cnpj: contactCpfCnpj.replace(/\D/g, '') || null,
+        phone: cleanedPhone,
+        cpf_cnpj: cleanedCpfCnpj || null,
       };
 
       const addressPayload: TablesInsert<'customers'> = {
@@ -494,7 +498,7 @@ const Checkout = () => {
           .from('customers')
           .update(addressPayload as TablesUpdate<'customers'>)
           .eq('id', customer.id)
-          .select('*') // Simplificando o select
+          .select('*')
           .single();
         if (updateError) throw updateError;
         savedCustomer = updatedCustomer as Customer;
@@ -503,7 +507,7 @@ const Checkout = () => {
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(addressPayload)
-          .select('*') // Simplificando o select
+          .select('*')
           .single();
         if (insertError) throw insertError;
         savedCustomer = newCustomer as Customer;
@@ -555,6 +559,11 @@ const Checkout = () => {
       const userId = userAuth.data.user?.id;
       const cleanedPhone = data.phone.replace(/\D/g, '');
       const cleanedCpfCnpj = data.cpf_cnpj?.replace(/\D/g, '') || null;
+      
+      // Validação final antes de enviar
+      if (!data.name || cleanedPhone.length < 10 || (cleanedCpfCnpj && cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14)) {
+          throw new Error("Dados de contato incompletos ou inválidos.");
+      }
 
       // Construindo o endereço completo a partir dos campos do addressForm
       const fullAddress = deliveryOption === 'delivery' ? 
@@ -578,15 +587,13 @@ const Checkout = () => {
         zip_code: addressForm.getValues('zip_code') || null,
       };
 
-      let selectColumns = '*'; // Seleção padrão
-
       if (user) {
         if (customer) {
           const { data: updatedCustomer, error: updateError } = await supabase
             .from('customers')
             .update(customerPayload as TablesUpdate<'customers'>)
             .eq('id', customer.id)
-            .select(selectColumns) // Simplificando o select
+            .select('*')
             .single();
           if (updateError) throw updateError;
           return updatedCustomer as Customer;
@@ -594,7 +601,7 @@ const Checkout = () => {
           const { data: newCustomer, error: insertError } = await supabase
             .from('customers')
             .insert(customerPayload)
-            .select(selectColumns) // Simplificando o select
+            .select('*')
             .single();
           if (insertError) throw insertError;
           return newCustomer as Customer;
@@ -604,7 +611,7 @@ const Checkout = () => {
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(customerPayload)
-          .select(selectColumns) // Simplificando o select
+          .select('*')
           .single();
         if (insertError) throw insertError;
         return newCustomer as Customer;
