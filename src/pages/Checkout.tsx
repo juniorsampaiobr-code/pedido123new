@@ -29,14 +29,7 @@ import { CpfCnpjInput } from '@/components/CpfCnpjInput';
 import { ClientLocationMap } from '@/components/ClientLocationMap';
 import { OnlinePaymentWarningModal } from '@/components/OnlinePaymentWarningModal';
 import { cn } from '@/lib/utils';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, } from '@/components/ui/form';
 
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
@@ -73,16 +66,17 @@ const checkoutSchema = z.object({
   cpf_cnpj: z.string().min(1, 'CPF/CNPJ é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length === 11 || val.length === 14, {
     message: 'CPF deve ter 11 dígitos ou CNPJ 14 dígitos.',
   }),
-  delivery_option: z.enum(['delivery', 'pickup'], { required_error: 'Selecione uma opção de entrega.' }),
+  delivery_option: z.enum(['delivery', 'pickup'], {
+    required_error: 'Selecione uma opção de entrega.',
+  }),
   notes: z.string().optional(),
   payment_method_id: z.string().min(1, 'Selecione um método de pagamento.'),
-  change_for: z.string().optional(), 
+  change_for: z.string().optional(),
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
 // --- Funções de Fetch ---
-
 // AGORA RECEBE O ID DO RESTAURANTE
 const fetchRestaurantData = async (restaurantId: string): Promise<Restaurant> => {
   const { data, error } = await supabase
@@ -92,10 +86,9 @@ const fetchRestaurantData = async (restaurantId: string): Promise<Restaurant> =>
     .eq('is_active', true)
     .limit(1)
     .single();
-
   if (error) throw new Error(`Erro ao buscar restaurante: ${error.message}`);
   if (!data) throw new Error('Restaurante não encontrado ou inativo.');
-  return data as Restaurant; 
+  return data as Restaurant;
 };
 
 const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]> => {
@@ -105,7 +98,6 @@ const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]>
     .eq('restaurant_id', restaurantId)
     .eq('is_active', true)
     .order('max_distance_km', { ascending: true });
-
   if (error) throw new Error(`Erro ao buscar zonas de entrega: ${error.message}`);
   return data;
 };
@@ -117,7 +109,6 @@ const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[
     .eq('restaurant_id', restaurantId)
     .eq('is_active', true)
     .order('name', { ascending: true });
-
   if (error) throw new Error(`Erro ao buscar métodos de pagamento: ${error.message}`);
   return data;
 };
@@ -130,14 +121,12 @@ const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
     .eq('user_id', userId)
     .limit(1)
     .single();
-
   if (error && error.code !== 'PGRST116') throw new Error(error.message);
   // O cast é seguro porque a query acima garante as colunas
   return data as Customer || null;
 };
 
 // --- Componente Principal ---
-
 const Checkout = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -145,29 +134,26 @@ const Checkout = () => {
   const queryClient = useQueryClient();
   const { items, totalAmount: cartSubtotal, clearCart } = useCart();
   const { data: user, isLoading: isLoadingAuth } = useAuthStatus();
-  
   const [restaurantIdFromState] = useState(location.state?.restaurantId as string | undefined);
   const restaurantIdFromQuery = searchParams.get('restaurantId') as string | undefined;
   const restaurantId = restaurantIdFromState || restaurantIdFromQuery;
-  
   const { data: mpPublicKey } = useMercadoPagoPublicKey(restaurantId);
-  
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [deliveryFee, setDeliveryFee] = useState(0);
-  const [deliveryTime, setDeliveryTime] = useState<[number, number] | null>(null); 
+  const [deliveryTime, setDeliveryTime] = useState<[number, number] | null>(null);
   const [isDeliveryAreaValid, setIsDeliveryAreaValid] = useState(true);
   const [customerCoords, setCustomerCoords] = useState<[number, number] | null>(null);
   const [isMercadoPagoOpen, setIsMercadoPagoOpen] = useState(false);
   const [mpPreferenceId, setMpPreferenceId] = useState<string | null>(null);
   const [mpInitPoint, setMpInitPoint] = useState<string | null>(null);
-  
   // Estado que indica se o endereço foi salvo/validado nesta sessão de checkout
-  const [isAddressSaved, setIsAddressSaved] = useState(false); 
-  
+  const [isAddressSaved, setIsAddressSaved] = useState(false);
   const [isOnlineWarningModalOpen, setIsOnlineWarningModalOpen] = useState(false);
   const [pendingOnlinePaymentId, setPendingOnlinePaymentId] = useState<string | null>(null);
-  
+  // Estado para armazenar a string do endereço que foi SALVO/VALIDADO
+  const [savedAddressString, setSavedAddressString] = useState<string | null>(null);
+
   // Fetch de dados essenciais
   const { data: restaurant, isLoading: isLoadingRestaurant, isError: isErrorRestaurant, error: errorRestaurant, refetch: refetchRestaurant } = useQuery<Restaurant>({
     queryKey: ['checkoutRestaurantData', restaurantId],
@@ -198,7 +184,6 @@ const Checkout = () => {
   });
 
   // --- Definições de Variáveis e Callbacks ---
-  
   const restaurantCoords: [number, number] | null = useMemo(() => {
     if (restaurant?.latitude && restaurant?.longitude) {
       return [restaurant.latitude, restaurant.longitude];
@@ -208,39 +193,33 @@ const Checkout = () => {
 
   // Função de cálculo de taxa (mantida, mas sem toasts internos)
   const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, neighborhood: string, lat?: number | null, lng?: number | null) => {
-    
-    const DEFAULT_DELIVERY_TIME: [number, number] = [30, 45]; 
+    const DEFAULT_DELIVERY_TIME: [number, number] = [30, 45];
     
     // 1. Lógica de Frete Grátis se a entrega dinâmica estiver desativada
     if (restaurant && restaurant.delivery_enabled === false) {
       const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${zip_code}`;
       let coords: { lat: number, lng: number } | null = null;
-      
       if (lat && lng) {
-          coords = { lat, lng };
+        coords = { lat, lng };
       } else {
-          coords = await geocodeAddress(fullAddress); 
+        coords = await geocodeAddress(fullAddress);
       }
-      
       if (!coords) {
         return { coords: null, fee: 0, time: null, isValid: false };
       }
-      
       if (deliveryZones && deliveryZones.length > 0 && restaurantCoords) {
         const feeResult = calculateDeliveryFee(
           [coords.lat, coords.lng],
           restaurantCoords,
           deliveryZones
         );
-        
         if (feeResult) {
           return { coords, fee: 0, time: [feeResult.minTime, feeResult.maxTime], isValid: true };
         }
       }
-      
       return { coords, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
     }
-    
+
     // 2. Lógica de Entrega Dinâmica
     if (!restaurant || !restaurantCoords) {
       return { coords: null, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
@@ -248,13 +227,11 @@ const Checkout = () => {
 
     const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${zip_code}`;
     let coords: { lat: number, lng: number } | null = null;
-    
     if (lat && lng) {
-        coords = { lat, lng };
+      coords = { lat, lng };
     } else {
-        coords = await geocodeAddress(fullAddress); 
+      coords = await geocodeAddress(fullAddress);
     }
-
     if (!coords) {
       return { coords: null, fee: 0, time: null, isValid: false };
     }
@@ -265,7 +242,6 @@ const Checkout = () => {
         restaurantCoords,
         deliveryZones
       );
-
       if (feeResult) {
         return { coords, fee: feeResult.fee, time: [feeResult.minTime, feeResult.maxTime], isValid: true };
       } else {
@@ -290,7 +266,7 @@ const Checkout = () => {
     },
     mode: 'onBlur',
   });
-  
+
   const addressForm = useForm<AddressFormValues>({
     resolver: zodResolver(addressSchema),
     defaultValues: {
@@ -302,7 +278,7 @@ const Checkout = () => {
     },
     mode: 'onBlur',
   });
-  
+
   // Watchers
   const deliveryOption = form.watch('delivery_option');
   const selectedPaymentMethodId = form.watch('payment_method_id');
@@ -310,18 +286,15 @@ const Checkout = () => {
   const isOnlinePayment = selectedPaymentMethod?.name?.includes('online');
   const isCashPayment = selectedPaymentMethod?.name?.includes('Dinheiro');
   const totalAmount = cartSubtotal + deliveryFee;
-  
+
   // Watchers para o formulário de endereço
   const addressFields = addressForm.watch(['zip_code', 'street', 'number', 'city', 'neighborhood']);
-  
+
   // String que representa o endereço atual no formulário (para comparação)
   const currentAddressString = useMemo(() => {
     const [zip_code, street, number, city, neighborhood] = addressFields;
     return `${street}|${number}|${neighborhood}|${city}|${zip_code}`;
   }, [addressFields]);
-  
-  // Estado para armazenar a string do endereço que foi SALVO/VALIDADO
-  const [savedAddressString, setSavedAddressString] = useState<string | null>(null);
 
   // 1. Preencher formulário de contato e endereço (apenas na montagem ou mudança de user/customer)
   useEffect(() => {
@@ -332,7 +305,6 @@ const Checkout = () => {
     setDeliveryTime(null);
     setIsDeliveryAreaValid(true);
     setSavedAddressString(null);
-    
     // Limpa os campos de endereço
     addressForm.reset({
       zip_code: '',
@@ -341,7 +313,7 @@ const Checkout = () => {
       neighborhood: '',
       city: '',
     });
-    
+
     if (customer) {
       // Preenche APENAS dados de contato do cliente existente
       form.reset({
@@ -351,57 +323,52 @@ const Checkout = () => {
         cpf_cnpj: customer.cpf_cnpj || '',
         change_for: '',
       });
-      
+
       // Se o cliente tem endereço salvo, preenche o formulário de endereço
       // NOVO: Verifica se as colunas individuais de endereço estão preenchidas
       if (customer.latitude && customer.longitude && customer.street && customer.number && customer.zip_code) {
-          
-          const zip_code = customer.zip_code || '';
-          const street = customer.street || '';
-          const number = customer.number || '';
-          const neighborhood = customer.neighborhood || '';
-          const city = customer.city || '';
-          
-          addressForm.reset({
-              zip_code: zip_code,
-              street: street,
-              number: number,
-              neighborhood: neighborhood,
-              city: city,
-          });
-          
-          // Define a string do endereço salvo para comparação futura
-          const initialAddressString = `${street}|${number}|${neighborhood}|${city}|${zip_code}`;
-          setSavedAddressString(initialAddressString);
-          
-          // Se o cliente já tem coordenadas, pré-calcula a taxa (sem geocodificação)
-          if (restaurantCoords && deliveryZones) {
-              const feeResult = calculateDeliveryFee(
-                  [customer.latitude, customer.longitude],
-                  restaurantCoords,
-                  deliveryZones
-              );
-              
-              if (feeResult) {
-                  setDeliveryFee(feeResult.fee);
-                  setDeliveryTime([feeResult.minTime, feeResult.maxTime]);
-                  setIsDeliveryAreaValid(true);
-                  setIsAddressSaved(true); // Marca como salvo se houver dados válidos
-                  setCustomerCoords([customer.latitude, customer.longitude]);
-              } else {
-                  // Fora da área de entrega
-                  setDeliveryFee(0);
-                  setIsDeliveryAreaValid(false);
-                  setIsAddressSaved(true); // Marca como salvo, mas inválido
-                  setCustomerCoords([customer.latitude, customer.longitude]);
-              }
+        const zip_code = customer.zip_code || '';
+        const street = customer.street || '';
+        const number = customer.number || '';
+        const neighborhood = customer.neighborhood || '';
+        const city = customer.city || '';
+        addressForm.reset({
+          zip_code: zip_code,
+          street: street,
+          number: number,
+          neighborhood: neighborhood,
+          city: city,
+        });
+
+        // Define a string do endereço salvo para comparação futura
+        const initialAddressString = `${street}|${number}|${neighborhood}|${city}|${zip_code}`;
+        setSavedAddressString(initialAddressString);
+
+        // Se o cliente já tem coordenadas, pré-calcula a taxa (sem geocodificação)
+        if (restaurantCoords && deliveryZones) {
+          const feeResult = calculateDeliveryFee(
+            [customer.latitude, customer.longitude],
+            restaurantCoords,
+            deliveryZones
+          );
+          if (feeResult) {
+            setDeliveryFee(feeResult.fee);
+            setDeliveryTime([feeResult.minTime, feeResult.maxTime]);
+            setIsDeliveryAreaValid(true);
+            setIsAddressSaved(true); // Marca como salvo se houver dados válidos
+            setCustomerCoords([customer.latitude, customer.longitude]);
+          } else {
+            // Fora da área de entrega
+            setDeliveryFee(0);
+            setIsDeliveryAreaValid(false);
+            setIsAddressSaved(true); // Marca como salvo, mas inválido
+            setCustomerCoords([customer.latitude, customer.longitude]);
           }
+        }
       }
-      
     } else if (user && !isLoadingCustomer) {
       // Preenche APENAS dados de contato do user_metadata (para novos clientes)
       const userMetadata = user.user_metadata;
-      
       form.reset({
         ...form.getValues(),
         name: (userMetadata.full_name as string) || '',
@@ -417,45 +384,26 @@ const Checkout = () => {
     // Se o endereço atual do formulário for diferente do último endereço salvo/validado,
     // e a opção for 'delivery', resetamos isAddressSaved.
     if (deliveryOption === 'delivery' && savedAddressString !== null && currentAddressString !== savedAddressString) {
-        setIsAddressSaved(false);
-        setDeliveryFee(0);
-        setDeliveryTime(null);
-        setIsDeliveryAreaValid(true);
-        setCustomerCoords(null);
+      setIsAddressSaved(false);
+      setDeliveryFee(0);
+      setDeliveryTime(null);
+      setIsDeliveryAreaValid(true);
+      setCustomerCoords(null);
     }
   }, [currentAddressString, savedAddressString, deliveryOption]);
 
-
-  // Se a opção de entrega mudar para 'pickup', o endereço é considerado salvo
-  useEffect(() => {
-    const DEFAULT_PICKUP_TIME: [number, number] = [15, 30];
-    
-    if (deliveryOption === 'pickup') {
-      setDeliveryFee(0);
-      setIsDeliveryAreaValid(true);
-      setIsAddressSaved(true);
-      setDeliveryTime(DEFAULT_PICKUP_TIME);
-    } else {
-      // Se voltar para delivery, reseta o status de salvo
-      // NOTA: Não resetamos o addressForm aqui, apenas o status de validação
-      setIsAddressSaved(false);
-      setDeliveryTime(null);
-    }
-  }, [deliveryOption]);
-
-
   // 3. Lógica de Troco (Validação manual)
   const changeForString = form.watch('change_for');
-  
   useEffect(() => {
     if (isCashPayment && changeForString && changeForString.trim() !== '') {
       const cleanedValue = changeForString.replace(',', '.');
       const changeForValue = parseFloat(cleanedValue);
-      
       if (isNaN(changeForValue)) {
         form.setError('change_for', { message: 'O troco deve ser um número válido.' });
       } else if (changeForValue < totalAmount) {
-        form.setError('change_for', { message: `O troco deve ser maior ou igual ao total do pedido (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}).` });
+        form.setError('change_for', {
+          message: `O troco deve ser maior ou igual ao total do pedido (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}).`
+        });
       } else {
         form.clearErrors('change_for');
       }
@@ -463,42 +411,58 @@ const Checkout = () => {
       form.clearErrors('change_for');
     }
   }, [isCashPayment, changeForString, totalAmount, form]);
-  
+
   // 4. Mutação para salvar APENAS o endereço (chamada pelo botão Salvar Endereço)
   const saveAddressMutation = useMutation({
     mutationFn: async (data: AddressFormValues): Promise<{ customer: Customer | null, feeResult: { coords: { lat: number, lng: number } | null, fee: number, time: [number, number] | null, isValid: boolean } }> => {
-      
       // --- 1. Geocodificação e Cálculo de Taxa (Movido para dentro da mutação) ---
       setIsGeocoding(true);
       // Usando os campos individuais para construir o fullAddress
       const fullAddress = `${data.street}, ${data.number}, ${data.neighborhood}, ${data.city}, ${data.zip_code}`;
       const feeResult = await calculateFee(data.zip_code, data.street, data.number, data.city, data.neighborhood);
       setIsGeocoding(false);
-      
+
       if (!feeResult.isValid) {
-          throw new Error(restaurant?.delivery_enabled === false ? "O endereço está errado ou incompleto, revise todos os campos." : "Endereço fora da área de entrega.");
+        throw new Error(restaurant?.delivery_enabled === false ? "O endereço está errado ou incompleto, revise todos os campos." : "Endereço fora da área de entrega.");
       }
-      
+
       if (!feeResult.coords) {
-          throw new Error("Não foi possível obter as coordenadas para salvar o endereço.");
+        throw new Error("Não foi possível obter as coordenadas para salvar o endereço.");
       }
-      
+
       // --- 2. Salvar Cliente (Se logado ou anônimo) ---
       const userAuth = await supabase.auth.getUser();
       const userId = userAuth.data.user?.id;
-      
+
       if (!customer?.id && !userId) {
         // Cliente anônimo: não salvamos o endereço no DB, apenas validamos
-        const mockCustomer: Customer = { id: 'anonymous', user_id: null, name: form.getValues('name'), phone: form.getValues('phone'), email: user?.email || null, address: fullAddress, created_at: '', updated_at: '', latitude: feeResult.coords.lat, longitude: feeResult.coords.lng, cpf_cnpj: form.getValues('cpf_cnpj'), street: data.street, number: data.number, neighborhood: data.neighborhood, city: data.city, zip_code: data.zip_code };
+        const mockCustomer: Customer = {
+          id: 'anonymous',
+          user_id: null,
+          name: form.getValues('name'),
+          phone: form.getValues('phone'),
+          email: user?.email || null,
+          address: fullAddress,
+          created_at: '',
+          updated_at: '',
+          latitude: feeResult.coords.lat,
+          longitude: feeResult.coords.lng,
+          cpf_cnpj: form.getValues('cpf_cnpj'),
+          street: data.street,
+          number: data.number,
+          neighborhood: data.neighborhood,
+          city: data.city,
+          zip_code: data.zip_code
+        };
         return { customer: mockCustomer, feeResult };
       }
-      
+
       const customerContactData = {
         name: form.getValues('name'),
         phone: form.getValues('phone'),
         cpf_cnpj: form.getValues('cpf_cnpj') || null,
       };
-      
+
       const addressPayload: TablesInsert<'customers'> = {
         user_id: user?.id || null,
         ...customerContactData,
@@ -515,7 +479,6 @@ const Checkout = () => {
       };
 
       let savedCustomer: Customer;
-
       if (customer?.id) {
         // Atualiza cliente existente (incluindo endereço)
         const { data: updatedCustomer, error: updateError } = await supabase
@@ -539,26 +502,22 @@ const Checkout = () => {
         // Este caso deve ser coberto pelo bloco 'Cliente anônimo' acima, mas por segurança
         throw new Error('Não foi possível identificar o cliente para salvar.');
       }
-      
+
       return { customer: savedCustomer, feeResult };
     },
     onSuccess: (result, variables) => {
       const { customer: newCustomer, feeResult } = result;
-      
       if (newCustomer?.id !== 'anonymous') {
         queryClient.invalidateQueries({ queryKey: ['checkoutCustomerData'] });
       }
-      
       setDeliveryFee(feeResult.fee);
       setDeliveryTime(feeResult.time);
       setIsDeliveryAreaValid(feeResult.isValid);
       setIsAddressSaved(true);
       setCustomerCoords([feeResult.coords!.lat, feeResult.coords!.lng]);
-      
       // NOVO: Atualiza a string do endereço salvo para comparação futura
       const newAddressString = `${variables.street}|${variables.number}|${variables.neighborhood}|${variables.city}|${variables.zip_code}`;
       setSavedAddressString(newAddressString);
-      
       toast.success('Endereço salvo e taxa de entrega calculada!');
     },
     onError: (err) => {
@@ -568,26 +527,37 @@ const Checkout = () => {
     }
   });
 
+  // Função para lidar com o salvamento do endereço
+  const handleSaveAddress = async () => {
+    const isValid = await addressForm.trigger();
+    if (!isValid) {
+      toast.error('Por favor, corrija os erros no formulário de endereço.');
+      return;
+    }
+    
+    const addressData = addressForm.getValues();
+    saveAddressMutation.mutate(addressData);
+  };
+
   const createCustomerMutation = useMutation({
     mutationFn: async (data: CheckoutFormValues): Promise<Customer> => {
       const userAuth = await supabase.auth.getUser();
       const userId = userAuth.data.user?.id;
-      
       const cleanedPhone = data.phone.replace(/\D/g, '');
       const cleanedCpfCnpj = data.cpf_cnpj?.replace(/\D/g, '') || null;
-      
+
       // Construindo o endereço completo a partir dos campos do addressForm
-      const fullAddress = deliveryOption === 'delivery' 
-        ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` 
-        : null;
-        
+      const fullAddress = deliveryOption === 'delivery' ? 
+        `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` : 
+        null;
+
       const customerPayload: TablesInsert<'customers'> = {
         user_id: user?.id || null,
         name: data.name,
         phone: cleanedPhone,
         email: user?.email || null,
         cpf_cnpj: cleanedCpfCnpj,
-        address: fullAddress, 
+        address: fullAddress,
         latitude: customerCoords ? customerCoords[0] : null,
         longitude: customerCoords ? customerCoords[1] : null,
         // Adicionando campos individuais para consistência
@@ -638,30 +608,28 @@ const Checkout = () => {
   const createOrderMutation = useMutation({
     mutationFn: async ({ customerId, data }: { customerId: string, data: CheckoutFormValues }) => {
       if (!restaurant) throw new Error('Dados do restaurante não disponíveis.');
-      
+
       let changeForValue: number | null = null;
       if (isCashPayment && data.change_for && data.change_for.trim() !== '') {
         const cleanedValue = data.change_for.replace(',', '.');
         const numValue = parseFloat(cleanedValue);
-        
         if (!isNaN(numValue) && numValue > totalAmount) {
           changeForValue = numValue;
         }
       }
-      
+
       let [minTime, maxTime] = deliveryTime || [null, null];
-      
       if ((deliveryOption === 'delivery' || deliveryOption === 'pickup') && (!minTime || !maxTime)) {
-          const fallbackTime = deliveryOption === 'pickup' ? [15, 30] : [30, 45];
-          minTime = fallbackTime[0];
-          maxTime = fallbackTime[1];
+        const fallbackTime = deliveryOption === 'pickup' ? [15, 30] : [30, 45];
+        minTime = fallbackTime[0];
+        maxTime = fallbackTime[1];
       }
-      
+
       // Construindo o endereço de entrega para o pedido
-      const deliveryAddress = deliveryOption === 'delivery' 
-        ? `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` 
-        : null;
-        
+      const deliveryAddress = deliveryOption === 'delivery' ? 
+        `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` : 
+        null;
+
       const orderPayload: TablesInsert<'orders'> = {
         restaurant_id: restaurant.id,
         customer_id: customerId,
@@ -681,7 +649,6 @@ const Checkout = () => {
         .insert(orderPayload)
         .select('id')
         .single();
-
       if (orderError) throw orderError;
 
       const orderItemsPayload: TablesInsert<'order_items'>[] = items.map(item => ({
@@ -696,9 +663,8 @@ const Checkout = () => {
       const { error: itemsError } = await supabase
         .from('order_items')
         .insert(orderItemsPayload);
-
       if (itemsError) throw itemsError;
-      
+
       return newOrder.id;
     },
     onSuccess: (orderId) => {
@@ -710,42 +676,41 @@ const Checkout = () => {
   });
 
   // --- Submissão Principal ---
-
   const onSubmit = async (data: CheckoutFormValues) => {
-    
     if (isCashPayment && data.change_for && data.change_for.trim() !== '') {
       const cleanedValue = data.change_for.replace(',', '.');
       const changeForValue = parseFloat(cleanedValue);
-      
       if (isNaN(changeForValue)) {
         toast.error('O troco deve ser um número válido.');
         return;
       }
       if (changeForValue < totalAmount) {
-        form.setError('change_for', { type: 'manual', message: `O troco deve ser maior ou igual ao total do pedido (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}).` });
+        form.setError('change_for', {
+          type: 'manual',
+          message: `O troco deve ser maior ou igual ao total do pedido (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}).`
+        });
         return;
       }
     }
-    
+
     if (items.length === 0) {
       toast.error('Seu carrinho está vazio.');
       navigate(`/menu/${restaurantId}`);
       return;
     }
-    
+
     if (deliveryOption === 'delivery') {
-        if (!isAddressSaved) {
-            toast.error('Você deve salvar e validar o endereço de entrega antes de finalizar o pedido.');
-            return;
-        }
-        if (!isDeliveryAreaValid) {
-            toast.error('O endereço de entrega está fora da área de cobertura.');
-            return;
-        }
+      if (!isAddressSaved) {
+        toast.error('Você deve salvar e validar o endereço de entrega antes de finalizar o pedido.');
+        return;
+      }
+      if (!isDeliveryAreaValid) {
+        toast.error('O endereço de entrega está fora da área de cobertura.');
+        return;
+      }
     }
 
     let customerId: string;
-    
     // 1. Cria/Atualiza o cliente
     try {
       const newCustomer = await createCustomerMutation.mutateAsync(data);
@@ -772,22 +737,18 @@ const Checkout = () => {
       navigate(`/order-success/${orderId}`, { replace: true });
     }
   };
-  
+
   // --- Lógica Mercado Pago ---
-  
   const handleMercadoPagoCheckout = async (orderId: string, data: CheckoutFormValues) => {
     if (!restaurant) return;
-    
     const clientUrl = window.location.origin + window.location.pathname;
-    
     const itemsPayload = items.map(item => ({
       name: item.product.name,
       price: item.product.price,
       quantity: item.quantity,
     }));
-    
-    const loadingToastId = toast.loading("Preparando pagamento online...");
 
+    const loadingToastId = toast.loading("Preparando pagamento online...");
     try {
       const { data: mpData, error: mpError } = await supabase.functions.invoke('create-payment-preference', {
         body: {
@@ -800,30 +761,26 @@ const Checkout = () => {
           customerCpfCnpj: data.cpf_cnpj,
         },
       });
-
       if (mpError) throw mpError;
-      
+
       const { init_point } = mpData as { init_point: string };
-      
       setMpPreferenceId(orderId);
       setMpInitPoint(init_point);
       setIsMercadoPagoOpen(true);
-      
       toast.dismiss(loadingToastId);
-      
     } catch (error: any) {
       toast.dismiss(loadingToastId);
       toast.error(`Erro no pagamento online: ${error.message}`);
       setIsMercadoPagoOpen(false);
     }
   };
-  
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success("Você saiu da sua conta.");
     navigate('/auth', { replace: true });
   };
-  
+
   const handlePaymentMethodChange = (newMethodId: string, isOnline: boolean, isMpConfigured: boolean) => {
     if (isOnline && isMpConfigured) {
       setPendingOnlinePaymentId(newMethodId);
@@ -833,7 +790,7 @@ const Checkout = () => {
       setPendingOnlinePaymentId(null);
     }
   };
-  
+
   const handleOnlineWarningConfirm = () => {
     if (pendingOnlinePaymentId) {
       form.setValue('payment_method_id', pendingOnlinePaymentId, { shouldValidate: true });
@@ -841,12 +798,11 @@ const Checkout = () => {
     setIsOnlineWarningModalOpen(false);
     setPendingOnlinePaymentId(null);
   };
-  
+
   // Variável para o endereço de exibição no mapa
   const displayAddress = useMemo(() => {
     // addressFields: [zip_code, street, number, city, neighborhood]
     const [zip_code, street, number, city, neighborhood] = addressFields;
-    
     // Garante que todos os campos necessários para o endereço completo estão preenchidos
     if (street && number && neighborhood && city && zip_code) {
       // Formato: Rua, Número - Bairro, Cidade, CEP
@@ -856,7 +812,6 @@ const Checkout = () => {
   }, [addressFields]);
 
   // --- Renderização ---
-
   if (!restaurantId) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -873,7 +828,9 @@ const Checkout = () => {
   }
 
   if (items.length === 0) {
-    useEffect(() => { navigate(`/menu/${restaurantId}`); }, [navigate, restaurantId]);
+    useEffect(() => {
+      navigate(`/menu/${restaurantId}`);
+    }, [navigate, restaurantId]);
     return <LoadingSpinner />;
   }
 
@@ -897,29 +854,28 @@ const Checkout = () => {
       </div>
     );
   }
-  
+
   const isFormSubmitting = createCustomerMutation.isPending || createOrderMutation.isPending || saveAddressMutation.isPending;
-  
   const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isAddressSaved);
 
   return (
     <div className="min-h-screen bg-background py-4 sm:py-8 px-4 sm:px-8">
       {/* Modal de Edição de Perfil do Cliente */}
-      <CustomerProfileModal 
+      <CustomerProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         customer={customer}
       />
-      
+
       {/* NOVO MODAL DE AVISO DE PAGAMENTO ONLINE */}
       <OnlinePaymentWarningModal
         isOpen={isOnlineWarningModalOpen}
         onConfirm={handleOnlineWarningConfirm}
       />
-      
+
       {/* Componente de Pagamento Mercado Pago (abre o modal/redirect) */}
       {isMercadoPagoOpen && mpInitPoint && (
-        <MercadoPagoPayment 
+        <MercadoPagoPayment
           preferenceId={mpPreferenceId!}
           initPoint={mpInitPoint}
           onClose={() => setIsMercadoPagoOpen(false)}
@@ -942,12 +898,7 @@ const Checkout = () => {
           </div>
           {user && (
             <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setIsProfileModalOpen(true)}
-                aria-label="Meu Perfil e Pedidos"
-              >
+              <Button variant="outline" size="sm" onClick={() => setIsProfileModalOpen(true)} aria-label="Meu Perfil e Pedidos">
                 <UserIcon className="h-4 w-4 mr-2" /> Perfil / Pedidos
               </Button>
               <Button variant="outline" size="sm" onClick={handleLogout}>
@@ -956,26 +907,21 @@ const Checkout = () => {
             </div>
           )}
         </div>
-        
+
         {/* Ajuste de Layout: Em telas pequenas, as colunas se empilham (padrão do grid) */}
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Coluna 1 & 2: Formulário de Checkout (Ocupa 100% em mobile, 2/3 em desktop) */}
           <div className="lg:col-span-2 space-y-6">
-            
             <Card>
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
-                  <User className="h-5 w-5 text-primary" />
-                  Seus Dados
+                  <User className="h-5 w-5 text-primary" /> Seus Dados
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex justify-between items-center mb-4">
                   <p className="text-sm text-muted-foreground">
-                    {user 
-                      ? `Logado como ${user.email}. ${customer ? 'Perfil de cliente encontrado.' : 'Preencha os dados para criar seu perfil de cliente.'}` 
-                      : 'Você está fazendo um pedido anônimo.'
-                    }
+                    {user ? `Logado como ${user.email}. ${customer ? 'Perfil de cliente encontrado.' : 'Preencha os dados para criar seu perfil de cliente.'}` : 'Você está fazendo um pedido anônimo.'}
                   </p>
                 </div>
                 <Form {...form}>
@@ -1009,12 +955,11 @@ const Checkout = () => {
                 </Form>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
-                  <Truck className="h-5 w-5 text-primary" />
-                  Opção de Entrega
+                  <Truck className="h-5 w-5 text-primary" /> Opção de Entrega
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1022,13 +967,23 @@ const Checkout = () => {
                   name="delivery_option"
                   control={form.control}
                   render={({ field }) => (
-                    <RadioGroup onValueChange={field.onChange} value={field.value} className="grid grid-cols-2 gap-4">
-                      <Label htmlFor="delivery" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer">
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      className="grid grid-cols-2 gap-4"
+                    >
+                      <Label
+                        htmlFor="delivery"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer"
+                      >
                         <RadioGroupItem value="delivery" id="delivery" className="sr-only" />
                         <Truck className="mb-3 h-6 w-6" />
                         <span translate="no">Entrega</span>
                       </Label>
-                      <Label htmlFor="pickup" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer">
+                      <Label
+                        htmlFor="pickup"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer"
+                      >
                         <RadioGroupItem value="pickup" id="pickup" className="sr-only" />
                         <MapPin className="mb-3 h-6 w-6" />
                         <span translate="no">Retirada no Local</span>
@@ -1044,8 +999,7 @@ const Checkout = () => {
               <Card className={cn(!isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
                 <CardHeader>
                   <CardTitle className="text-xl flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-primary" />
-                    Endereço de Entrega
+                    <MapPin className="h-5 w-5 text-primary" /> Endereço de Entrega
                     {isAddressSaved && <CheckCircle className="h-5 w-5 text-green-500 ml-2" />}
                     {!isAddressSaved && <AlertCircle className="h-5 w-5 text-destructive ml-2" />}
                   </CardTitle>
@@ -1060,9 +1014,12 @@ const Checkout = () => {
                       <AlertDescription>As taxas de entrega dinâmica estão desativadas. O frete será R$ 0,00.</AlertDescription>
                     </Alert>
                   )}
-                  
+
                   <Form {...addressForm}>
-                    <form onSubmit={(e) => { e.preventDefault(); handleSaveAddress(); }} id="address-form-inner" className="space-y-4">
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSaveAddress();
+                    }} id="address-form-inner" className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2 md:col-span-1">
                           <Label htmlFor="zip_code">CEP *</Label>
@@ -1072,10 +1029,7 @@ const Checkout = () => {
                             render={({ field }) => (
                               <FormItem className="flex-1 space-y-0">
                                 <FormControl>
-                                  <ZipCodeInput 
-                                    placeholder="Digite o CEP"
-                                    {...field}
-                                  />
+                                  <ZipCodeInput placeholder="Digite o CEP" {...field} />
                                 </FormControl>
                               </FormItem>
                             )}
@@ -1102,28 +1056,31 @@ const Checkout = () => {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="city">Cidade *</Label>
-                          <Input id="city" {...addressForm.register('city')} />
+                        <Input id="city" {...addressForm.register('city')} />
                         {addressForm.formState.errors.city && <p className="text-destructive text-sm">{addressForm.formState.errors.city.message}</p>}
                       </div>
-                      
-                      <Button 
-                          type="submit" 
-                          className="w-full h-10 text-base mt-4"
-                          disabled={saveAddressMutation.isPending || isGeocoding}
+                      <Button
+                        type="submit"
+                        className="w-full h-10 text-base mt-4"
+                        disabled={saveAddressMutation.isPending || isGeocoding}
                       >
-                          {saveAddressMutation.isPending || isGeocoding ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                          Salvar Endereço e Calcular Taxa
+                        {saveAddressMutation.isPending || isGeocoding ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        Salvar Endereço e Calcular Taxa
                       </Button>
                     </form>
                   </Form>
-                  
+
                   {isGeocoding && (
                     <Alert className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       <AlertTitle>Calculando Taxa de Entrega...</AlertTitle>
                     </Alert>
                   )}
-                  
+
                   {/* Mensagens de status da entrega */}
                   {isAddressSaved && !isGeocoding && (
                     <>
@@ -1135,7 +1092,7 @@ const Checkout = () => {
                           <AlertDescription>Seu endereço está fora da área de cobertura do restaurante.</AlertDescription>
                         </Alert>
                       )}
-                      
+
                       {/* Caso 2: Entrega Dinâmica ATIVA e Dentro da Área (ou Frete Grátis ATIVO) */}
                       {(restaurant.delivery_enabled === false || (isDeliveryAreaValid && deliveryTime)) && (
                         <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 text-green-700">
@@ -1149,14 +1106,14 @@ const Checkout = () => {
                       )}
                     </>
                   )}
-                  
+
                   {/* Mapa do Cliente após salvar o endereço */}
                   {isAddressSaved && customerCoords && displayAddress && (
                     <div className="mt-6">
-                      <ClientLocationMap 
-                        latitude={customerCoords[0]} 
-                        longitude={customerCoords[1]} 
-                        address={displayAddress} 
+                      <ClientLocationMap
+                        latitude={customerCoords[0]}
+                        longitude={customerCoords[1]}
+                        address={displayAddress}
                       />
                     </div>
                   )}
@@ -1168,8 +1125,7 @@ const Checkout = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-primary" />
-                  Método de Pagamento *
+                  <CreditCard className="h-5 w-5 text-primary" /> Método de Pagamento *
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1177,26 +1133,24 @@ const Checkout = () => {
                   name="payment_method_id"
                   control={form.control}
                   render={({ field }) => (
-                    <RadioGroup 
+                    <RadioGroup
                       onValueChange={(newMethodId) => {
                         const method = paymentMethods?.find(m => m.id === newMethodId);
                         const isOnline = method?.name?.includes('online');
                         const isMpConfigured = !!mpPublicKey && mpPublicKey.trim() !== '';
-                        
                         handlePaymentMethodChange(newMethodId, !!isOnline, isMpConfigured);
-                      }} 
-                      value={field.value} 
+                      }}
+                      value={field.value}
                       className="space-y-3"
                     >
                       {paymentMethods?.map(method => {
                         const isMpOnline = method.name?.includes('online');
                         const isMpConfigured = !!mpPublicKey && mpPublicKey.trim() !== '';
                         const isDisabled = isMpOnline && !isMpConfigured;
-                        
                         return (
-                          <Label 
-                            key={method.id} 
-                            htmlFor={method.id} 
+                          <Label
+                            key={method.id}
+                            htmlFor={method.id}
                             className={cn(
                               "flex items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer",
                               isDisabled && "opacity-50 cursor-not-allowed"
@@ -1221,25 +1175,24 @@ const Checkout = () => {
                 {form.formState.errors.payment_method_id && <p className="text-destructive text-sm mt-2">{form.formState.errors.payment_method_id.message}</p>}
               </CardContent>
             </Card>
-            
+
             {/* Troco (se for dinheiro) */}
             {isCashPayment && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-xl flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-primary" />
-                    Troco
+                    <DollarSign className="h-5 w-5 text-primary" /> Troco
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
                     <Label htmlFor="change_for">Precisa de troco para quanto? (Opcional)</Label>
-                    <Input 
-                      id="change_for" 
-                      type="number" 
-                      step="0.01" 
+                    <Input
+                      id="change_for"
+                      type="number"
+                      step="0.01"
                       placeholder={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}
-                      {...form.register('change_for')} 
+                      {...form.register('change_for')}
                     />
                     {form.formState.errors.change_for?.message && (
                       <p className="text-destructive text-sm">{form.formState.errors.change_for.message}</p>
@@ -1256,14 +1209,18 @@ const Checkout = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
-                  <Mail className="h-5 w-5 text-primary" />
-                  Observações
+                  <Mail className="h-5 w-5 text-primary" /> Observações
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notas para o restaurante (Opcional)</Label>
-                  <Textarea id="notes" {...form.register('notes')} rows={3} placeholder="Ex: Entregar na portaria, sem pimenta, etc." />
+                  <Textarea
+                    id="notes"
+                    {...form.register('notes')}
+                    rows={3}
+                    placeholder="Ex: Entregar na portaria, sem pimenta, etc."
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -1284,9 +1241,7 @@ const Checkout = () => {
                     </div>
                   ))}
                 </div>
-                
                 <Separator />
-                
                 <div className="space-y-1">
                   <div className="flex justify-between text-sm text-muted-foreground">
                     <span>Subtotal</span>
@@ -1297,16 +1252,13 @@ const Checkout = () => {
                     <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}</span>
                   </div>
                 </div>
-                
                 <Separator />
-                
                 <div className="flex justify-between font-bold text-xl">
                   <span>Total</span>
                   <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}</span>
                 </div>
-                
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   form="checkout-form"
                   className="w-full h-12 text-lg"
                   disabled={isCheckoutDisabled}
@@ -1317,14 +1269,12 @@ const Checkout = () => {
                     isOnlinePayment ? 'Pagar e Finalizar' : 'Confirmar Pedido'
                   )}
                 </Button>
-                
                 {deliveryOption === 'delivery' && !isAddressSaved && (
-                    <Alert variant="destructive" className="mt-3">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription className="text-xs">Salve o endereço acima para continuar.</AlertDescription>
-                    </Alert>
+                  <Alert variant="destructive" className="mt-3">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">Salve o endereço acima para continuar.</AlertDescription>
+                  </Alert>
                 )}
-                
                 <Link to={`/menu/${restaurant.id}`} className="block text-center text-sm text-muted-foreground hover:underline mt-2">
                   Voltar ao Cardápio
                 </Link>
