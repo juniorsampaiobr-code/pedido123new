@@ -159,6 +159,11 @@ export type Database = {
           latitude: number | null
           longitude: number | null
           cpf_cnpj: string | null
+          street: string | null
+          number: string | null
+          neighborhood: string | null
+          city: string | null
+          zip_code: string | null
         }
         Insert: {
           address?: string | null
@@ -172,6 +177,11 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           cpf_cnpj?: string | null
+          street?: string | null
+          number?: string | null
+          neighborhood?: string | null
+          city?: string | null
+          zip_code?: string | null
         }
         Update: {
           address?: string | null
@@ -185,6 +195,11 @@ export type Database = {
           latitude?: number | null
           longitude?: number | null
           cpf_cnpj?: string | null
+          street?: string | null
+          number?: string | null
+          neighborhood?: string | null
+          city?: string | null
+          zip_code?: string | null
         }
         Relationships: []
       }

@@ -40,7 +40,7 @@ import {
 
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
-type Customer = Tables<'customers'> & { street: string | null, number: string | null, neighborhood: string | null, city: string | null, zip_code: string | null }; // Adicionando campos de endereço
+type Customer = Tables<'customers'>; // Removendo a extensão manual
 type DeliveryZone = Tables<'delivery_zones'>;
 type PaymentMethod = Tables<'payment_methods'>;
 type CartItem = {
@@ -132,6 +132,7 @@ const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
     .single();
 
   if (error && error.code !== 'PGRST116') throw new Error(error.message);
+  // O cast é seguro porque a query acima garante as colunas
   return data as Customer || null;
 };
 
