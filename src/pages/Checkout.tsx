@@ -312,8 +312,34 @@ const Checkout = () => {
   // Watchers para o formulário de endereço
   const addressFields = addressForm.watch(['zip_code', 'street', 'number', 'city', 'neighborhood']);
   
-  // 1. Preencher formulário de contato (apenas na montagem ou mudança de user/customer)
+  // String que representa o endereço atual no formulário (para comparação)
+  const currentAddressString = useMemo(() => {
+    const [zip_code, street, number, city, neighborhood] = addressFields;
+    return `${street}|${number}|${neighborhood}|${city}|${zip_code}`;
+  }, [addressFields]);
+  
+  // Estado para armazenar a string do endereço que foi SALVO/VALIDADO
+  const [savedAddressString, setSavedAddressString] = useState<string | null>(null);
+
+  // 1. Preencher formulário de contato e endereço (apenas na montagem ou mudança de user/customer)
   useEffect(() => {
+    // Resetar estados de endereço e taxa apenas se o cliente/usuário mudar
+    setIsAddressSaved(false);
+    setCustomerCoords(null);
+    setDeliveryFee(0);
+    setDeliveryTime(null);
+    setIsDeliveryAreaValid(true);
+    setSavedAddressString(null);
+    
+    // Limpa os campos de endereço
+    addressForm.reset({
+      zip_code: '',
+      street: '',
+      number: '',
+      neighborhood: '',
+      city: '',
+    });
+    
     if (customer) {
       // Preenche APENAS dados de contato do cliente existente
       form.reset({
@@ -326,16 +352,24 @@ const Checkout = () => {
       
       // Se o cliente tem endereço salvo, preenche o formulário de endereço
       if (customer.address && customer.latitude && customer.longitude) {
-          // Tenta extrair os campos do endereço salvo (simplificado, pode não ser perfeito)
-          const parts = customer.address.split(',').map(p => p.trim());
+          // Tenta extrair os campos do endereço salvo
+          const zip_code = customer.zip_code || customer.address.match(/\d{5}-?\d{3}$/)?.[0]?.replace(/\D/g, '') || '';
+          const street = customer.street || '';
+          const number = customer.number || '';
+          const neighborhood = customer.neighborhood || '';
+          const city = customer.city || '';
           
           addressForm.reset({
-              zip_code: customer.address.match(/\d{5}-?\d{3}$/)?.[0]?.replace(/\D/g, '') || '',
-              street: customer.street || parts[0] || '',
-              number: customer.number || parts[1] || '',
-              neighborhood: customer.neighborhood || parts[2] || '',
-              city: customer.city || parts[3] || '',
+              zip_code: zip_code,
+              street: street,
+              number: number,
+              neighborhood: neighborhood,
+              city: city,
           });
+          
+          // Define a string do endereço salvo para comparação futura
+          const initialAddressString = `${street}|${number}|${neighborhood}|${city}|${zip_code}`;
+          setSavedAddressString(initialAddressString);
           
           // Se o cliente já tem coordenadas, pré-calcula a taxa (sem geocodificação)
           if (restaurantCoords && deliveryZones) {
@@ -374,6 +408,20 @@ const Checkout = () => {
       });
     }
   }, [customer, form, user, isLoadingCustomer, addressForm, restaurantCoords, deliveryZones]); // Dependências ajustadas
+
+  // 2. Efeito para resetar o status de salvo se o endereço for alterado
+  useEffect(() => {
+    // Se o endereço atual do formulário for diferente do último endereço salvo/validado,
+    // e a opção for 'delivery', resetamos isAddressSaved.
+    if (deliveryOption === 'delivery' && savedAddressString !== null && currentAddressString !== savedAddressString) {
+        setIsAddressSaved(false);
+        setDeliveryFee(0);
+        setDeliveryTime(null);
+        setIsDeliveryAreaValid(true);
+        setCustomerCoords(null);
+    }
+  }, [currentAddressString, savedAddressString, deliveryOption]);
+
 
   // Se a opção de entrega mudar para 'pickup', o endereço é considerado salvo
   useEffect(() => {
@@ -491,7 +539,7 @@ const Checkout = () => {
       
       return { customer: savedCustomer, feeResult };
     },
-    onSuccess: (result) => {
+    onSuccess: (result, variables) => {
       const { customer: newCustomer, feeResult } = result;
       
       if (newCustomer?.id !== 'anonymous') {
@@ -503,6 +551,11 @@ const Checkout = () => {
       setIsDeliveryAreaValid(feeResult.isValid);
       setIsAddressSaved(true);
       setCustomerCoords([feeResult.coords!.lat, feeResult.coords!.lng]);
+      
+      // NOVO: Atualiza a string do endereço salvo para comparação futura
+      const newAddressString = `${variables.street}|${variables.number}|${variables.neighborhood}|${variables.city}|${variables.zip_code}`;
+      setSavedAddressString(newAddressString);
+      
       toast.success('Endereço salvo e taxa de entrega calculada!');
     },
     onError: (err) => {
@@ -559,12 +612,6 @@ const Checkout = () => {
         address: fullAddress, 
         latitude: customerCoords ? customerCoords[0] : null,
         longitude: customerCoords ? customerCoords[1] : null,
-        // Adicionando campos individuais para consistência
-        street: addressForm.getValues('street') || null,
-        number: addressForm.getValues('number') || null,
-        neighborhood: addressForm.getValues('neighborhood') || null,
-        city: addressForm.getValues('city') || null,
-        zip_code: addressForm.getValues('zip_code') || null,
       };
 
       if (user) {
