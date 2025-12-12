@@ -491,6 +491,9 @@ const Checkout = () => {
         zip_code: data.zip_code,
       };
 
+      // Colunas que queremos de volta
+      const selectColumns = '*, street, number, neighborhood, city, zip_code';
+
       let savedCustomer: Customer;
       if (customer?.id) {
         // Atualiza cliente existente (incluindo endereço)
@@ -498,7 +501,7 @@ const Checkout = () => {
           .from('customers')
           .update(addressPayload as TablesUpdate<'customers'>)
           .eq('id', customer.id)
-          .select('*')
+          .select(selectColumns)
           .single();
         if (updateError) throw updateError;
         savedCustomer = updatedCustomer as Customer;
@@ -507,7 +510,7 @@ const Checkout = () => {
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(addressPayload)
-          .select('*')
+          .select(selectColumns)
           .single();
         if (insertError) throw insertError;
         savedCustomer = newCustomer as Customer;
@@ -560,6 +563,11 @@ const Checkout = () => {
       const cleanedPhone = data.phone.replace(/\D/g, '');
       const cleanedCpfCnpj = data.cpf_cnpj?.replace(/\D/g, '') || null;
 
+      // Validação final antes de enviar
+      if (!data.name || cleanedPhone.length < 10 || (cleanedCpfCnpj && cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14)) {
+          throw new Error("Dados de contato incompletos ou inválidos.");
+      }
+
       // Construindo o endereço completo a partir dos campos do addressForm
       const fullAddress = deliveryOption === 'delivery' ? 
         `${addressFields[1]}, ${addressFields[2]}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` : 
@@ -587,13 +595,16 @@ const Checkout = () => {
           customerPayload.email = null;
       }
 
+      // Colunas que queremos de volta
+      const selectColumns = '*, street, number, neighborhood, city, zip_code';
+
       if (user) {
         if (customer) {
           const { data: updatedCustomer, error: updateError } = await supabase
             .from('customers')
             .update(customerPayload as TablesUpdate<'customers'>)
             .eq('id', customer.id)
-            .select('*')
+            .select(selectColumns)
             .single();
           if (updateError) throw updateError;
           return updatedCustomer as Customer;
@@ -601,7 +612,7 @@ const Checkout = () => {
           const { data: newCustomer, error: insertError } = await supabase
             .from('customers')
             .insert(customerPayload)
-            .select('*')
+            .select(selectColumns)
             .single();
           if (insertError) throw insertError;
           return newCustomer as Customer;
@@ -611,7 +622,7 @@ const Checkout = () => {
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(customerPayload)
-          .select('*')
+          .select(selectColumns)
           .single();
         if (insertError) throw insertError;
         return newCustomer as Customer;
