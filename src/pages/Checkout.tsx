@@ -113,11 +113,11 @@ const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[
   return data;
 };
 
-// ATUALIZADO: Buscando colunas de endereço individuais
+// ATUALIZADO: Simplificando o SELECT para evitar erro 400
 const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
   const { data, error } = await supabase
     .from('customers')
-    .select('*, street, number, neighborhood, city, zip_code')
+    .select('*') // Removendo a lista explícita de colunas de endereço após o '*'
     .eq('user_id', userId)
     .limit(1)
     .single();
@@ -248,7 +248,7 @@ const Checkout = () => {
         return { coords, fee: 0, time: null, isValid: false };
       }
     } else {
-      return { coords, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
+      return { coords: null, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
     }
   }, [restaurant, restaurantCoords, deliveryZones]);
 
@@ -494,7 +494,7 @@ const Checkout = () => {
           .from('customers')
           .update(addressPayload as TablesUpdate<'customers'>)
           .eq('id', customer.id)
-          .select('*, street, number, neighborhood, city, zip_code') // Seleciona explicitamente
+          .select('*') // Simplificando o select
           .single();
         if (updateError) throw updateError;
         savedCustomer = updatedCustomer as Customer;
@@ -503,7 +503,7 @@ const Checkout = () => {
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(addressPayload)
-          .select('*, street, number, neighborhood, city, zip_code') // Seleciona explicitamente
+          .select('*') // Simplificando o select
           .single();
         if (insertError) throw insertError;
         savedCustomer = newCustomer as Customer;
@@ -584,7 +584,7 @@ const Checkout = () => {
             .from('customers')
             .update(customerPayload as TablesUpdate<'customers'>)
             .eq('id', customer.id)
-            .select('*, street, number, neighborhood, city, zip_code') // Seleciona explicitamente
+            .select('*') // Simplificando o select
             .single();
           if (updateError) throw updateError;
           return updatedCustomer as Customer;
@@ -592,7 +592,7 @@ const Checkout = () => {
           const { data: newCustomer, error: insertError } = await supabase
             .from('customers')
             .insert(customerPayload)
-            .select('*, street, number, neighborhood, city, zip_code') // Seleciona explicitamente
+            .select('*') // Simplificando o select
             .single();
           if (insertError) throw insertError;
           return newCustomer as Customer;
@@ -602,7 +602,7 @@ const Checkout = () => {
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(customerPayload)
-          .select('*, street, number, neighborhood, city, zip_code') // Seleciona explicitamente
+          .select('*') // Simplificando o select
           .single();
         if (insertError) throw insertError;
         return newCustomer as Customer;
