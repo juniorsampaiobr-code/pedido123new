@@ -40,7 +40,7 @@ import {
 
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
-type Customer = Tables<'customers'>; // Removendo a extensão manual
+type Customer = Tables<'customers'>;
 type DeliveryZone = Tables<'delivery_zones'>;
 type PaymentMethod = Tables<'payment_methods'>;
 type CartItem = {
@@ -522,7 +522,7 @@ const Checkout = () => {
           .from('customers')
           .update(addressPayload as TablesUpdate<'customers'>)
           .eq('id', customer.id)
-          .select('*, street, number, neighborhood, city, zip_code') // Seleciona os campos individuais
+          .select('*, street, number, neighborhood, city, zip_code') // Seleciona explicitamente
           .single();
         if (updateError) throw updateError;
         savedCustomer = updatedCustomer as Customer;
@@ -531,7 +531,7 @@ const Checkout = () => {
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(addressPayload)
-          .select('*, street, number, neighborhood, city, zip_code') // Seleciona os campos individuais
+          .select('*, street, number, neighborhood, city, zip_code') // Seleciona explicitamente
           .single();
         if (insertError) throw insertError;
         savedCustomer = newCustomer as Customer;
@@ -567,31 +567,6 @@ const Checkout = () => {
       setIsAddressSaved(false);
     }
   });
-  
-  const handleSaveAddress = async () => {
-    if (deliveryOption === 'pickup') return;
-    
-    const isValid = await addressForm.trigger();
-    if (!isValid) {
-      toast.error("Preencha todos os campos obrigatórios do endereço.");
-      return;
-    }
-    
-    const data = addressForm.getValues();
-    
-    // Usamos o toast de loading da mutação para evitar problemas de DOM
-    const loadingToastId = toast.loading("Salvando endereço e calculando taxa...");
-    
-    try {
-        await saveAddressMutation.mutateAsync(data);
-        toast.dismiss(loadingToastId);
-    } catch (e) {
-        // O erro já foi tratado no onError da mutação
-        toast.dismiss(loadingToastId);
-    }
-  };
-
-  // --- Mutações de Pedido ---
 
   const createCustomerMutation = useMutation({
     mutationFn: async (data: CheckoutFormValues): Promise<Customer> => {
@@ -629,7 +604,7 @@ const Checkout = () => {
             .from('customers')
             .update(customerPayload as TablesUpdate<'customers'>)
             .eq('id', customer.id)
-            .select('*, street, number, neighborhood, city, zip_code')
+            .select('*, street, number, neighborhood, city, zip_code') // Seleciona explicitamente
             .single();
           if (updateError) throw updateError;
           return updatedCustomer as Customer;
@@ -637,7 +612,7 @@ const Checkout = () => {
           const { data: newCustomer, error: insertError } = await supabase
             .from('customers')
             .insert(customerPayload)
-            .select('*, street, number, neighborhood, city, zip_code')
+            .select('*, street, number, neighborhood, city, zip_code') // Seleciona explicitamente
             .single();
           if (insertError) throw insertError;
           return newCustomer as Customer;
@@ -646,7 +621,7 @@ const Checkout = () => {
         const { data: newCustomer, error: insertError } = await supabase
           .from('customers')
           .insert(customerPayload)
-          .select('*, street, number, neighborhood, city, zip_code')
+          .select('*, street, number, neighborhood, city, zip_code') // Seleciona explicitamente
           .single();
         if (insertError) throw insertError;
         return newCustomer as Customer;
