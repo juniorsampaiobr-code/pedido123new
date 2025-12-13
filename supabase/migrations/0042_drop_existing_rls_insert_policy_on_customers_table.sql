@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Allow insert for all customer types" ON public.customers;

@@ -1,0 +1,21 @@
+diff --git a/src/pages/OrderSuccess.tsx b/src/pages/OrderSuccess.tsx
+index eac935b..547b56c 100644
+--- a/src/pages/OrderSuccess.tsx
++++ b/src/pages/OrderSuccess.tsx
+@@ -50,7 +50,7 @@ const OrderSuccess = () => {
+     queryKey: ['customerOrderStatus', orderId],
+     queryFn: () => fetchOrderDetails(orderId!),
+     enabled: !!orderId,
+-    refetchInterval: 10000, // Keep tracking status
++
+   });
+ 
+   const isCancellable = useMemo(() => {
+@@ -118,6 +118,7 @@ const OrderSuccess = () => {
+       // clearCart(); // Removido. O clearCart deve ser chamado no Checkout.tsx após o sucesso do pedido.
+       // Se o Mercado Pago retornar 'approved' OU 'pending', tentamos confirmar o pagamento no backend.
+       if (paymentStatus === 'approved' || paymentStatus === 'pending') {
++        console.log("LOG: Chamando confirmPaymentMutation para OrderID:", orderId);
+         setTimeout(() => {
+           confirmPaymentMutation.mutate(orderId);
+         }, 0);

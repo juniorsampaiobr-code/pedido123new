@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Allow customer self-cancellation" ON public.orders;
