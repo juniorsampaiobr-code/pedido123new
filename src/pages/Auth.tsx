@@ -138,6 +138,30 @@ const Auth = () => {
         const cleanedPhone = cleanPhoneNumber(phone);
         const cleanedCpfCnpj = cleanCpfCnpj(cpfCnpj);
         
+        // Verificar duplicidade antes de criar a conta
+        const { data: checkData, error: checkError } = await supabase.rpc('check_registration_data', {
+          phone_in: cleanedPhone,
+          cpf_cnpj_in: cleanedCpfCnpj
+        });
+
+        if (checkError) {
+          console.error("Erro ao verificar dados:", checkError);
+        } else if (checkData) {
+          const { phone_exists, cpf_exists } = checkData as { phone_exists: boolean, cpf_exists: boolean };
+          
+          if (phone_exists) {
+            toast.error("Este telefone já está cadastrado em outra conta.");
+            setIsLoading(false);
+            return;
+          }
+          
+          if (cpf_exists) {
+            toast.error("Este CPF/CNPJ já está cadastrado em outra conta.");
+            setIsLoading(false);
+            return;
+          }
+        }
+        
         const { data, error } = await supabase.auth.signUp({
           email,
           password,

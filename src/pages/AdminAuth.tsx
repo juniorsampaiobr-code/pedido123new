@@ -199,6 +199,32 @@ const AdminAuth = () => {
         const cleanedPhone = cleanPhoneNumber(phone);
         const cleanedCpfCnpj = cleanCpfCnpj(cpfCnpj);
         
+        // Verificar duplicidade antes de criar a conta
+        const { data: checkData, error: checkError } = await supabase.rpc('check_registration_data', {
+          phone_in: cleanedPhone,
+          cpf_cnpj_in: cleanedCpfCnpj
+        });
+
+        if (checkError) {
+          console.error("Erro ao verificar dados:", checkError);
+          // Opcional: Permitir continuar se a verificação falhar, ou bloquear
+          // Por segurança, vamos apenas logar e continuar, deixando o banco barrar se tiver constraint
+        } else if (checkData) {
+          const { phone_exists, cpf_exists } = checkData as { phone_exists: boolean, cpf_exists: boolean };
+          
+          if (phone_exists) {
+            toast.error("Este telefone já está cadastrado em outra conta.");
+            setIsFormLoading(false);
+            return;
+          }
+          
+          if (cpf_exists) {
+            toast.error("Este CPF/CNPJ já está cadastrado em outra conta.");
+            setIsFormLoading(false);
+            return;
+          }
+        }
+
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -215,7 +241,7 @@ const AdminAuth = () => {
         if (error) {
           // Se o erro for 'User already registered', tenta fazer o login
           if (error.message.includes("User already registered")) {
-            toast.warning("Usuário já cadastrado. Tentando fazer login...");
+            toast.warning("Usuário já cadastrado com este email. Tentando fazer login...");
             
             const { error: signInError } = await supabase.auth.signInWithPassword({
               email,
