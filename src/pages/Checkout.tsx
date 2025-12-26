@@ -43,6 +43,40 @@ type CartItem = {
   subtotal: number;
 };
 
+// --- Helpers de Formatação ---
+const formatPhoneNumber = (value: string) => {
+  if (!value) return '';
+  let cleaned = value.replace(/\D/g, '');
+  
+  if (cleaned.length > 11) cleaned = cleaned.slice(0, 11);
+  if (cleaned.length > 0) cleaned = `(${cleaned}`;
+  if (cleaned.length > 3) cleaned = `${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+  if (cleaned.length > 10) cleaned = `${cleaned.slice(0, 10)}-${cleaned.slice(10)}`;
+  
+  return cleaned;
+};
+
+const formatCpfCnpj = (value: string) => {
+  if (!value) return '';
+  let cleaned = value.replace(/\D/g, '');
+
+  if (cleaned.length > 14) cleaned = cleaned.slice(0, 14);
+
+  if (cleaned.length <= 11) {
+    // CPF
+    if (cleaned.length > 9) cleaned = `${cleaned.slice(0, 9)}-${cleaned.slice(9)}`;
+    if (cleaned.length > 6) cleaned = `${cleaned.slice(0, 6)}.${cleaned.slice(6)}`;
+    if (cleaned.length > 3) cleaned = `${cleaned.slice(0, 3)}.${cleaned.slice(3)}`;
+  } else {
+    // CNPJ
+    if (cleaned.length > 12) cleaned = `${cleaned.slice(0, 12)}-${cleaned.slice(12)}`;
+    if (cleaned.length > 8) cleaned = `${cleaned.slice(0, 8)}/${cleaned.slice(8)}`;
+    if (cleaned.length > 5) cleaned = `${cleaned.slice(0, 5)}.${cleaned.slice(5)}`;
+    if (cleaned.length > 2) cleaned = `${cleaned.slice(0, 2)}.${cleaned.slice(2)}`;
+  }
+  return cleaned;
+};
+
 // --- Schemas ---
 const addressSchema = z.object({
   zip_code: z.string().min(1, 'CEP é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length === 8, {
@@ -319,8 +353,8 @@ const Checkout = () => {
       form.reset({
         ...form.getValues(),
         name: customer.name || '',
-        phone: customer.phone || '',
-        cpf_cnpj: customer.cpf_cnpj || '',
+        phone: formatPhoneNumber(customer.phone || ''), // Formatando
+        cpf_cnpj: formatCpfCnpj(customer.cpf_cnpj || ''), // Formatando
         change_for: '',
       });
 
@@ -372,8 +406,8 @@ const Checkout = () => {
       form.reset({
         ...form.getValues(),
         name: (userMetadata.full_name as string) || '',
-        phone: (userMetadata.phone as string) || '',
-        cpf_cnpj: (userMetadata.cpf_cnpj as string) || '',
+        phone: formatPhoneNumber((userMetadata.phone as string) || ''), // Formatando
+        cpf_cnpj: formatCpfCnpj((userMetadata.cpf_cnpj as string) || ''), // Formatando
         change_for: '',
       });
     }
