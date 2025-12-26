@@ -26,19 +26,20 @@ import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/PhoneInput';
 import { CpfCnpjInput } from '@/components/CpfCnpjInput';
 import { Tables, TablesUpdate, TablesInsert, Enums } from '@/integrations/supabase/types';
-import { User, Save, Loader2, History, Clock, CreditCard, Package, CheckCircle, XCircle, Check, Euro, Truck, Eye, Mail } from 'lucide-react';
+import { User, Save, Loader2, History, Clock, CreditCard, Package, CheckCircle, XCircle, Check, Euro, Truck, Eye, Mail, Store } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Link } from 'react-router-dom'; // Importando Link
+import { Link } from 'react-router-dom';
 
 type Customer = Tables<'customers'>;
 type Order = Tables<'orders'> & { 
   order_items: (Tables<'order_items'> & { products: Tables<'products'> | null })[],
   payment_methods: Tables<'payment_methods'> | null,
+  restaurants: { name: string | null } | null, // Adicionado relacionamento com restaurantes
 };
 type OrderStatus = Enums<'order_status'>;
 
@@ -55,7 +56,6 @@ const ORDER_STATUS_MAP: Record<OrderStatus, { label: string, icon: React.Element
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
 
-// ATUALIZADO: CPF/CNPJ agora é obrigatório e deve ter 11 ou 14 dígitos
 const profileSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório.'),
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(cleanPhoneNumber).refine(val => val.length >= 10, {
@@ -74,14 +74,15 @@ interface CustomerProfileModalProps {
   customer: Customer | null;
 }
 
-// NOVO: Função para buscar os últimos 5 pedidos do cliente
+// Atualizado para buscar o nome do restaurante
 const fetchCustomerOrders = async (customerId: string): Promise<Order[]> => {
   const { data, error } = await supabase
     .from('orders')
     .select(`
       *,
       order_items(*, products(name)),
-      payment_methods(name)
+      payment_methods(name),
+      restaurants(name)
     `)
     .eq('customer_id', customerId)
     .order('created_at', { ascending: false })
@@ -96,7 +97,7 @@ const fetchCustomerOrders = async (customerId: string): Promise<Order[]> => {
 
 export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProfileModalProps) => {
   const queryClient = useQueryClient();
-  const [userEmail, setUserEmail] = useState<string | null>(null); // Estado para armazenar o email do usuário logado
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -107,7 +108,6 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
     },
   });
   
-  // NOVO: Query para buscar o histórico de pedidos
   const { data: orders, isLoading: isLoadingOrders } = useQuery<Order[]>({
     queryKey: ['customerOrders', customer?.id],
     queryFn: () => fetchCustomerOrders(customer!.id),
@@ -123,14 +123,12 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
         setUserEmail(user.email || null);
         
         if (customer) {
-          // Caso 1: Cliente existe na tabela 'customers'
           form.reset({
             name: customer.name || '',
             phone: customer.phone || '',
             cpf_cnpj: customer.cpf_cnpj || '',
           });
         } else if (isOpen) {
-          // Caso 2: Cliente não existe, mas o modal está aberto (usuário logado)
           const userMetadata = user.user_metadata;
           form.reset({
             name: (userMetadata.full_name as string) || '',
@@ -139,7 +137,6 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
           });
         }
       } else {
-        // Usuário não logado, limpa o formulário
         form.reset({ name: '', phone: '', cpf_cnpj: '' });
         setUserEmail(null);
       }
@@ -152,7 +149,6 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
 
   const mutation = useMutation({
     mutationFn: async (data: ProfileFormValues) => {
-      // Se o cliente for nulo, precisamos do user_id para criar um novo registro
       const user = await supabase.auth.getUser();
       const userId = user.data.user?.id;
       
@@ -161,12 +157,10 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
       const updateData: TablesUpdate<'customers'> = {
         name: data.name,
         phone: data.phone,
-        // O email não é mais atualizado aqui
         cpf_cnpj: data.cpf_cnpj || null,
       };
 
       if (customer?.id) {
-        // Atualiza cliente existente
         const { error } = await supabase
           .from('customers')
           .update(updateData)
@@ -174,14 +168,12 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
 
         if (error) throw new Error(error.message);
       } else if (userId) {
-        // Cria novo cliente se não existir (usando insert, pois o upsert é mais complexo com RLS)
         const insertData: TablesInsert<'customers'> = { 
             ...updateData, 
             user_id: userId, 
-            // Campos obrigatórios que não estão no updateData:
             name: data.name,
             phone: data.phone,
-            email: user.data.user?.email || null, // Usa o email do auth.users
+            email: user.data.user?.email || null,
         };
         
         const { error } = await supabase
@@ -195,7 +187,6 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
     },
     onSuccess: () => {
       toast.success('Perfil atualizado com sucesso!');
-      // Invalida a query do cliente no menu/checkout para forçar a atualização
       queryClient.invalidateQueries({ queryKey: ['menuCustomerData'] });
       queryClient.invalidateQueries({ queryKey: ['checkoutCustomerData'] });
       onClose();
@@ -225,7 +216,6 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
           </DialogDescription>
         </DialogHeader>
         
-        {/* Reestruturando o layout para garantir que o formulário e o histórico fiquem em colunas separadas */}
         <div className="grid md:grid-cols-2 gap-6 pt-4">
           
           {/* Coluna 1: Formulário de Perfil */}
@@ -234,7 +224,6 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 
-                {/* Campo de Email (Somente Leitura) */}
                 <div className="space-y-2">
                     <FormLabel className="flex items-center gap-2">
                         <Mail className="h-4 w-4" /> Email
@@ -320,8 +309,8 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
                     const createdAt = new Date(order.created_at!);
                     const formattedDate = format(createdAt, "dd/MM/yy 'às' HH:mm", { locale: ptBR });
                     const paymentMethodName = order.payment_methods?.name || 'Não especificado';
+                    const restaurantName = order.restaurants?.name || 'Loja Desconhecida';
                     
-                    // Lista de itens (limitada a 2 para resumo)
                     const itemSummary = order.order_items
                       .slice(0, 2)
                       .map(item => item.products?.name || 'Item')
@@ -330,8 +319,13 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
 
                     return (
                       <div key={order.id} className="border p-3 rounded-lg hover:bg-muted/50 transition-colors space-y-1">
-                        <div className="flex justify-between items-start">
-                          <p className="font-bold text-sm">Pedido #{orderNumber}</p>
+                        <div className="flex justify-between items-start mb-1">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm">Pedido #{orderNumber}</span>
+                            <span className="text-xs font-semibold text-primary flex items-center gap-1 mt-0.5">
+                              <Store className="h-3 w-3" /> {restaurantName}
+                            </span>
+                          </div>
                           <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full text-white flex-shrink-0", statusInfo.color)}>
                             {statusInfo.label}
                           </span>
@@ -351,14 +345,11 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
                           <span className="font-bold text-foreground">{formatPrice(order.total_amount)}</span>
                         </div>
                         
-                        {/* NOVO BOTÃO DE VISUALIZAÇÃO (apenas para o pedido mais recente) */}
-                        {orders[0].id === order.id && (
-                            <Link to={`/order-success/${order.id}`} onClick={onClose}>
-                                <Button variant="secondary" size="sm" className="w-full mt-2">
-                                    <Eye className="h-4 w-4 mr-2" /> Ver Pedido
-                                </Button>
-                            </Link>
-                        )}
+                        <Link to={`/order-success/${order.id}`} onClick={onClose}>
+                            <Button variant="secondary" size="sm" className="w-full mt-2 h-7 text-xs">
+                                <Eye className="h-3 w-3 mr-2" /> Ver Detalhes
+                            </Button>
+                        </Link>
                       </div>
                     );
                   })
@@ -370,7 +361,6 @@ export const CustomerProfileModal = ({ isOpen, onClose, customer }: CustomerProf
           </div>
         </div>
         
-        {/* O DialogFooter agora só contém o botão Fechar */}
         <DialogFooter className="pt-4">
           <Button type="button" variant="outline" onClick={onClose}>Fechar</Button>
         </DialogFooter>
