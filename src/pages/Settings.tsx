@@ -28,6 +28,19 @@ type Restaurant = Tables<'restaurants'>;
 
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 
+// Helper para formatar o telefone ao carregar do banco
+const formatPhoneNumber = (value: string) => {
+  if (!value) return '';
+  let cleaned = value.replace(/\D/g, '');
+  
+  if (cleaned.length > 11) cleaned = cleaned.slice(0, 11);
+  if (cleaned.length > 0) cleaned = `(${cleaned}`;
+  if (cleaned.length > 3) cleaned = `${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+  if (cleaned.length > 10) cleaned = `${cleaned.slice(0, 10)}-${cleaned.slice(10)}`;
+  
+  return cleaned;
+};
+
 const restaurantSchema = z.object({
   name: z.string().min(1, 'O nome do restaurante é obrigatório.'),
   description: z.string().optional(),
@@ -126,7 +139,7 @@ const Settings = () => {
         neighborhood: restaurant.neighborhood || '',
         city: restaurant.city || '',
         zip_code: initialZipCode,
-        phone: restaurant.phone || '',
+        phone: formatPhoneNumber(restaurant.phone || ''), // APLICA A FORMATAÇÃO AQUI
         email: restaurant.email || '',
         is_active: restaurant.is_active ?? true,
         latitude: restaurant.latitude ?? null,

@@ -42,6 +42,19 @@ interface AdminProfileData {
 const cleanPhoneNumber = (phone: string) => phone.replace(/\D/g, '');
 const cleanCpfCnpj = (doc: string) => doc.replace(/\D/g, '');
 
+// Helper para formatar o telefone ao carregar do banco
+const formatPhoneNumber = (value: string) => {
+  if (!value) return '';
+  let cleaned = value.replace(/\D/g, '');
+  
+  if (cleaned.length > 11) cleaned = cleaned.slice(0, 11);
+  if (cleaned.length > 0) cleaned = `(${cleaned}`;
+  if (cleaned.length > 3) cleaned = `${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+  if (cleaned.length > 10) cleaned = `${cleaned.slice(0, 10)}-${cleaned.slice(10)}`;
+  
+  return cleaned;
+};
+
 const profileSchema = z.object({
   full_name: z.string().min(1, 'Nome é obrigatório.'),
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(cleanPhoneNumber).refine(val => val.length >= 10, {
@@ -132,7 +145,7 @@ export const AdminProfileModal = ({ isOpen, onClose, userId }: AdminProfileModal
       // Preenche o formulário com os dados do perfil, restaurante e CPF/CNPJ do estado local
       form.reset({
         full_name: profileData.profile.full_name || '',
-        phone: profileData.profile.phone || '',
+        phone: formatPhoneNumber(profileData.profile.phone || ''), // APLICA A FORMATAÇÃO AQUI
         store_name: profileData.restaurant?.name || '',
         cpf_cnpj: userCpfCnpj || '', // Usa o CPF/CNPJ carregado do user_metadata
       });
