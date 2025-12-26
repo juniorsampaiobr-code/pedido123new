@@ -13,8 +13,8 @@ serve(async (req) => {
   }
 
   try {
-    // NOVO: Recebendo storeName e cpfCnpj
-    const { userId, fullName, storeName, cpfCnpj } = await req.json();
+    // NOVO: Recebendo storeName, cpfCnpj e phone
+    const { userId, fullName, storeName, cpfCnpj, phone } = await req.json();
 
     if (!userId) {
       return new Response(JSON.stringify({ error: 'User ID is required.' }), {
@@ -74,6 +74,7 @@ serve(async (req) => {
         .from('restaurants')
         .insert({
           name: finalRestaurantName, // USANDO O NOME DA LOJA
+          phone: phone, // SALVANDO O TELEFONE DO RESTAURANTE
           description: 'Seu novo restaurante Pedido 123!',
           owner_user_id: userId,
           is_active: true,

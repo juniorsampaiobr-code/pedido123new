@@ -50,6 +50,7 @@ const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role
   const fullName = user.user_metadata.full_name || 'Novo Usuário';
   const storeName = user.user_metadata.store_name || fullName;
   const cpfCnpj = user.user_metadata.cpf_cnpj || null;
+  const phone = user.user_metadata.phone || null; // Pegando o telefone dos metadados
   
   const { error: setupError, data: setupData } = await supabase.functions.invoke('ensure-admin-access', {
     body: { 
@@ -57,6 +58,7 @@ const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role
       fullName: fullName,
       storeName: storeName,
       cpfCnpj: cpfCnpj,
+      phone: phone, // Enviando o telefone para a função
     },
   });
   
