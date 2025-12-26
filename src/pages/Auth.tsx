@@ -29,6 +29,7 @@ const Auth = () => {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState(""); // Novo estado
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [cpfCnpj, setCpfCnpj] = useState("");
@@ -43,17 +44,14 @@ const Auth = () => {
     
     if (from === '/checkout') {
       console.log("User logged in, redirecting to checkout.");
-      // Se veio do checkout, redireciona para /checkout, garantindo que o restaurantId seja passado no state
       navigate('/checkout', { 
         replace: true, 
-        state: { restaurantId: restaurantIdFromState } // Usa o ID que veio do PreCheckout
+        state: { restaurantId: restaurantIdFromState } 
       });
     } else if (finalRestaurantId) {
-      // Se não veio do checkout, mas temos um ID de restaurante (do estado ou ativo), vai para o menu
       console.log("User logged in, redirecting to specific menu:", finalRestaurantId);
       navigate(`/menu/${finalRestaurantId}`, { replace: true });
     } else {
-      // Último recurso: se não há restaurante ativo, volta para a Index
       console.log("User logged in, no active restaurant found, redirecting to index.");
       navigate('/', { replace: true });
     }
@@ -68,8 +66,6 @@ const Auth = () => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Se o evento for SIGNED_IN, a query já foi invalidada no handleEmailAuth
-          // Se for INITIAL_SESSION ou outro evento, faz o redirect
           handleRedirect(session.user, restaurantIdFromState);
         }
       }
@@ -114,6 +110,12 @@ const Auth = () => {
       toast.error("A Senha deve ter pelo menos 6 caracteres.");
       return false;
     }
+
+    // Nova validação de confirmação de senha
+    if (password !== confirmPassword) {
+      toast.error("As senhas não coincidem. Por favor, digite novamente.");
+      return false;
+    }
     
     return true;
   };
@@ -138,7 +140,6 @@ const Auth = () => {
         const cleanedPhone = cleanPhoneNumber(phone);
         const cleanedCpfCnpj = cleanCpfCnpj(cpfCnpj);
         
-        // Verificar duplicidade antes de criar a conta
         const { data: checkData, error: checkError } = await supabase.rpc('check_registration_data', {
           phone_in: cleanedPhone,
           cpf_cnpj_in: cleanedCpfCnpj
@@ -169,7 +170,6 @@ const Auth = () => {
             data: {
               full_name: fullName,
               phone: cleanedPhone,
-              // Salvamos o CPF/CNPJ no user_metadata para ser usado no checkout
               cpf_cnpj: cleanedCpfCnpj,
             },
           }
@@ -179,7 +179,6 @@ const Auth = () => {
         
         if (data.session) {
           toast.success("Conta criada e login efetuado com sucesso!");
-          // NOVO: Invalida a query de status de autenticação
           queryClient.invalidateQueries({ queryKey: ['authStatus'] });
         } else {
           toast.success("Conta criada! Verifique seu email para confirmar.");
@@ -193,7 +192,6 @@ const Auth = () => {
         if (error) throw error;
         
         toast.success("Login realizado com sucesso!");
-        // NOVO: Invalida a query de status de autenticação
         queryClient.invalidateQueries({ queryKey: ['authStatus'] });
       }
     } catch (error: any) {
@@ -207,7 +205,6 @@ const Auth = () => {
     }
   };
 
-  // NOVO: Função para recuperação de senha
   const handlePasswordRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -219,7 +216,6 @@ const Auth = () => {
     setIsLoading(true);
     
     try {
-      // CORREÇÃO: Redireciona para a página de recuperação de senha
       const baseUrl = window.location.origin + window.location.pathname;
       const redirectToUrl = `${baseUrl}#/password-recovery`;
       
@@ -234,7 +230,7 @@ const Auth = () => {
         duration: 8000,
       });
       
-      setIsForgotPassword(false); // Volta para a tela de login
+      setIsForgotPassword(false);
     } catch (error: any) {
       toast.error(error.message || "Erro ao enviar email de recuperação.");
     } finally {
@@ -265,7 +261,6 @@ const Auth = () => {
           <CardContent className="space-y-4">
             
             {isForgotPassword ? (
-              // Formulário de Recuperação de Senha
               <form onSubmit={handlePasswordRecovery} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email *</Label>
@@ -303,7 +298,6 @@ const Auth = () => {
                 </div>
               </form>
             ) : (
-              // Formulário de Login/Cadastro
               <form onSubmit={handleEmailAuth} className="space-y-4">
                 {isSignUp && (
                   <>
@@ -367,6 +361,22 @@ const Auth = () => {
                     className="h-12"
                   />
                 </div>
+
+                {/* Campo de confirmação de senha apenas para cadastro */}
+                {isSignUp && (
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirmar Senha *</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      className="h-12"
+                    />
+                  </div>
+                )}
                 
                 {!isSignUp && (
                   <div className="text-right">
@@ -395,7 +405,10 @@ const Auth = () => {
                     variant="link"
                     type="button"
                     className="p-0 h-auto"
-                    onClick={() => setIsSignUp(!isSignUp)}
+                    onClick={() => {
+                      setIsSignUp(!isSignUp);
+                      setConfirmPassword(""); // Limpa o campo ao trocar
+                    }}
                   >
                     {isSignUp ? "Já tem uma conta? Faça login" : "Não tem uma conta? Crie uma agora"}
                   </Button>

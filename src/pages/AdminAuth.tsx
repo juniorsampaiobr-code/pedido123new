@@ -50,7 +50,7 @@ const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role
   const fullName = user.user_metadata.full_name || 'Novo Usuário';
   const storeName = user.user_metadata.store_name || fullName;
   const cpfCnpj = user.user_metadata.cpf_cnpj || null;
-  const phone = user.user_metadata.phone || null; // Pegando o telefone dos metadados
+  const phone = user.user_metadata.phone || null;
   
   const { error: setupError, data: setupData } = await supabase.functions.invoke('ensure-admin-access', {
     body: { 
@@ -58,7 +58,7 @@ const setupNewStoreAndRole = async (user: User): Promise<{ role: Enums<'app_role
       fullName: fullName,
       storeName: storeName,
       cpfCnpj: cpfCnpj,
-      phone: phone, // Enviando o telefone para a função
+      phone: phone,
     },
   });
   
@@ -93,6 +93,7 @@ const AdminAuth = () => {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState(""); // Novo estado
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [storeName, setStoreName] = useState("");
@@ -187,6 +188,13 @@ const AdminAuth = () => {
       toast.error("A Senha deve ter pelo menos 6 caracteres.");
       return false;
     }
+
+    // Nova validação de confirmação de senha
+    if (isSignUp && password !== confirmPassword) {
+      toast.error("As senhas não coincidem. Por favor, digite novamente.");
+      return false;
+    }
+
     return true;
   };
 
@@ -201,7 +209,6 @@ const AdminAuth = () => {
         const cleanedPhone = cleanPhoneNumber(phone);
         const cleanedCpfCnpj = cleanCpfCnpj(cpfCnpj);
         
-        // Verificar duplicidade antes de criar a conta
         const { data: checkData, error: checkError } = await supabase.rpc('check_registration_data', {
           phone_in: cleanedPhone,
           cpf_cnpj_in: cleanedCpfCnpj
@@ -209,8 +216,6 @@ const AdminAuth = () => {
 
         if (checkError) {
           console.error("Erro ao verificar dados:", checkError);
-          // Opcional: Permitir continuar se a verificação falhar, ou bloquear
-          // Por segurança, vamos apenas logar e continuar, deixando o banco barrar se tiver constraint
         } else if (checkData) {
           const { phone_exists, cpf_exists } = checkData as { phone_exists: boolean, cpf_exists: boolean };
           
@@ -241,7 +246,6 @@ const AdminAuth = () => {
         });
         
         if (error) {
-          // Se o erro for 'User already registered', tenta fazer o login
           if (error.message.includes("User already registered")) {
             toast.warning("Usuário já cadastrado com este email. Tentando fazer login...");
             
@@ -253,7 +257,6 @@ const AdminAuth = () => {
             if (signInError) throw signInError;
             
             toast.success("Login realizado com sucesso!");
-            // O onAuthStateChange/handleRedirect será chamado automaticamente
             return;
           }
           
@@ -296,7 +299,6 @@ const AdminAuth = () => {
     
     setIsFormLoading(true);
     try {
-      // CORREÇÃO: Usando window.location.href para garantir que o hash seja incluído no redirectTo
       const baseUrl = window.location.origin + window.location.pathname;
       const redirectToUrl = `${baseUrl}#/password-recovery`;
       
@@ -343,7 +345,6 @@ const AdminAuth = () => {
           <CardContent className="space-y-4">
             
             {isForgotPassword ? (
-              // Formulário de Recuperação de Senha
               <form onSubmit={handlePasswordRecovery} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email *</Label>
@@ -381,7 +382,6 @@ const AdminAuth = () => {
                 </div>
               </form>
             ) : (
-              // Formulário de Login/Cadastro
               <form onSubmit={handleEmailAuth} className="space-y-4">
                 {isSignUp && (
                   <>
@@ -457,6 +457,22 @@ const AdminAuth = () => {
                     className="h-12"
                   />
                 </div>
+
+                {/* Campo de confirmação de senha apenas para cadastro */}
+                {isSignUp && (
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirmar Senha *</Label>
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      placeholder="••••••••"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      required
+                      className="h-12"
+                    />
+                  </div>
+                )}
                 
                 {!isSignUp && (
                   <div className="text-right">
@@ -487,7 +503,10 @@ const AdminAuth = () => {
                 variant="link"
                 type="button"
                 className="p-0 h-auto"
-                onClick={() => setIsSignUp(!isSignUp)}
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setConfirmPassword(""); // Limpa o campo ao trocar
+                }}
               >
                 {isSignUp ? "Já tem uma conta? Faça login" : "Não tem uma conta? Cadastre-se agora"}
               </Button>
