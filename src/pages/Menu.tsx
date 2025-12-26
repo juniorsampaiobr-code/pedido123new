@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables, Enums } from '@/integrations/supabase/types';
@@ -103,7 +103,7 @@ const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
 const Menu = () => {
   const { restaurantId } = useParams<{ restaurantId: string }>();
   const isMobile = useIsMobile();
-  const { totalItems } = useCart();
+  const { totalItems, items, clearCart } = useCart();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { data: user } = useAuthStatus();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -127,6 +127,23 @@ const Menu = () => {
     enabled: !!user,
     staleTime: 0,
   });
+
+  // Efeito para verificar se o carrinho pertence a outro restaurante
+  useEffect(() => {
+    if (restaurantId && items.length > 0) {
+      // Verifica o ID do restaurante do primeiro item do carrinho
+      const cartRestaurantId = items[0].product.restaurant_id;
+      
+      // Se houver ID e for diferente do restaurante atual
+      if (cartRestaurantId && cartRestaurantId !== restaurantId) {
+        clearCart(true); // Limpa silenciosamente
+        toast.info("Novo Restaurante Detectado", {
+          description: "Seu carrinho anterior foi limpo para iniciar um novo pedido nesta loja.",
+          duration: 5000,
+        });
+      }
+    }
+  }, [restaurantId, items, clearCart]);
 
   // 4. Lógica de Status de Negócio
   const { isOpen, todayHours } = useMemo(() => {

@@ -18,7 +18,7 @@ interface CartContextType {
   addItem: (product: Product, quantity: number, notes: string) => void;
   removeItem: (productId: string) => void;
   updateItemQuantity: (productId: string, newQuantity: number) => void;
-  clearCart: () => void;
+  clearCart: (suppressToast?: boolean) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -107,9 +107,11 @@ const CartProvider = ({ children }: { children: React.ReactNode }) => {
     });
   }, [removeItem]);
 
-  const clearCart = useCallback(() => {
+  const clearCart = useCallback((suppressToast = false) => {
     setItems([]);
-    toast.info('Carrinho limpo.');
+    if (!suppressToast) {
+      toast.info('Carrinho limpo.');
+    }
   }, []);
 
   const value = useMemo(() => ({
