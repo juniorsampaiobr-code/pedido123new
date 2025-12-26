@@ -1242,7 +1242,7 @@ const Checkout = () => {
                                 <p className="font-medium" translate="no">{method.name}</p>
                                 <p className="text-xs text-muted-foreground">{method.description}</p>
                                 {isDisabled && (
-                                  <p className="text-xs text-destructive mt-1">Pagamento online indisponível (Chave Pública não configurada).</p>
+                                  <p className="text-xs text-destructive mt-1">Pagamento online indisponível no momento.</p>
                                 )}
                               </div>
                             </div>
