@@ -34,7 +34,6 @@ import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
-// Estendendo o tipo Customer para incluir o complemento, já que o type genérico pode não estar atualizado ainda
 type Customer = Tables<'customers'> & { complement?: string | null };
 type DeliveryZone = Tables<'delivery_zones'>;
 type PaymentMethod = Tables<'payment_methods'>;
@@ -84,7 +83,7 @@ const addressSchema = z.object({
   zip_code: z.string().min(1, 'CEP é obrigatório.'),
   street: z.string().min(1, 'Rua é obrigatória.'),
   number: z.string().min(1, 'Número é obrigatório.'),
-  complement: z.string().optional(), // Novo campo opcional
+  complement: z.string().optional(),
   neighborhood: z.string().min(1, 'Bairro é obrigatório.'),
   city: z.string().min(1, 'Cidade é obrigatória.'),
 });
@@ -295,7 +294,7 @@ const Checkout = () => {
       zip_code: '',
       street: '',
       number: '',
-      complement: '', // Default para complemento
+      complement: '',
       neighborhood: '',
       city: '',
     },
@@ -347,7 +346,7 @@ const Checkout = () => {
         const number = customer.number || '';
         const neighborhood = customer.neighborhood || '';
         const city = customer.city || '';
-        const complement = customer.complement || ''; // Recupera o complemento do banco
+        const complement = customer.complement || '';
         
         addressForm.reset({
           zip_code: zip_code,
@@ -424,20 +423,13 @@ const Checkout = () => {
 
   const saveAddressMutation = useMutation({
     mutationFn: async (data: AddressFormValues): Promise<{ customer: Customer | null, feeResult: { coords: { lat: number, lng: number } | null, fee: number, time: [number, number] | null, isValid: boolean } }> => {
-      console.log('=== INICIANDO SALVAMENTO DE ENDEREÇO ===');
-      console.log('Dados do endereço:', data);
       setIsGeocoding(true);
       
       const fullAddress = `${data.street}, ${data.number}${data.complement ? ` - ${data.complement}` : ''}, ${data.neighborhood}, ${data.city}, ${data.zip_code}`;
-      
-      console.log('Endereço completo:', fullAddress);
-      console.log('Iniciando geocodificação...');
       const feeResult = await calculateFee(data.zip_code, data.street, data.number, data.city, data.neighborhood);
       setIsGeocoding(false);
-      console.log('Resultado da geocodificação:', feeResult);
 
       if (!feeResult.isValid) {
-        console.error('Endereço inválido ou fora da área de entrega');
         throw new Error(restaurant?.delivery_enabled === false ? "O endereço está errado ou incompleto, revise todos os campos." : "Endereço fora da área de entrega.");
       }
 
@@ -455,14 +447,9 @@ const Checkout = () => {
       const cleanedPhone = contactPhone.replace(/\D/g, '');
       const cleanedCpfCnpj = contactCpfCnpj.replace(/\D/g, '');
 
-      console.log('=== VALIDAÇÃO DE CONTATO ===');
       if (!contactName || cleanedPhone.length < 10 || !cleanedCpfCnpj || (cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14)) {
-          const errorMsg = "Preencha Nome, Telefone (10+ dígitos) e CPF/CNPJ (11 ou 14 dígitos) nos Seus Dados antes de salvar o endereço.";
-          console.error('ERRO DE VALIDAÇÃO:', errorMsg);
-          throw new Error(errorMsg);
+          throw new Error("Preencha Nome, Telefone (10+ dígitos) e CPF/CNPJ (11 ou 14 dígitos) nos Seus Dados antes de salvar o endereço.");
       }
-
-      console.log('Validação de contato passou!');
 
       if (!customer?.id && !userId) {
         const mockCustomer: Customer = {
@@ -482,7 +469,7 @@ const Checkout = () => {
           neighborhood: data.neighborhood,
           city: data.city,
           zip_code: data.zip_code,
-          complement: data.complement || null // Adicionando complemento ao objeto mock
+          complement: data.complement || null
         };
         return { customer: mockCustomer, feeResult };
       }
@@ -493,7 +480,6 @@ const Checkout = () => {
         cpf_cnpj: cleanedCpfCnpj || null,
       };
 
-      // Cast para any para incluir o campo complement se ele não estiver nos types gerados
       const addressPayload: any = {
         user_id: user?.id || null,
         ...customerContactData,
@@ -506,7 +492,7 @@ const Checkout = () => {
         neighborhood: data.neighborhood,
         city: data.city,
         zip_code: data.zip_code,
-        complement: data.complement || null, // Incluindo complemento no payload
+        complement: data.complement || null,
       };
 
       const selectColumns = '*, street, number, neighborhood, city, zip_code, complement';
@@ -577,7 +563,6 @@ const Checkout = () => {
           throw new Error("Dados de contato incompletos ou inválidos.");
       }
 
-      // CORREÇÃO: Usando addressForm.getValues() para garantir que os dados do endereço sejam os mais atuais
       const currentAddress = addressForm.getValues();
       
       const fullAddress = deliveryOption === 'delivery' ? 
@@ -598,7 +583,7 @@ const Checkout = () => {
         neighborhood: addressForm.getValues('neighborhood') || null,
         city: addressForm.getValues('city') || null,
         zip_code: addressForm.getValues('zip_code') || null,
-        complement: addressForm.getValues('complement') || null, // Incluindo complemento
+        complement: addressForm.getValues('complement') || null,
       };
       
       if (!user) {
@@ -664,7 +649,6 @@ const Checkout = () => {
         maxTime = fallbackTime[1];
       }
 
-      // CORREÇÃO: Usando addressForm.getValues() para garantir que os dados do endereço sejam os mais atuais
       const currentAddress = addressForm.getValues();
 
       const deliveryAddress = deliveryOption === 'delivery' ? 
@@ -841,7 +825,7 @@ const Checkout = () => {
     addressForm.setValue('city', address.city);
     addressForm.setValue('zip_code', address.zip_code);
     addressForm.setValue('number', address.number);
-    addressForm.setValue('complement', ''); // LIMPA O COMPLEMENTO AO MUDAR O ENDEREÇO
+    addressForm.setValue('complement', ''); 
     
     toast.info("Endereço encontrado! Verifique o número e clique em Salvar.");
   }, [addressForm]);
@@ -901,10 +885,9 @@ const Checkout = () => {
   const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isAddressSaved);
 
   return (
-    // Container principal alterado para 'block' em vez de flexbox centralizado, 
-    // permitindo que o conteúdo flua naturalmente com mx-auto
+    // Substituindo a estrutura de container para usar container mx-auto
     <div className="min-h-screen bg-background w-full overflow-x-hidden">
-      <div className="w-full max-w-5xl mx-auto py-4 sm:py-8 px-4 sm:px-6 lg:px-8 space-y-8">
+      <div className="container mx-auto px-4 py-4 sm:py-8 max-w-5xl space-y-8">
         <CustomerProfileModal
           isOpen={isProfileModalOpen}
           onClose={() => setIsProfileModalOpen(false)}
@@ -950,7 +933,7 @@ const Checkout = () => {
 
         <div className="grid lg:grid-cols-3 gap-8 w-full">
           <div className="lg:col-span-2 space-y-6">
-            <Card className="w-full overflow-hidden">
+            <Card className="w-full max-w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                   <User className="h-5 w-5 text-primary" /> Seus Dados
@@ -994,7 +977,7 @@ const Checkout = () => {
               </CardContent>
             </Card>
 
-            <Card className="w-full overflow-hidden">
+            <Card className="w-full max-w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                   <Truck className="h-5 w-5 text-primary" /> Opção de Entrega
@@ -1005,10 +988,11 @@ const Checkout = () => {
                   name="delivery_option"
                   control={form.control}
                   render={({ field }) => (
+                    // Ajuste importante: gap-2 para mobile
                     <RadioGroup
                       onValueChange={field.onChange}
                       value={field.value}
-                      className="grid grid-cols-2 gap-4 min-w-0"
+                      className="grid grid-cols-2 gap-2 sm:gap-4 min-w-0"
                     >
                       <Label
                         htmlFor="delivery"
@@ -1033,7 +1017,7 @@ const Checkout = () => {
             </Card>
 
             {deliveryOption === 'delivery' && (
-              <Card className={cn("w-full overflow-hidden", !isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
+              <Card className={cn("w-full max-w-full overflow-hidden", !isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
                 <CardHeader>
                   <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                     <MapPin className="h-5 w-5 text-primary" /> Endereço de Entrega
@@ -1157,7 +1141,7 @@ const Checkout = () => {
               </Card>
             )}
 
-            <Card className="w-full overflow-hidden">
+            <Card className="w-full max-w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                   <CreditCard className="h-5 w-5 text-primary" /> Método de Pagamento *
@@ -1212,7 +1196,7 @@ const Checkout = () => {
             </Card>
 
             {isCashPayment && (
-              <Card className="w-full overflow-hidden">
+              <Card className="w-full max-w-full overflow-hidden">
                 <CardHeader>
                   <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                     <DollarSign className="h-5 w-5 text-primary" /> Troco
@@ -1240,7 +1224,7 @@ const Checkout = () => {
               </Card>
             )}
 
-            <Card className="w-full overflow-hidden">
+            <Card className="w-full max-w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                   <Mail className="h-5 w-5 text-primary" /> Observações
@@ -1261,7 +1245,7 @@ const Checkout = () => {
           </div>
 
           <div className="lg:col-span-1 space-y-6 sticky top-4 self-start">
-            <Card className="shadow-lg w-full overflow-hidden">
+            <Card className="shadow-lg w-full max-w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-xl sm:text-2xl">Resumo</CardTitle>
               </CardHeader>
