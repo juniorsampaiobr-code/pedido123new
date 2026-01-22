@@ -936,7 +936,8 @@ const Checkout = () => {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6 sm:gap-8 w-full">
-          <div className="lg:col-span-2 space-y-6">
+          {/* Adicionando min-w-0 para evitar que o grid expanda além da largura da tela em layouts problemáticos */}
+          <div className="lg:col-span-2 space-y-6 min-w-0">
             <Card className="w-full overflow-hidden">
               <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
                 {/* Fonte do CardTitle reduzida em mobile */}
@@ -955,7 +956,7 @@ const Checkout = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
                       <div className="space-y-1.5 sm:space-y-2">
                         <Label htmlFor="name" className="text-xs sm:text-sm">Nome Completo *</Label>
-                        <Input id="name" {...form.register('name')} className="h-9 sm:h-12 text-sm" />
+                        <Input id="name" {...form.register('name')} className="h-9 sm:h-12 text-sm w-full" />
                         {form.formState.errors.name && <p className="text-destructive text-xs sm:text-sm">{form.formState.errors.name.message}</p>}
                       </div>
                       <div className="space-y-1.5 sm:space-y-2">
@@ -963,7 +964,7 @@ const Checkout = () => {
                         <Controller
                           name="phone"
                           control={form.control}
-                          render={({ field }) => <PhoneInput id="phone" {...field} className="h-9 sm:h-12 text-sm" />}
+                          render={({ field }) => <PhoneInput id="phone" {...field} className="h-9 sm:h-12 text-sm w-full" />}
                         />
                         {form.formState.errors.phone && <p className="text-destructive text-xs sm:text-sm">{form.formState.errors.phone.message}</p>}
                       </div>
@@ -972,7 +973,7 @@ const Checkout = () => {
                         <Controller
                           name="cpf_cnpj"
                           control={form.control}
-                          render={({ field }) => <CpfCnpjInput id="cpf_cnpj" {...field} className="h-9 sm:h-12 text-sm" />}
+                          render={({ field }) => <CpfCnpjInput id="cpf_cnpj" {...field} className="h-9 sm:h-12 text-sm w-full" />}
                         />
                         {form.formState.errors.cpf_cnpj && <p className="text-destructive text-xs sm:text-sm">{form.formState.errors.cpf_cnpj.message}</p>}
                       </div>
@@ -996,11 +997,11 @@ const Checkout = () => {
                     <RadioGroup
                       onValueChange={field.onChange}
                       value={field.value}
-                      className="grid grid-cols-2 gap-2 sm:gap-4 min-w-0"
+                      className="grid grid-cols-2 gap-2 sm:gap-4 min-w-0 w-full"
                     >
                       <Label
                         htmlFor="delivery"
-                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center w-full max-w-full"
                       >
                         <RadioGroupItem value="delivery" id="delivery" className="sr-only" />
                         <Truck className="mb-1.5 sm:mb-3 h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0" />
@@ -1008,7 +1009,7 @@ const Checkout = () => {
                       </Label>
                       <Label
                         htmlFor="pickup"
-                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center w-full max-w-full"
                       >
                         <RadioGroupItem value="pickup" id="pickup" className="sr-only" />
                         <MapPin className="mb-1.5 sm:mb-3 h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0" />
@@ -1058,7 +1059,7 @@ const Checkout = () => {
                             id="number" 
                             {...addressForm.register('number')} 
                             placeholder="Nº"
-                            className="h-9 sm:h-12 text-sm"
+                            className="h-9 sm:h-12 text-sm w-full"
                           />
                           {addressForm.formState.errors.number && <p className="text-destructive text-xs sm:text-sm">{addressForm.formState.errors.number.message}</p>}
                         </div>
@@ -1068,13 +1069,13 @@ const Checkout = () => {
                             id="complement" 
                             {...addressForm.register('complement')} 
                             placeholder="Apto, Bloco..."
-                            className="h-9 sm:h-12 text-sm"
+                            className="h-9 sm:h-12 text-sm w-full"
                           />
                         </div>
                       </div>
 
                       {addressForm.watch('street') && (
-                        <div className="bg-muted p-2 sm:p-3 rounded text-xs sm:text-sm break-words overflow-hidden">
+                        <div className="bg-muted p-2 sm:p-3 rounded text-xs sm:text-sm break-words overflow-hidden w-full">
                           <p><strong>Endereço:</strong></p>
                           <p>
                             {addressForm.watch('street')}
@@ -1163,7 +1164,7 @@ const Checkout = () => {
                         handlePaymentMethodChange(newMethodId, !!isOnline, isMpConfigured);
                       }}
                       value={field.value}
-                      className="space-y-2 sm:space-y-3"
+                      className="space-y-2 sm:space-y-3 w-full"
                     >
                       {paymentMethods?.map(method => {
                         const isMpOnline = method.name?.includes('online');
@@ -1174,14 +1175,15 @@ const Checkout = () => {
                             key={method.id}
                             htmlFor={method.id}
                             className={cn(
-                              "flex items-center justify-between rounded-md border-2 border-muted bg-popover p-2.5 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer",
+                              "flex items-center justify-between rounded-md border-2 border-muted bg-popover p-2.5 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer w-full max-w-full",
                               isDisabled && "opacity-50 cursor-not-allowed"
                             )}
                           >
                             <div className="flex items-center space-x-2 sm:space-x-3 overflow-hidden min-w-0 w-full">
                               <RadioGroupItem value={method.id} id={method.id} disabled={isDisabled} className="flex-shrink-0" />
                               <div className="min-w-0 flex-1">
-                                <p className="font-medium text-xs sm:text-base break-words w-full leading-tight" translate="no">{method.name}</p>
+                                {/* IMPORTANTE: Usando whitespace-normal para permitir quebra de texto em nomes longos */}
+                                <p className="font-medium text-xs sm:text-base break-words w-full leading-tight whitespace-normal" translate="no">{method.name}</p>
                                 <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{method.description}</p>
                                 {isDisabled && (
                                   <p className="text-[10px] text-destructive mt-0.5">Indisponível no momento.</p>
@@ -1214,7 +1216,7 @@ const Checkout = () => {
                       step="0.01"
                       placeholder={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}
                       {...form.register('change_for')}
-                      className="h-9 sm:h-12 text-sm"
+                      className="h-9 sm:h-12 text-sm w-full"
                     />
                     {form.formState.errors.change_for?.message && (
                       <p className="text-destructive text-xs sm:text-sm">{form.formState.errors.change_for.message}</p>
@@ -1241,14 +1243,14 @@ const Checkout = () => {
                     {...form.register('notes')}
                     rows={3}
                     placeholder="Ex: Entregar na portaria, sem pimenta..."
-                    className="text-sm"
+                    className="text-sm w-full"
                   />
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          <div className="lg:col-span-1 space-y-6 sticky top-4 self-start">
+          <div className="lg:col-span-1 space-y-6 sticky top-4 self-start min-w-0">
             <Card className="shadow-lg w-full overflow-hidden">
               <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
                 <CardTitle className="text-lg sm:text-2xl">Resumo</CardTitle>
