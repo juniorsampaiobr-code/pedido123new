@@ -294,7 +294,7 @@ const Checkout = () => {
       zip_code: '',
       street: '',
       number: '',
-      complement: '', 
+      complement: '', // Default para complemento
       neighborhood: '',
       city: '',
     },
@@ -1078,8 +1078,13 @@ const Checkout = () => {
                       {addressForm.watch('street') && (
                         <div className="bg-muted p-3 rounded text-sm">
                           <p><strong>Endereço selecionado:</strong></p>
-                          <p>{addressForm.watch('street')}, {addressForm.watch('neighborhood')}</p>
-                          <p>{addressForm.watch('city')} - CEP: {addressForm.watch('zip_code')}</p>
+                          <p>
+                            {addressForm.watch('street')}
+                            {addressForm.watch('number') ? `, ${addressForm.watch('number')}` : ''}
+                            {addressForm.watch('complement') ? ` - ${addressForm.watch('complement')}` : ''}
+                          </p>
+                          <p>{addressForm.watch('neighborhood')} - {addressForm.watch('city')}</p>
+                          <p>CEP: {addressForm.watch('zip_code')}</p>
                         </div>
                       )}
 
