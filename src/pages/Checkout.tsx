@@ -901,29 +901,28 @@ const Checkout = () => {
   const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isAddressSaved);
 
   return (
-    // Removido overflow-x-hidden do container principal para evitar corte abrupto
-    <div className="min-h-screen bg-background py-4 sm:py-8 px-2 sm:px-8 w-full">
-      <CustomerProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        customer={customer}
-      />
-
-      <OnlinePaymentWarningModal
-        isOpen={isOnlineWarningModalOpen}
-        onConfirm={handleOnlineWarningConfirm}
-      />
-
-      {isMercadoPagoOpen && mpInitPoint && (
-        <MercadoPagoPayment
-          preferenceId={mpPreferenceId!}
-          initPoint={mpInitPoint}
-          onClose={() => setIsMercadoPagoOpen(false)}
+    <div className="min-h-screen bg-background w-full">
+      <div className="container mx-auto px-4 py-6 max-w-5xl space-y-8">
+        <CustomerProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+          customer={customer}
         />
-      )}
 
-      <div className="w-full lg:max-w-5xl mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <OnlinePaymentWarningModal
+          isOpen={isOnlineWarningModalOpen}
+          onConfirm={handleOnlineWarningConfirm}
+        />
+
+        {isMercadoPagoOpen && mpInitPoint && (
+          <MercadoPagoPayment
+            preferenceId={mpPreferenceId!}
+            initPoint={mpInitPoint}
+            onClose={() => setIsMercadoPagoOpen(false)}
+          />
+        )}
+
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <Link to={`/menu/${restaurantId}`}>
               <Button variant="ghost" size="icon" aria-label="Voltar ao Menu">
@@ -949,7 +948,7 @@ const Checkout = () => {
 
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            <Card className="w-full max-w-full">
+            <Card className="w-full">
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
                   <User className="h-5 w-5 text-primary" /> Seus Dados
@@ -993,7 +992,7 @@ const Checkout = () => {
               </CardContent>
             </Card>
 
-            <Card className="w-full max-w-full">
+            <Card className="w-full">
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
                   <Truck className="h-5 w-5 text-primary" /> Opção de Entrega
@@ -1032,7 +1031,7 @@ const Checkout = () => {
             </Card>
 
             {deliveryOption === 'delivery' && (
-              <Card className={cn("w-full max-w-full", !isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
+              <Card className={cn("w-full", !isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
                 <CardHeader>
                   <CardTitle className="text-xl flex items-center gap-2">
                     <MapPin className="h-5 w-5 text-primary" /> Endereço de Entrega
@@ -1155,7 +1154,7 @@ const Checkout = () => {
               </Card>
             )}
 
-            <Card className="w-full max-w-full">
+            <Card className="w-full">
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
                   <CreditCard className="h-5 w-5 text-primary" /> Método de Pagamento *
@@ -1210,7 +1209,7 @@ const Checkout = () => {
             </Card>
 
             {isCashPayment && (
-              <Card className="w-full max-w-full">
+              <Card className="w-full">
                 <CardHeader>
                   <CardTitle className="text-xl flex items-center gap-2">
                     <DollarSign className="h-5 w-5 text-primary" /> Troco
@@ -1237,7 +1236,7 @@ const Checkout = () => {
               </Card>
             )}
 
-            <Card className="w-full max-w-full">
+            <Card className="w-full">
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
                   <Mail className="h-5 w-5 text-primary" /> Observações
@@ -1258,7 +1257,7 @@ const Checkout = () => {
           </div>
 
           <div className="lg:col-span-1 space-y-6 sticky top-4 self-start">
-            <Card className="shadow-lg w-full max-w-full">
+            <Card className="shadow-lg w-full">
               <CardHeader>
                 <CardTitle className="text-2xl">Resumo</CardTitle>
               </CardHeader>
