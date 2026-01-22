@@ -584,8 +584,7 @@ const Checkout = () => {
         `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.zip_code}` : 
         null;
 
-      // Cast para any para incluir o campo complement se ele não estiver nos types gerados
-      const customerPayload: any = {
+      const customerPayload: TablesInsert<'customers'> = {
         user_id: user?.id || null,
         name: data.name,
         phone: cleanedPhone,
@@ -599,20 +598,19 @@ const Checkout = () => {
         neighborhood: addressForm.getValues('neighborhood') || null,
         city: addressForm.getValues('city') || null,
         zip_code: addressForm.getValues('zip_code') || null,
-        complement: addressForm.getValues('complement') || null, // Incluindo complemento
       };
       
       if (!user) {
           customerPayload.email = null;
       }
 
-      const selectColumns = '*, street, number, neighborhood, city, zip_code, complement';
+      const selectColumns = '*, street, number, neighborhood, city, zip_code';
 
       if (user) {
         if (customer) {
           const { data: updatedCustomer, error: updateError } = await supabase
             .from('customers')
-            .update(customerPayload)
+            .update(customerPayload as TablesUpdate<'customers'>)
             .eq('id', customer.id)
             .select(selectColumns)
             .single();
@@ -902,7 +900,7 @@ const Checkout = () => {
   const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isAddressSaved);
 
   return (
-    <div className="min-h-screen bg-background py-4 sm:py-8 px-4 sm:px-8">
+    <div className="min-h-screen bg-background py-4 sm:py-8 px-4 sm:px-8 overflow-x-hidden">
       <CustomerProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
@@ -923,24 +921,24 @@ const Checkout = () => {
       )}
 
       <div className="w-full lg:max-w-5xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
             <Link to={`/menu/${restaurantId}`}>
               <Button variant="ghost" size="icon" aria-label="Voltar ao Menu">
                 <ArrowLeft className="h-6 w-6" />
               </Button>
             </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Finalizar Pedido</h1>
-              <p className="text-lg text-muted-foreground font-medium">{restaurant.name}</p>
+            <div className="flex-1 sm:flex-none">
+              <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Finalizar Pedido</h1>
+              <p className="text-base sm:text-lg text-muted-foreground font-medium truncate max-w-[200px] sm:max-w-none">{restaurant.name}</p>
             </div>
           </div>
           {user && (
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setIsProfileModalOpen(true)} aria-label="Meu Perfil e Pedidos">
-                <UserIcon className="h-4 w-4 mr-2" /> Perfil / Pedidos
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <Button variant="outline" size="sm" onClick={() => setIsProfileModalOpen(true)} aria-label="Meu Perfil e Pedidos" className="flex-1 sm:flex-none">
+                <UserIcon className="h-4 w-4 mr-2" /> <span className="truncate">Perfil / Pedidos</span>
               </Button>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
+              <Button variant="outline" size="sm" onClick={handleLogout} className="flex-shrink-0">
                 <LogOut className="h-4 w-4 mr-1" /> Sair
               </Button>
             </div>
