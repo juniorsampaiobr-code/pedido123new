@@ -584,7 +584,6 @@ const Checkout = () => {
         `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.zip_code}` : 
         null;
 
-      // Cast para any para incluir o campo complement se ele não estiver nos types gerados
       const customerPayload: any = {
         user_id: user?.id || null,
         name: data.name,
@@ -902,8 +901,8 @@ const Checkout = () => {
   const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isAddressSaved);
 
   return (
-    // Removido max-w-[100vw] para corrigir conflito com o zoom global em mobile
-    <div className="min-h-screen bg-background py-4 sm:py-8 px-4 sm:px-8 overflow-x-hidden w-full">
+    // Removido overflow-x-hidden do container principal para evitar corte abrupto
+    <div className="min-h-screen bg-background py-4 sm:py-8 px-2 sm:px-8 w-full">
       <CustomerProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
@@ -1263,7 +1262,8 @@ const Checkout = () => {
               <CardHeader>
                 <CardTitle className="text-2xl">Resumo</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              {/* Adicionando p-4 (padrão é geralmente p-6) para mobile para dar mais espaço */}
+              <CardContent className="space-y-4 p-4 sm:p-6">
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                   {items.map((item) => (
                     <div key={item.product.id} className="flex justify-between text-sm">
