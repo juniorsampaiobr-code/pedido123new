@@ -901,8 +901,8 @@ const Checkout = () => {
   const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isAddressSaved);
 
   return (
-    // Atualizado para usar flexbox e centralizar o conteúdo, mantendo as margens
-    <div className="min-h-screen bg-background w-full flex justify-center py-4 sm:py-8 px-4 sm:px-8">
+    // Container principal centralizado com Flexbox e largura máxima
+    <div className="min-h-screen bg-background w-full flex justify-center py-4 sm:py-8 px-4 sm:px-8 overflow-x-hidden">
       <div className="w-full max-w-5xl space-y-8">
         <CustomerProfileModal
           isOpen={isProfileModalOpen}
@@ -949,13 +949,13 @@ const Checkout = () => {
 
         <div className="grid lg:grid-cols-3 gap-8 w-full">
           <div className="lg:col-span-2 space-y-6">
-            <Card className="w-full">
+            <Card className="w-full max-w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                   <User className="h-5 w-5 text-primary" /> Seus Dados
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3 sm:p-6">
                 <div className="flex justify-between items-center mb-4">
                   <p className="text-sm text-muted-foreground">
                     {user ? `Logado como ${user.email}. ${customer ? 'Perfil de cliente encontrado.' : 'Preencha os dados para criar seu perfil de cliente.'}` : 'Você está fazendo um pedido anônimo.'}
@@ -993,13 +993,13 @@ const Checkout = () => {
               </CardContent>
             </Card>
 
-            <Card className="w-full">
+            <Card className="w-full max-w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                   <Truck className="h-5 w-5 text-primary" /> Opção de Entrega
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3 sm:p-6">
                 <Controller
                   name="delivery_option"
                   control={form.control}
@@ -1011,19 +1011,19 @@ const Checkout = () => {
                     >
                       <Label
                         htmlFor="delivery"
-                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-3 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-3 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center"
                       >
                         <RadioGroupItem value="delivery" id="delivery" className="sr-only" />
                         <Truck className="mb-3 h-5 w-5 sm:h-6 sm:w-6" />
-                        <span translate="no" className="text-sm sm:text-base">Entrega</span>
+                        <span translate="no" className="text-sm sm:text-base break-words">Entrega</span>
                       </Label>
                       <Label
                         htmlFor="pickup"
-                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-3 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-3 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center"
                       >
                         <RadioGroupItem value="pickup" id="pickup" className="sr-only" />
                         <MapPin className="mb-3 h-5 w-5 sm:h-6 sm:w-6" />
-                        <span translate="no" className="text-sm sm:text-base">Retirada no Local</span>
+                        <span translate="no" className="text-sm sm:text-base break-words">Retirada no Local</span>
                       </Label>
                     </RadioGroup>
                   )}
@@ -1032,7 +1032,7 @@ const Checkout = () => {
             </Card>
 
             {deliveryOption === 'delivery' && (
-              <Card className={cn("w-full max-w-full", !isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
+              <Card className={cn("w-full max-w-full overflow-hidden", !isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
                 <CardHeader>
                   <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                     <MapPin className="h-5 w-5 text-primary" /> Endereço de Entrega
@@ -1041,7 +1041,7 @@ const Checkout = () => {
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">Preencha e salve o endereço para calcular a taxa de entrega.</p>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 p-3 sm:p-6">
                   {restaurant.delivery_enabled === false && (
                     <Alert variant="default" className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 text-blue-700">
                       <Truck className="h-4 w-4" />
@@ -1085,7 +1085,7 @@ const Checkout = () => {
                       </div>
 
                       {addressForm.watch('street') && (
-                        <div className="bg-muted p-3 rounded text-sm break-words">
+                        <div className="bg-muted p-3 rounded text-sm break-words overflow-hidden">
                           <p><strong>Endereço selecionado:</strong></p>
                           <p>
                             {addressForm.watch('street')}
@@ -1157,13 +1157,13 @@ const Checkout = () => {
               </Card>
             )}
 
-            <Card className="w-full">
+            <Card className="w-full max-w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                   <CreditCard className="h-5 w-5 text-primary" /> Método de Pagamento *
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3 sm:p-6">
                 <Controller
                   name="payment_method_id"
                   control={form.control}
@@ -1212,13 +1212,13 @@ const Checkout = () => {
             </Card>
 
             {isCashPayment && (
-              <Card className="w-full">
+              <Card className="w-full max-w-full overflow-hidden">
                 <CardHeader>
                   <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                     <DollarSign className="h-5 w-5 text-primary" /> Troco
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-3 sm:p-6">
                   <div className="space-y-2">
                     <Label htmlFor="change_for">Precisa de troco para quanto? (Opcional)</Label>
                     <Input
@@ -1240,13 +1240,13 @@ const Checkout = () => {
               </Card>
             )}
 
-            <Card className="w-full">
+            <Card className="w-full max-w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                   <Mail className="h-5 w-5 text-primary" /> Observações
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3 sm:p-6">
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notas para o restaurante (Opcional)</Label>
                   <Textarea
@@ -1261,7 +1261,7 @@ const Checkout = () => {
           </div>
 
           <div className="lg:col-span-1 space-y-6 sticky top-4 self-start">
-            <Card className="shadow-lg w-full">
+            <Card className="shadow-lg w-full max-w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-xl sm:text-2xl">Resumo</CardTitle>
               </CardHeader>
