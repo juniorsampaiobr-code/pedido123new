@@ -346,9 +346,6 @@ const Checkout = () => {
         const number = customer.number || '';
         const neighborhood = customer.neighborhood || '';
         const city = customer.city || '';
-        // Nota: O customer da DB pode não ter o campo complemento salvo estruturalmente
-        // Se estiver dentro de 'address' (string), não estamos extraindo de volta aqui por enquanto
-        // para simplificar e não quebrar a lógica de colunas existentes.
         
         addressForm.reset({
           zip_code: zip_code,
@@ -575,9 +572,11 @@ const Checkout = () => {
           throw new Error("Dados de contato incompletos ou inválidos.");
       }
 
-      // Constrói o endereço completo incluindo o complemento
+      // CORREÇÃO: Usando addressForm.getValues() para garantir que os dados do endereço sejam os mais atuais
+      const currentAddress = addressForm.getValues();
+      
       const fullAddress = deliveryOption === 'delivery' ? 
-        `${addressFields[1]}, ${addressFields[2]}${addressFields[5] ? ` - ${addressFields[5]}` : ''}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` : 
+        `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.zip_code}` : 
         null;
 
       const customerPayload: TablesInsert<'customers'> = {
@@ -589,11 +588,11 @@ const Checkout = () => {
         address: fullAddress,
         latitude: customerCoords ? customerCoords[0] : null,
         longitude: customerCoords ? customerCoords[1] : null,
-        street: addressForm.getValues('street') || null,
-        number: addressForm.getValues('number') || null,
-        neighborhood: addressForm.getValues('neighborhood') || null,
-        city: addressForm.getValues('city') || null,
-        zip_code: addressForm.getValues('zip_code') || null,
+        street: currentAddress.street || null,
+        number: currentAddress.number || null,
+        neighborhood: currentAddress.neighborhood || null,
+        city: currentAddress.city || null,
+        zip_code: currentAddress.zip_code || null,
       };
       
       if (!user) {
@@ -659,8 +658,11 @@ const Checkout = () => {
         maxTime = fallbackTime[1];
       }
 
+      // CORREÇÃO: Usando addressForm.getValues() para garantir que os dados do endereço sejam os mais atuais
+      const currentAddress = addressForm.getValues();
+
       const deliveryAddress = deliveryOption === 'delivery' ? 
-        `${addressFields[1]}, ${addressFields[2]}${addressFields[5] ? ` - ${addressFields[5]}` : ''}, ${addressFields[4]}, ${addressFields[3]}, ${addressFields[0]}` : 
+        `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.zip_code}` : 
         null;
 
       const orderPayload: TablesInsert<'orders'> = {
