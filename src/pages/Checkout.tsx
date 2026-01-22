@@ -901,9 +901,10 @@ const Checkout = () => {
   const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isAddressSaved);
 
   return (
-    // Container principal centralizado com Flexbox e largura máxima
-    <div className="min-h-screen bg-background w-full flex justify-center py-4 sm:py-8 px-4 sm:px-8 overflow-x-hidden">
-      <div className="w-full max-w-5xl space-y-8">
+    // Container principal alterado para 'block' em vez de flexbox centralizado, 
+    // permitindo que o conteúdo flua naturalmente com mx-auto
+    <div className="min-h-screen bg-background w-full overflow-x-hidden">
+      <div className="w-full max-w-5xl mx-auto py-4 sm:py-8 px-4 sm:px-6 lg:px-8 space-y-8">
         <CustomerProfileModal
           isOpen={isProfileModalOpen}
           onClose={() => setIsProfileModalOpen(false)}
@@ -949,7 +950,7 @@ const Checkout = () => {
 
         <div className="grid lg:grid-cols-3 gap-8 w-full">
           <div className="lg:col-span-2 space-y-6">
-            <Card className="w-full max-w-full overflow-hidden">
+            <Card className="w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                   <User className="h-5 w-5 text-primary" /> Seus Dados
@@ -963,7 +964,7 @@ const Checkout = () => {
                 </div>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} id="checkout-form">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
                       <div className="space-y-2">
                         <Label htmlFor="name">Nome Completo *</Label>
                         <Input id="name" {...form.register('name')} className="h-10 sm:h-12" />
@@ -993,7 +994,7 @@ const Checkout = () => {
               </CardContent>
             </Card>
 
-            <Card className="w-full max-w-full overflow-hidden">
+            <Card className="w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                   <Truck className="h-5 w-5 text-primary" /> Opção de Entrega
@@ -1007,23 +1008,23 @@ const Checkout = () => {
                     <RadioGroup
                       onValueChange={field.onChange}
                       value={field.value}
-                      className="grid grid-cols-2 gap-4"
+                      className="grid grid-cols-2 gap-4 min-w-0"
                     >
                       <Label
                         htmlFor="delivery"
                         className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-3 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center"
                       >
                         <RadioGroupItem value="delivery" id="delivery" className="sr-only" />
-                        <Truck className="mb-3 h-5 w-5 sm:h-6 sm:w-6" />
-                        <span translate="no" className="text-sm sm:text-base break-words">Entrega</span>
+                        <Truck className="mb-3 h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+                        <span translate="no" className="text-sm sm:text-base break-words w-full">Entrega</span>
                       </Label>
                       <Label
                         htmlFor="pickup"
                         className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-3 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center"
                       >
                         <RadioGroupItem value="pickup" id="pickup" className="sr-only" />
-                        <MapPin className="mb-3 h-5 w-5 sm:h-6 sm:w-6" />
-                        <span translate="no" className="text-sm sm:text-base break-words">Retirada no Local</span>
+                        <MapPin className="mb-3 h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+                        <span translate="no" className="text-sm sm:text-base break-words w-full">Retirada no Local</span>
                       </Label>
                     </RadioGroup>
                   )}
@@ -1032,12 +1033,12 @@ const Checkout = () => {
             </Card>
 
             {deliveryOption === 'delivery' && (
-              <Card className={cn("w-full max-w-full overflow-hidden", !isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
+              <Card className={cn("w-full overflow-hidden", !isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
                 <CardHeader>
                   <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                     <MapPin className="h-5 w-5 text-primary" /> Endereço de Entrega
-                    {isAddressSaved && <CheckCircle className="h-5 w-5 text-green-500 ml-2" />}
-                    {!isAddressSaved && <AlertCircle className="h-5 w-5 text-destructive ml-2" />}
+                    {isAddressSaved && <CheckCircle className="h-5 w-5 text-green-500 ml-2 flex-shrink-0" />}
+                    {!isAddressSaved && <AlertCircle className="h-5 w-5 text-destructive ml-2 flex-shrink-0" />}
                   </CardTitle>
                   <p className="text-sm text-muted-foreground">Preencha e salve o endereço para calcular a taxa de entrega.</p>
                 </CardHeader>
@@ -1062,7 +1063,7 @@ const Checkout = () => {
                       <input type="hidden" {...addressForm.register('neighborhood')} />
                       <input type="hidden" {...addressForm.register('city')} />
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
                         <div className="space-y-2">
                           <Label htmlFor="number">Número *</Label>
                           <Input 
@@ -1099,7 +1100,6 @@ const Checkout = () => {
 
                       <Button
                         type="submit"
-                        // Adicionado h-auto, py-2 e whitespace-normal para permitir que o texto quebre linhas
                         className="w-full h-auto py-2 text-sm sm:text-base mt-4 whitespace-normal"
                         disabled={saveAddressMutation.isPending || isGeocoding}
                       >
@@ -1157,7 +1157,7 @@ const Checkout = () => {
               </Card>
             )}
 
-            <Card className="w-full max-w-full overflow-hidden">
+            <Card className="w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                   <CreditCard className="h-5 w-5 text-primary" /> Método de Pagamento *
@@ -1191,9 +1191,9 @@ const Checkout = () => {
                               isDisabled && "opacity-50 cursor-not-allowed"
                             )}
                           >
-                            <div className="flex items-center space-x-3 overflow-hidden">
+                            <div className="flex items-center space-x-3 overflow-hidden min-w-0">
                               <RadioGroupItem value={method.id} id={method.id} disabled={isDisabled} className="flex-shrink-0" />
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <p className="font-medium truncate text-sm sm:text-base" translate="no">{method.name}</p>
                                 <p className="text-xs text-muted-foreground truncate">{method.description}</p>
                                 {isDisabled && (
@@ -1212,7 +1212,7 @@ const Checkout = () => {
             </Card>
 
             {isCashPayment && (
-              <Card className="w-full max-w-full overflow-hidden">
+              <Card className="w-full overflow-hidden">
                 <CardHeader>
                   <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                     <DollarSign className="h-5 w-5 text-primary" /> Troco
@@ -1240,7 +1240,7 @@ const Checkout = () => {
               </Card>
             )}
 
-            <Card className="w-full max-w-full overflow-hidden">
+            <Card className="w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
                   <Mail className="h-5 w-5 text-primary" /> Observações
@@ -1261,7 +1261,7 @@ const Checkout = () => {
           </div>
 
           <div className="lg:col-span-1 space-y-6 sticky top-4 self-start">
-            <Card className="shadow-lg w-full max-w-full overflow-hidden">
+            <Card className="shadow-lg w-full overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-xl sm:text-2xl">Resumo</CardTitle>
               </CardHeader>
