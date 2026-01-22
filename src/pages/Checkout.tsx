@@ -584,7 +584,8 @@ const Checkout = () => {
         `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.zip_code}` : 
         null;
 
-      const customerPayload: TablesInsert<'customers'> = {
+      // Cast para any para incluir o campo complement se ele não estiver nos types gerados
+      const customerPayload: any = {
         user_id: user?.id || null,
         name: data.name,
         phone: cleanedPhone,
@@ -598,19 +599,20 @@ const Checkout = () => {
         neighborhood: addressForm.getValues('neighborhood') || null,
         city: addressForm.getValues('city') || null,
         zip_code: addressForm.getValues('zip_code') || null,
+        complement: addressForm.getValues('complement') || null, // Incluindo complemento
       };
       
       if (!user) {
           customerPayload.email = null;
       }
 
-      const selectColumns = '*, street, number, neighborhood, city, zip_code';
+      const selectColumns = '*, street, number, neighborhood, city, zip_code, complement';
 
       if (user) {
         if (customer) {
           const { data: updatedCustomer, error: updateError } = await supabase
             .from('customers')
-            .update(customerPayload as TablesUpdate<'customers'>)
+            .update(customerPayload)
             .eq('id', customer.id)
             .select(selectColumns)
             .single();
@@ -900,7 +902,7 @@ const Checkout = () => {
   const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isAddressSaved);
 
   return (
-    <div className="min-h-screen bg-background py-4 sm:py-8 px-4 sm:px-8 overflow-x-hidden">
+    <div className="min-h-screen bg-background py-4 sm:py-8 px-4 sm:px-8 overflow-x-hidden w-full max-w-[100vw]">
       <CustomerProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
@@ -928,9 +930,9 @@ const Checkout = () => {
                 <ArrowLeft className="h-6 w-6" />
               </Button>
             </Link>
-            <div className="flex-1 sm:flex-none">
+            <div className="flex-1 min-w-0">
               <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Finalizar Pedido</h1>
-              <p className="text-base sm:text-lg text-muted-foreground font-medium truncate max-w-[200px] sm:max-w-none">{restaurant.name}</p>
+              <p className="text-base sm:text-lg text-muted-foreground font-medium truncate max-w-full">{restaurant.name}</p>
             </div>
           </div>
           {user && (
@@ -947,7 +949,7 @@ const Checkout = () => {
 
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            <Card>
+            <Card className="w-full max-w-full">
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
                   <User className="h-5 w-5 text-primary" /> Seus Dados
@@ -991,7 +993,7 @@ const Checkout = () => {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="w-full max-w-full">
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
                   <Truck className="h-5 w-5 text-primary" /> Opção de Entrega
@@ -1030,7 +1032,7 @@ const Checkout = () => {
             </Card>
 
             {deliveryOption === 'delivery' && (
-              <Card className={cn(!isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
+              <Card className={cn("w-full max-w-full", !isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
                 <CardHeader>
                   <CardTitle className="text-xl flex items-center gap-2">
                     <MapPin className="h-5 w-5 text-primary" /> Endereço de Entrega
@@ -1081,7 +1083,7 @@ const Checkout = () => {
                       </div>
 
                       {addressForm.watch('street') && (
-                        <div className="bg-muted p-3 rounded text-sm">
+                        <div className="bg-muted p-3 rounded text-sm break-words">
                           <p><strong>Endereço selecionado:</strong></p>
                           <p>
                             {addressForm.watch('street')}
@@ -1139,11 +1141,12 @@ const Checkout = () => {
                   )}
 
                   {isAddressSaved && customerCoords && displayAddress && (
-                    <div className="mt-6">
+                    <div className="mt-6 w-full max-w-full overflow-hidden">
                       <ClientLocationMap
                         latitude={customerCoords[0]}
                         longitude={customerCoords[1]}
                         address={displayAddress}
+                        className="w-full"
                       />
                     </div>
                   )}
@@ -1151,7 +1154,7 @@ const Checkout = () => {
               </Card>
             )}
 
-            <Card>
+            <Card className="w-full max-w-full">
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
                   <CreditCard className="h-5 w-5 text-primary" /> Método de Pagamento *
@@ -1185,11 +1188,11 @@ const Checkout = () => {
                               isDisabled && "opacity-50 cursor-not-allowed"
                             )}
                           >
-                            <div className="flex items-center space-x-3">
-                              <RadioGroupItem value={method.id} id={method.id} disabled={isDisabled} />
-                              <div>
-                                <p className="font-medium" translate="no">{method.name}</p>
-                                <p className="text-xs text-muted-foreground">{method.description}</p>
+                            <div className="flex items-center space-x-3 overflow-hidden">
+                              <RadioGroupItem value={method.id} id={method.id} disabled={isDisabled} className="flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="font-medium truncate" translate="no">{method.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{method.description}</p>
                                 {isDisabled && (
                                   <p className="text-xs text-destructive mt-1">Pagamento online indisponível no momento.</p>
                                 )}
@@ -1206,7 +1209,7 @@ const Checkout = () => {
             </Card>
 
             {isCashPayment && (
-              <Card>
+              <Card className="w-full max-w-full">
                 <CardHeader>
                   <CardTitle className="text-xl flex items-center gap-2">
                     <DollarSign className="h-5 w-5 text-primary" /> Troco
@@ -1233,7 +1236,7 @@ const Checkout = () => {
               </Card>
             )}
 
-            <Card>
+            <Card className="w-full max-w-full">
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
                   <Mail className="h-5 w-5 text-primary" /> Observações
@@ -1254,7 +1257,7 @@ const Checkout = () => {
           </div>
 
           <div className="lg:col-span-1 space-y-6 sticky top-4 self-start">
-            <Card className="shadow-lg">
+            <Card className="shadow-lg w-full max-w-full">
               <CardHeader>
                 <CardTitle className="text-2xl">Resumo</CardTitle>
               </CardHeader>
