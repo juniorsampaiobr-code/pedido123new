@@ -30,6 +30,7 @@ import { ClientLocationMap } from '@/components/ClientLocationMap';
 import { OnlinePaymentWarningModal } from '@/components/OnlinePaymentWarningModal';
 import { cn } from '@/lib/utils';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, } from '@/components/ui/form';
+import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
@@ -79,9 +80,7 @@ const formatCpfCnpj = (value: string) => {
 
 // --- Schemas ---
 const addressSchema = z.object({
-  zip_code: z.string().min(1, 'CEP é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length === 8, {
-    message: 'CEP deve ter 8 dígitos.',
-  }),
+  zip_code: z.string().min(1, 'CEP é obrigatório.'),
   street: z.string().min(1, 'Rua é obrigatória.'),
   number: z.string().min(1, 'Número é obrigatório.'),
   neighborhood: z.string().min(1, 'Bairro é obrigatório.'),
@@ -882,6 +881,18 @@ const Checkout = () => {
     setPendingOnlinePaymentId(null);
   };
 
+  // Callback para preencher os campos de endereço
+  const handleAddressSelect = useCallback((address: any) => {
+    addressForm.setValue('street', address.street);
+    addressForm.setValue('neighborhood', address.neighborhood);
+    addressForm.setValue('city', address.city);
+    addressForm.setValue('zip_code', address.zip_code);
+    addressForm.setValue('number', address.number); // Preenche se vier do Google
+    
+    // Opcional: Acionar a validação imediatamente ou deixar o usuário conferir o número
+    toast.info("Endereço encontrado! Verifique o número e clique em Salvar.");
+  }, [addressForm]);
+
   // Variável para o endereço de exibição no mapa
   const displayAddress = useMemo(() => {
     // addressFields: [zip_code, street, number, city, neighborhood]
@@ -1100,45 +1111,36 @@ const Checkout = () => {
 
                   <Form {...addressForm}>
                     <form onSubmit={addressForm.handleSubmit(handleSaveAddress)} id="address-form-inner" className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2 md:col-span-1">
-                          <Label htmlFor="zip_code">CEP *</Label>
-                          <Controller
-                            name="zip_code"
-                            control={addressForm.control}
-                            render={({ field }) => (
-                              <FormItem className="flex-1 space-y-0">
-                                <FormControl>
-                                  <ZipCodeInput placeholder="Digite o CEP" {...field} />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          {addressForm.formState.errors.zip_code && <p className="text-destructive text-sm">{addressForm.formState.errors.zip_code.message}</p>}
-                        </div>
-                        <div className="space-y-2 md:col-span-2">
-                          <Label htmlFor="street">Rua *</Label>
-                          <Input id="street" {...addressForm.register('street')} />
-                          {addressForm.formState.errors.street && <p className="text-destructive text-sm">{addressForm.formState.errors.street.message}</p>}
-                        </div>
+                      <div className="space-y-4">
+                        <Label htmlFor="address-search">Buscar Endereço</Label>
+                        <AddressAutocomplete onAddressSelect={handleAddressSelect} disabled={isGeocoding} />
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="number">Número *</Label>
-                          <Input id="number" {...addressForm.register('number')} />
-                          {addressForm.formState.errors.number && <p className="text-destructive text-sm">{addressForm.formState.errors.number.message}</p>}
-                        </div>
-                        <div className="space-y-2 md:col-span-2">
-                          <Label htmlFor="neighborhood">Bairro *</Label>
-                          <Input id="neighborhood" {...addressForm.register('neighborhood')} />
-                          {addressForm.formState.errors.neighborhood && <p className="text-destructive text-sm">{addressForm.formState.errors.neighborhood.message}</p>}
-                        </div>
-                      </div>
+
+                      {/* Campos ocultos mas registrados no form */}
+                      <input type="hidden" {...addressForm.register('zip_code')} />
+                      <input type="hidden" {...addressForm.register('street')} />
+                      <input type="hidden" {...addressForm.register('neighborhood')} />
+                      <input type="hidden" {...addressForm.register('city')} />
+
                       <div className="space-y-2">
-                        <Label htmlFor="city">Cidade *</Label>
-                        <Input id="city" {...addressForm.register('city')} />
-                        {addressForm.formState.errors.city && <p className="text-destructive text-sm">{addressForm.formState.errors.city.message}</p>}
+                        <Label htmlFor="number">Número *</Label>
+                        <Input 
+                          id="number" 
+                          {...addressForm.register('number')} 
+                          placeholder="Número da casa/apto"
+                        />
+                        {addressForm.formState.errors.number && <p className="text-destructive text-sm">{addressForm.formState.errors.number.message}</p>}
                       </div>
+
+                      {/* Exibição visual do endereço selecionado (se houver) */}
+                      {addressForm.watch('street') && (
+                        <div className="bg-muted p-3 rounded text-sm">
+                          <p><strong>Endereço selecionado:</strong></p>
+                          <p>{addressForm.watch('street')}, {addressForm.watch('neighborhood')}</p>
+                          <p>{addressForm.watch('city')} - CEP: {addressForm.watch('zip_code')}</p>
+                        </div>
+                      )}
+
                       <Button
                         type="submit"
                         className="w-full h-10 text-base mt-4"
