@@ -885,9 +885,12 @@ const Checkout = () => {
   const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isAddressSaved);
 
   return (
-    // Substituindo a estrutura de container para usar container mx-auto
     <div className="min-h-screen bg-background w-full overflow-x-hidden">
-      <div className="container mx-auto px-4 py-4 sm:py-8 max-w-5xl space-y-8">
+      {/* 
+        Ajustado padding horizontal (px-3 em vez de px-4) para telas menores 
+        para ganhar mais espaço útil
+      */}
+      <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-8 max-w-5xl space-y-6 sm:space-y-8">
         <CustomerProfileModal
           isOpen={isProfileModalOpen}
           onClose={() => setIsProfileModalOpen(false)}
@@ -908,68 +911,70 @@ const Checkout = () => {
         )}
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <Link to={`/menu/${restaurantId}`}>
               <Button variant="ghost" size="icon" aria-label="Voltar ao Menu">
                 <ArrowLeft className="h-6 w-6" />
               </Button>
             </Link>
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-3xl font-bold text-foreground">Finalizar Pedido</h1>
-              <p className="text-sm sm:text-lg text-muted-foreground font-medium truncate max-w-full">{restaurant.name}</p>
+              {/* Fonte do título reduzida em mobile */}
+              <h1 className="text-lg sm:text-3xl font-bold text-foreground">Finalizar Pedido</h1>
+              <p className="text-xs sm:text-lg text-muted-foreground font-medium truncate max-w-full">{restaurant.name}</p>
             </div>
           </div>
           {user && (
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-              <Button variant="outline" size="sm" onClick={() => setIsProfileModalOpen(true)} aria-label="Meu Perfil e Pedidos" className="flex-1 sm:flex-none">
-                <UserIcon className="h-4 w-4 mr-2" /> <span className="truncate">Perfil / Pedidos</span>
+              <Button variant="outline" size="sm" onClick={() => setIsProfileModalOpen(true)} aria-label="Meu Perfil e Pedidos" className="flex-1 sm:flex-none text-xs sm:text-sm h-8 sm:h-9">
+                <UserIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> <span className="truncate">Perfil / Pedidos</span>
               </Button>
-              <Button variant="outline" size="sm" onClick={handleLogout} className="flex-shrink-0">
-                <LogOut className="h-4 w-4 mr-1" /> Sair
+              <Button variant="outline" size="sm" onClick={handleLogout} className="flex-shrink-0 text-xs sm:text-sm h-8 sm:h-9">
+                <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Sair
               </Button>
             </div>
           )}
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8 w-full">
+        <div className="grid lg:grid-cols-3 gap-6 sm:gap-8 w-full">
           <div className="lg:col-span-2 space-y-6">
-            <Card className="w-full max-w-full overflow-hidden">
-              <CardHeader>
-                <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                  <User className="h-5 w-5 text-primary" /> Seus Dados
+            <Card className="w-full overflow-hidden">
+              <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+                {/* Fonte do CardTitle reduzida em mobile */}
+                <CardTitle className="text-base sm:text-xl flex items-center gap-2">
+                  <User className="h-4 w-4 sm:h-5 sm:w-5 text-primary" /> Seus Dados
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-3 sm:p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <p className="text-sm text-muted-foreground">
-                    {user ? `Logado como ${user.email}. ${customer ? 'Perfil de cliente encontrado.' : 'Preencha os dados para criar seu perfil de cliente.'}` : 'Você está fazendo um pedido anônimo.'}
+              <CardContent className="px-3 pb-3 sm:p-6 sm:pt-0">
+                <div className="flex justify-between items-center mb-3 sm:mb-4">
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    {user ? `Logado como ${user.email}` : 'Pedido anônimo'}
                   </p>
                 </div>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} id="checkout-form">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Nome Completo *</Label>
-                        <Input id="name" {...form.register('name')} className="h-10 sm:h-12" />
-                        {form.formState.errors.name && <p className="text-destructive text-sm">{form.formState.errors.name.message}</p>}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label htmlFor="name" className="text-xs sm:text-sm">Nome Completo *</Label>
+                        <Input id="name" {...form.register('name')} className="h-9 sm:h-12 text-sm" />
+                        {form.formState.errors.name && <p className="text-destructive text-xs sm:text-sm">{form.formState.errors.name.message}</p>}
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Telefone *</Label>
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label htmlFor="phone" className="text-xs sm:text-sm">Telefone *</Label>
                         <Controller
                           name="phone"
                           control={form.control}
-                          render={({ field }) => <PhoneInput id="phone" {...field} className="h-10 sm:h-12" />}
+                          render={({ field }) => <PhoneInput id="phone" {...field} className="h-9 sm:h-12 text-sm" />}
                         />
-                        {form.formState.errors.phone && <p className="text-destructive text-sm">{form.formState.errors.phone.message}</p>}
+                        {form.formState.errors.phone && <p className="text-destructive text-xs sm:text-sm">{form.formState.errors.phone.message}</p>}
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="cpf_cnpj">CPF/CNPJ *</Label>
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label htmlFor="cpf_cnpj" className="text-xs sm:text-sm">CPF/CNPJ *</Label>
                         <Controller
                           name="cpf_cnpj"
                           control={form.control}
-                          render={({ field }) => <CpfCnpjInput id="cpf_cnpj" {...field} className="h-10 sm:h-12" />}
+                          render={({ field }) => <CpfCnpjInput id="cpf_cnpj" {...field} className="h-9 sm:h-12 text-sm" />}
                         />
-                        {form.formState.errors.cpf_cnpj && <p className="text-destructive text-sm">{form.formState.errors.cpf_cnpj.message}</p>}
+                        {form.formState.errors.cpf_cnpj && <p className="text-destructive text-xs sm:text-sm">{form.formState.errors.cpf_cnpj.message}</p>}
                       </div>
                     </div>
                   </form>
@@ -977,18 +982,17 @@ const Checkout = () => {
               </CardContent>
             </Card>
 
-            <Card className="w-full max-w-full overflow-hidden">
-              <CardHeader>
-                <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                  <Truck className="h-5 w-5 text-primary" /> Opção de Entrega
+            <Card className="w-full overflow-hidden">
+              <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+                <CardTitle className="text-base sm:text-xl flex items-center gap-2">
+                  <Truck className="h-4 w-4 sm:h-5 sm:w-5 text-primary" /> Opção de Entrega
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-3 sm:p-6">
+              <CardContent className="px-3 pb-3 sm:p-6 sm:pt-0">
                 <Controller
                   name="delivery_option"
                   control={form.control}
                   render={({ field }) => (
-                    // Ajuste importante: gap-2 para mobile
                     <RadioGroup
                       onValueChange={field.onChange}
                       value={field.value}
@@ -996,19 +1000,19 @@ const Checkout = () => {
                     >
                       <Label
                         htmlFor="delivery"
-                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-3 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center"
                       >
                         <RadioGroupItem value="delivery" id="delivery" className="sr-only" />
-                        <Truck className="mb-3 h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
-                        <span translate="no" className="text-sm sm:text-base break-words w-full">Entrega</span>
+                        <Truck className="mb-1.5 sm:mb-3 h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0" />
+                        <span translate="no" className="text-xs sm:text-base break-words w-full">Entrega</span>
                       </Label>
                       <Label
                         htmlFor="pickup"
-                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-3 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center"
                       >
                         <RadioGroupItem value="pickup" id="pickup" className="sr-only" />
-                        <MapPin className="mb-3 h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
-                        <span translate="no" className="text-sm sm:text-base break-words w-full">Retirada no Local</span>
+                        <MapPin className="mb-1.5 sm:mb-3 h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0" />
+                        <span translate="no" className="text-xs sm:text-base break-words w-full">Retirada no Local</span>
                       </Label>
                     </RadioGroup>
                   )}
@@ -1017,28 +1021,28 @@ const Checkout = () => {
             </Card>
 
             {deliveryOption === 'delivery' && (
-              <Card className={cn("w-full max-w-full overflow-hidden", !isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
-                <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-primary" /> Endereço de Entrega
-                    {isAddressSaved && <CheckCircle className="h-5 w-5 text-green-500 ml-2 flex-shrink-0" />}
-                    {!isAddressSaved && <AlertCircle className="h-5 w-5 text-destructive ml-2 flex-shrink-0" />}
+              <Card className={cn("w-full overflow-hidden", !isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
+                <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+                  <CardTitle className="text-base sm:text-xl flex items-center gap-2">
+                    <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-primary" /> Endereço de Entrega
+                    {isAddressSaved && <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 ml-2 flex-shrink-0" />}
+                    {!isAddressSaved && <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive ml-2 flex-shrink-0" />}
                   </CardTitle>
-                  <p className="text-sm text-muted-foreground">Preencha e salve o endereço para calcular a taxa de entrega.</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Preencha e salve para calcular a taxa.</p>
                 </CardHeader>
-                <CardContent className="space-y-4 p-3 sm:p-6">
+                <CardContent className="space-y-3 sm:space-y-4 px-3 pb-3 sm:p-6 sm:pt-0">
                   {restaurant.delivery_enabled === false && (
-                    <Alert variant="default" className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 text-blue-700">
+                    <Alert variant="default" className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 text-blue-700 p-2 sm:p-4">
                       <Truck className="h-4 w-4" />
-                      <AlertTitle>Frete Grátis Ativo</AlertTitle>
-                      <AlertDescription>As taxas de entrega dinâmica estão desativadas. O frete será R$ 0,00.</AlertDescription>
+                      <AlertTitle className="text-sm font-semibold">Frete Grátis Ativo</AlertTitle>
+                      <AlertDescription className="text-xs sm:text-sm">Taxas dinâmicas desativadas. Frete R$ 0,00.</AlertDescription>
                     </Alert>
                   )}
 
                   <Form {...addressForm}>
-                    <form onSubmit={addressForm.handleSubmit(handleSaveAddress)} id="address-form-inner" className="space-y-4">
-                      <div className="space-y-4">
-                        <Label htmlFor="address-search">Buscar Endereço</Label>
+                    <form onSubmit={addressForm.handleSubmit(handleSaveAddress)} id="address-form-inner" className="space-y-3 sm:space-y-4">
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label htmlFor="address-search" className="text-xs sm:text-sm">Buscar Endereço</Label>
                         <AddressAutocomplete onAddressSelect={handleAddressSelect} disabled={isGeocoding} />
                       </div>
 
@@ -1047,80 +1051,79 @@ const Checkout = () => {
                       <input type="hidden" {...addressForm.register('neighborhood')} />
                       <input type="hidden" {...addressForm.register('city')} />
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
-                        <div className="space-y-2">
-                          <Label htmlFor="number">Número *</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label htmlFor="number" className="text-xs sm:text-sm">Número *</Label>
                           <Input 
                             id="number" 
                             {...addressForm.register('number')} 
-                            placeholder="Número da casa/apto"
-                            className="h-10 sm:h-12"
+                            placeholder="Nº"
+                            className="h-9 sm:h-12 text-sm"
                           />
-                          {addressForm.formState.errors.number && <p className="text-destructive text-sm">{addressForm.formState.errors.number.message}</p>}
+                          {addressForm.formState.errors.number && <p className="text-destructive text-xs sm:text-sm">{addressForm.formState.errors.number.message}</p>}
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="complement">Complemento (Opcional)</Label>
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label htmlFor="complement" className="text-xs sm:text-sm">Complemento</Label>
                           <Input 
                             id="complement" 
                             {...addressForm.register('complement')} 
-                            placeholder="Apto, Bloco, etc."
-                            className="h-10 sm:h-12"
+                            placeholder="Apto, Bloco..."
+                            className="h-9 sm:h-12 text-sm"
                           />
                         </div>
                       </div>
 
                       {addressForm.watch('street') && (
-                        <div className="bg-muted p-3 rounded text-sm break-words overflow-hidden">
-                          <p><strong>Endereço selecionado:</strong></p>
+                        <div className="bg-muted p-2 sm:p-3 rounded text-xs sm:text-sm break-words overflow-hidden">
+                          <p><strong>Endereço:</strong></p>
                           <p>
                             {addressForm.watch('street')}
                             {addressForm.watch('number') ? `, ${addressForm.watch('number')}` : ''}
                             {addressForm.watch('complement') ? ` - ${addressForm.watch('complement')}` : ''}
                           </p>
                           <p>{addressForm.watch('neighborhood')} - {addressForm.watch('city')}</p>
-                          <p>CEP: {addressForm.watch('zip_code')}</p>
                         </div>
                       )}
 
                       <Button
                         type="submit"
-                        className="w-full h-auto py-2 text-sm sm:text-base mt-4 whitespace-normal"
+                        className="w-full h-auto py-2 text-xs sm:text-base mt-2 whitespace-normal"
                         disabled={saveAddressMutation.isPending || isGeocoding}
                       >
                         {saveAddressMutation.isPending || isGeocoding ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin mr-2" />
                         ) : (
-                          <Save className="h-4 w-4 mr-2" />
+                          <Save className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                         )}
-                        Salvar Endereço e Calcular Taxa
+                        Salvar e Calcular
                       </Button>
                     </form>
                   </Form>
 
                   {isGeocoding && (
-                    <Alert className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <AlertTitle>Calculando Taxa de Entrega...</AlertTitle>
+                    <Alert className="flex items-center gap-2 p-2 sm:p-4">
+                      <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                      <AlertTitle className="text-xs sm:text-sm">Calculando...</AlertTitle>
                     </Alert>
                   )}
 
                   {isAddressSaved && !isGeocoding && (
                     <>
                       {restaurant.delivery_enabled !== false && !isDeliveryAreaValid && (
-                        <Alert variant="destructive">
+                        <Alert variant="destructive" className="p-2 sm:p-4">
                           <AlertCircle className="h-4 w-4" />
-                          <AlertTitle>Fora da Área de Entrega</AlertTitle>
-                          <AlertDescription>Seu endereço está fora da área de cobertura do restaurante.</AlertDescription>
+                          <AlertTitle className="text-sm">Fora da Área</AlertTitle>
+                          <AlertDescription className="text-xs">Endereço fora da área de cobertura.</AlertDescription>
                         </Alert>
                       )}
 
                       {(restaurant.delivery_enabled === false || (isDeliveryAreaValid && deliveryTime)) && (
-                        <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 text-green-700">
+                        <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 text-green-700 p-2 sm:p-4">
                           <Truck className="h-4 w-4" />
-                          <AlertTitle>Entrega Disponível</AlertTitle>
-                          <AlertDescription>
-                            Taxa de entrega: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}. 
-                            Tempo estimado: {deliveryTime ? `${deliveryTime[0]} - ${deliveryTime[1]}` : '30 - 45'} minutos.
+                          <AlertTitle className="text-sm">Entrega Disponível</AlertTitle>
+                          <AlertDescription className="text-xs">
+                            Taxa: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}. 
+                            Tempo: {deliveryTime ? `${deliveryTime[0]}-${deliveryTime[1]}` : '30-45'} min.
                           </AlertDescription>
                         </Alert>
                       )}
@@ -1128,7 +1131,7 @@ const Checkout = () => {
                   )}
 
                   {isAddressSaved && customerCoords && displayAddress && (
-                    <div className="mt-6 w-full max-w-full overflow-hidden">
+                    <div className="mt-4 w-full overflow-hidden rounded-md border">
                       <ClientLocationMap
                         latitude={customerCoords[0]}
                         longitude={customerCoords[1]}
@@ -1141,13 +1144,13 @@ const Checkout = () => {
               </Card>
             )}
 
-            <Card className="w-full max-w-full overflow-hidden">
-              <CardHeader>
-                <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-primary" /> Método de Pagamento *
+            <Card className="w-full overflow-hidden">
+              <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+                <CardTitle className="text-base sm:text-xl flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-primary" /> Pagamento *
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-3 sm:p-6">
+              <CardContent className="px-3 pb-3 sm:p-6 sm:pt-0">
                 <Controller
                   name="payment_method_id"
                   control={form.control}
@@ -1160,7 +1163,7 @@ const Checkout = () => {
                         handlePaymentMethodChange(newMethodId, !!isOnline, isMpConfigured);
                       }}
                       value={field.value}
-                      className="space-y-3"
+                      className="space-y-2 sm:space-y-3"
                     >
                       {paymentMethods?.map(method => {
                         const isMpOnline = method.name?.includes('online');
@@ -1171,17 +1174,17 @@ const Checkout = () => {
                             key={method.id}
                             htmlFor={method.id}
                             className={cn(
-                              "flex items-center justify-between rounded-md border-2 border-muted bg-popover p-3 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer",
+                              "flex items-center justify-between rounded-md border-2 border-muted bg-popover p-2.5 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer",
                               isDisabled && "opacity-50 cursor-not-allowed"
                             )}
                           >
-                            <div className="flex items-center space-x-3 overflow-hidden min-w-0">
+                            <div className="flex items-center space-x-2 sm:space-x-3 overflow-hidden min-w-0 w-full">
                               <RadioGroupItem value={method.id} id={method.id} disabled={isDisabled} className="flex-shrink-0" />
                               <div className="min-w-0 flex-1">
-                                <p className="font-medium truncate text-sm sm:text-base" translate="no">{method.name}</p>
-                                <p className="text-xs text-muted-foreground truncate">{method.description}</p>
+                                <p className="font-medium text-xs sm:text-base break-words w-full leading-tight" translate="no">{method.name}</p>
+                                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{method.description}</p>
                                 {isDisabled && (
-                                  <p className="text-xs text-destructive mt-1">Pagamento online indisponível no momento.</p>
+                                  <p className="text-[10px] text-destructive mt-0.5">Indisponível no momento.</p>
                                 )}
                               </div>
                             </div>
@@ -1191,53 +1194,54 @@ const Checkout = () => {
                     </RadioGroup>
                   )}
                 />
-                {form.formState.errors.payment_method_id && <p className="text-destructive text-sm mt-2">{form.formState.errors.payment_method_id.message}</p>}
+                {form.formState.errors.payment_method_id && <p className="text-destructive text-xs sm:text-sm mt-2">{form.formState.errors.payment_method_id.message}</p>}
               </CardContent>
             </Card>
 
             {isCashPayment && (
-              <Card className="w-full max-w-full overflow-hidden">
-                <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-primary" /> Troco
+              <Card className="w-full overflow-hidden">
+                <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+                  <CardTitle className="text-base sm:text-xl flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-primary" /> Troco
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-3 sm:p-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="change_for">Precisa de troco para quanto? (Opcional)</Label>
+                <CardContent className="px-3 pb-3 sm:p-6 sm:pt-0">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="change_for" className="text-xs sm:text-sm">Precisa de troco para quanto?</Label>
                     <Input
                       id="change_for"
                       type="number"
                       step="0.01"
                       placeholder={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}
                       {...form.register('change_for')}
-                      className="h-10 sm:h-12"
+                      className="h-9 sm:h-12 text-sm"
                     />
                     {form.formState.errors.change_for?.message && (
-                      <p className="text-destructive text-sm">{form.formState.errors.change_for.message}</p>
+                      <p className="text-destructive text-xs sm:text-sm">{form.formState.errors.change_for.message}</p>
                     )}
                     {form.formState.errors.change_for?.type === 'manual' && (
-                      <p className="text-destructive text-sm">{form.formState.errors.change_for.message}</p>
+                      <p className="text-destructive text-xs sm:text-sm">{form.formState.errors.change_for.message}</p>
                     )}
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            <Card className="w-full max-w-full overflow-hidden">
-              <CardHeader>
-                <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                  <Mail className="h-5 w-5 text-primary" /> Observações
+            <Card className="w-full overflow-hidden">
+              <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+                <CardTitle className="text-base sm:text-xl flex items-center gap-2">
+                  <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-primary" /> Observações
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-3 sm:p-6">
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notas para o restaurante (Opcional)</Label>
+              <CardContent className="px-3 pb-3 sm:p-6 sm:pt-0">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor="notes" className="text-xs sm:text-sm">Notas para o restaurante</Label>
                   <Textarea
                     id="notes"
                     {...form.register('notes')}
                     rows={3}
-                    placeholder="Ex: Entregar na portaria, sem pimenta, etc."
+                    placeholder="Ex: Entregar na portaria, sem pimenta..."
+                    className="text-sm"
                   />
                 </div>
               </CardContent>
@@ -1245,15 +1249,14 @@ const Checkout = () => {
           </div>
 
           <div className="lg:col-span-1 space-y-6 sticky top-4 self-start">
-            <Card className="shadow-lg w-full max-w-full overflow-hidden">
-              <CardHeader>
-                <CardTitle className="text-xl sm:text-2xl">Resumo</CardTitle>
+            <Card className="shadow-lg w-full overflow-hidden">
+              <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
+                <CardTitle className="text-lg sm:text-2xl">Resumo</CardTitle>
               </CardHeader>
-              {/* Adicionando p-4 (padrão é geralmente p-6) para mobile para dar mais espaço */}
-              <CardContent className="space-y-4 p-4 sm:p-6">
+              <CardContent className="space-y-3 sm:space-y-4 px-3 pb-3 sm:p-6 sm:pt-0">
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                   {items.map((item) => (
-                    <div key={item.product.id} className="flex justify-between text-sm">
+                    <div key={item.product.id} className="flex justify-between text-xs sm:text-sm">
                       <span className="truncate max-w-[70%]">{item.quantity}x {item.product.name}</span>
                       <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.subtotal)}</span>
                     </div>
@@ -1261,39 +1264,39 @@ const Checkout = () => {
                 </div>
                 <Separator />
                 <div className="space-y-1">
-                  <div className="flex justify-between text-sm text-muted-foreground">
+                  <div className="flex justify-between text-xs sm:text-sm text-muted-foreground">
                     <span>Subtotal</span>
                     <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cartSubtotal)}</span>
                   </div>
-                  <div className="flex justify-between text-sm text-muted-foreground">
+                  <div className="flex justify-between text-xs sm:text-sm text-muted-foreground">
                     <span>Taxa de Entrega</span>
                     <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}</span>
                   </div>
                 </div>
                 <Separator />
-                <div className="flex justify-between font-bold text-lg sm:text-xl">
+                <div className="flex justify-between font-bold text-base sm:text-xl">
                   <span>Total</span>
                   <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}</span>
                 </div>
                 <Button
                   type="submit"
                   form="checkout-form"
-                  className="w-full h-10 sm:h-12 text-base sm:text-lg"
+                  className="w-full h-10 sm:h-12 text-sm sm:text-lg"
                   disabled={isCheckoutDisabled}
                 >
                   {isCheckoutDisabled ? (
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin mr-2" />
                   ) : (
                     isOnlinePayment ? 'Pagar e Finalizar' : 'Confirmar Pedido'
                   )}
                 </Button>
                 {deliveryOption === 'delivery' && !isAddressSaved && (
-                  <Alert variant="destructive" className="mt-3">
+                  <Alert variant="destructive" className="mt-3 p-2 sm:p-4">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription className="text-xs">Salve o endereço acima para continuar.</AlertDescription>
                   </Alert>
                 )}
-                <Link to={`/menu/${restaurant.id}`} className="block text-center text-sm text-muted-foreground hover:underline mt-2">
+                <Link to={`/menu/${restaurant.id}`} className="block text-center text-xs sm:text-sm text-muted-foreground hover:underline mt-2">
                   Voltar ao Cardápio
                 </Link>
               </CardContent>
