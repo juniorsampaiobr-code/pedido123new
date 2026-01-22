@@ -89,18 +89,3 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
-
-/* NOVO: Aplica zoom de 90% em telas menores que 768px (mobile) */
-@media (max-width: 767px) {
-  /* Usamos o seletor #root para garantir que o zoom afete todo o conteúdo da aplicação React */
-  #root {
-    zoom: 0.9;
-    /* Fallback para navegadores que não suportam 'zoom' */
-    transform: scale(0.9);
-    transform-origin: top left;
-    /* Ajusta a largura para compensar o zoom e evitar rolagem horizontal */
-    width: calc(100% / 0.9); 
-    min-height: calc(100vh / 0.9);
-    overflow-x: hidden;
-  }
-}
