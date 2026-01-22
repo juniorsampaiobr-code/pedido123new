@@ -294,7 +294,7 @@ const Checkout = () => {
       zip_code: '',
       street: '',
       number: '',
-      complement: '', // Default para complemento
+      complement: '', 
       neighborhood: '',
       city: '',
     },
@@ -588,11 +588,11 @@ const Checkout = () => {
         address: fullAddress,
         latitude: customerCoords ? customerCoords[0] : null,
         longitude: customerCoords ? customerCoords[1] : null,
-        street: currentAddress.street || null,
-        number: currentAddress.number || null,
-        neighborhood: currentAddress.neighborhood || null,
-        city: currentAddress.city || null,
-        zip_code: currentAddress.zip_code || null,
+        street: addressForm.getValues('street') || null,
+        number: addressForm.getValues('number') || null,
+        neighborhood: addressForm.getValues('neighborhood') || null,
+        city: addressForm.getValues('city') || null,
+        zip_code: addressForm.getValues('zip_code') || null,
       };
       
       if (!user) {
@@ -835,6 +835,7 @@ const Checkout = () => {
     addressForm.setValue('city', address.city);
     addressForm.setValue('zip_code', address.zip_code);
     addressForm.setValue('number', address.number);
+    addressForm.setValue('complement', ''); // LIMPA O COMPLEMENTO AO MUDAR O ENDEREÇO
     
     toast.info("Endereço encontrado! Verifique o número e clique em Salvar.");
   }, [addressForm]);
