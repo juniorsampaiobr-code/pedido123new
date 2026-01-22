@@ -34,7 +34,8 @@ import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
-type Customer = Tables<'customers'>;
+// Estendendo o tipo Customer para incluir o complemento, já que o type genérico pode não estar atualizado ainda
+type Customer = Tables<'customers'> & { complement?: string | null };
 type DeliveryZone = Tables<'delivery_zones'>;
 type PaymentMethod = Tables<'payment_methods'>;
 type CartItem = {
@@ -346,17 +347,18 @@ const Checkout = () => {
         const number = customer.number || '';
         const neighborhood = customer.neighborhood || '';
         const city = customer.city || '';
+        const complement = customer.complement || ''; // Recupera o complemento do banco
         
         addressForm.reset({
           zip_code: zip_code,
           street: street,
           number: number,
-          complement: '', 
+          complement: complement, 
           neighborhood: neighborhood,
           city: city,
         });
 
-        const initialAddressString = `${street}|${number}||${neighborhood}|${city}|${zip_code}`;
+        const initialAddressString = `${street}|${number}|${complement}|${neighborhood}|${city}|${zip_code}`;
         setSavedAddressString(initialAddressString);
 
         if (restaurantCoords && deliveryZones) {
@@ -479,7 +481,8 @@ const Checkout = () => {
           number: data.number,
           neighborhood: data.neighborhood,
           city: data.city,
-          zip_code: data.zip_code
+          zip_code: data.zip_code,
+          complement: data.complement || null // Adicionando complemento ao objeto mock
         };
         return { customer: mockCustomer, feeResult };
       }
@@ -490,7 +493,8 @@ const Checkout = () => {
         cpf_cnpj: cleanedCpfCnpj || null,
       };
 
-      const addressPayload: TablesInsert<'customers'> = {
+      // Cast para any para incluir o campo complement se ele não estiver nos types gerados
+      const addressPayload: any = {
         user_id: user?.id || null,
         ...customerContactData,
         email: user?.email || null,
@@ -502,15 +506,16 @@ const Checkout = () => {
         neighborhood: data.neighborhood,
         city: data.city,
         zip_code: data.zip_code,
+        complement: data.complement || null, // Incluindo complemento no payload
       };
 
-      const selectColumns = '*, street, number, neighborhood, city, zip_code';
+      const selectColumns = '*, street, number, neighborhood, city, zip_code, complement';
 
       let savedCustomer: Customer;
       if (customer?.id) {
         const { data: updatedCustomer, error: updateError } = await supabase
           .from('customers')
-          .update(addressPayload as TablesUpdate<'customers'>)
+          .update(addressPayload)
           .eq('id', customer.id)
           .select(selectColumns)
           .single();
@@ -579,7 +584,8 @@ const Checkout = () => {
         `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.zip_code}` : 
         null;
 
-      const customerPayload: TablesInsert<'customers'> = {
+      // Cast para any para incluir o campo complement se ele não estiver nos types gerados
+      const customerPayload: any = {
         user_id: user?.id || null,
         name: data.name,
         phone: cleanedPhone,
@@ -593,19 +599,20 @@ const Checkout = () => {
         neighborhood: addressForm.getValues('neighborhood') || null,
         city: addressForm.getValues('city') || null,
         zip_code: addressForm.getValues('zip_code') || null,
+        complement: addressForm.getValues('complement') || null, // Incluindo complemento
       };
       
       if (!user) {
           customerPayload.email = null;
       }
 
-      const selectColumns = '*, street, number, neighborhood, city, zip_code';
+      const selectColumns = '*, street, number, neighborhood, city, zip_code, complement';
 
       if (user) {
         if (customer) {
           const { data: updatedCustomer, error: updateError } = await supabase
             .from('customers')
-            .update(customerPayload as TablesUpdate<'customers'>)
+            .update(customerPayload)
             .eq('id', customer.id)
             .select(selectColumns)
             .single();
