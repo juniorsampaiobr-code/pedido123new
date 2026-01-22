@@ -902,7 +902,8 @@ const Checkout = () => {
   const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isAddressSaved);
 
   return (
-    <div className="min-h-screen bg-background py-4 sm:py-8 px-4 sm:px-8 overflow-x-hidden w-full max-w-[100vw]">
+    // Removido max-w-[100vw] para corrigir conflito com o zoom global em mobile
+    <div className="min-h-screen bg-background py-4 sm:py-8 px-4 sm:px-8 overflow-x-hidden w-full">
       <CustomerProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
@@ -1097,7 +1098,8 @@ const Checkout = () => {
 
                       <Button
                         type="submit"
-                        className="w-full h-10 text-base mt-4"
+                        // Adicionado h-auto, py-2 e whitespace-normal para permitir que o texto quebre linhas
+                        className="w-full h-auto py-2 text-base mt-4 whitespace-normal"
                         disabled={saveAddressMutation.isPending || isGeocoding}
                       >
                         {saveAddressMutation.isPending || isGeocoding ? (
