@@ -367,7 +367,9 @@ const Checkout = () => {
             deliveryZones
           );
           if (feeResult) {
-            setDeliveryFee(feeResult.fee);
+            // CORREÇÃO: Respeitar restaurant.delivery_enabled
+            const finalFee = restaurant?.delivery_enabled === false ? 0 : feeResult.fee;
+            setDeliveryFee(finalFee);
             setDeliveryTime([feeResult.minTime, feeResult.maxTime]);
             setIsDeliveryAreaValid(true);
             setIsAddressSaved(true);
@@ -390,7 +392,7 @@ const Checkout = () => {
         change_for: '',
       });
     }
-  }, [customer, form, user, isLoadingCustomer, addressForm, restaurantCoords, deliveryZones]);
+  }, [customer, form, user, isLoadingCustomer, addressForm, restaurantCoords, deliveryZones, restaurant]); // Adicionado restaurant às dependências
 
   useEffect(() => {
     if (deliveryOption === 'delivery' && savedAddressString !== null && currentAddressString !== savedAddressString) {
@@ -936,7 +938,6 @@ const Checkout = () => {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6 sm:gap-8 w-full">
-          {/* Adicionando min-w-0 para evitar que o grid expanda além da largura da tela em layouts problemáticos */}
           <div className="lg:col-span-2 space-y-6 min-w-0">
             <Card className="w-full overflow-hidden">
               <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
@@ -1059,7 +1060,7 @@ const Checkout = () => {
                             id="number" 
                             {...addressForm.register('number')} 
                             placeholder="Nº"
-                            className="h-9 sm:h-12 text-sm w-full"
+                            className="h-9 sm:h-12 text-sm"
                           />
                           {addressForm.formState.errors.number && <p className="text-destructive text-xs sm:text-sm">{addressForm.formState.errors.number.message}</p>}
                         </div>
@@ -1069,13 +1070,13 @@ const Checkout = () => {
                             id="complement" 
                             {...addressForm.register('complement')} 
                             placeholder="Apto, Bloco..."
-                            className="h-9 sm:h-12 text-sm w-full"
+                            className="h-9 sm:h-12 text-sm"
                           />
                         </div>
                       </div>
 
                       {addressForm.watch('street') && (
-                        <div className="bg-muted p-2 sm:p-3 rounded text-xs sm:text-sm break-words overflow-hidden w-full">
+                        <div className="bg-muted p-2 sm:p-3 rounded text-xs sm:text-sm break-words overflow-hidden">
                           <p><strong>Endereço:</strong></p>
                           <p>
                             {addressForm.watch('street')}
@@ -1182,7 +1183,6 @@ const Checkout = () => {
                             <div className="flex items-center space-x-2 sm:space-x-3 overflow-hidden min-w-0 w-full">
                               <RadioGroupItem value={method.id} id={method.id} disabled={isDisabled} className="flex-shrink-0" />
                               <div className="min-w-0 flex-1">
-                                {/* IMPORTANTE: Usando whitespace-normal para permitir quebra de texto em nomes longos */}
                                 <p className="font-medium text-xs sm:text-base break-words w-full leading-tight whitespace-normal" translate="no">{method.name}</p>
                                 <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{method.description}</p>
                                 {isDisabled && (
