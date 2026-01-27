@@ -354,9 +354,7 @@ const Checkout = () => {
 
   // --- Efeito para Recalcular Taxa Automaticamente quando Zonas ou Status mudam ---
   useEffect(() => {
-    // Esse efeito será disparado sempre que 'deliveryZones' ou 'restaurant' mudarem (após o refetch do realtime)
-    // E também se 'customerCoords' ou 'isAddressSaved' mudarem.
-    
+    // Só recalcula se já temos um endereço salvo e válido, coordenadas e dados do restaurante/zonas
     if (isAddressSaved && customerCoords && restaurantCoords && deliveryZones && restaurant) {
       console.log('[Checkout] Recalculando taxa devido a mudanças nos dados...', { deliveryZones });
       
@@ -384,7 +382,7 @@ const Checkout = () => {
         }
       }
     }
-  }, [deliveryZones, restaurant, customerCoords, restaurantCoords, isAddressSaved]); 
+  }, [deliveryZones, restaurant?.delivery_enabled, customerCoords, restaurantCoords, isAddressSaved]); 
 
   // --- Efeito de Inicialização (Carregar dados do cliente) ---
   useEffect(() => {
@@ -398,32 +396,9 @@ const Checkout = () => {
         change_for: '',
       });
 
-      if (customer.latitude && customer.longitude && customer.street && customer.number && customer.zip_code) {
-        const zip_code = customer.zip_code || '';
-        const street = customer.street || '';
-        const number = customer.number || '';
-        const neighborhood = customer.neighborhood || '';
-        const city = customer.city || '';
-        const complement = customer.complement || '';
-        
-        addressForm.reset({
-          zip_code: zip_code,
-          street: street,
-          number: number,
-          complement: complement, 
-          neighborhood: neighborhood,
-          city: city,
-        });
-
-        const initialAddressString = `${street}|${number}|${complement}|${neighborhood}|${city}|${zip_code}`;
-        setSavedAddressString(initialAddressString);
-        
-        // Define coordenadas iniciais
-        setCustomerCoords([customer.latitude, customer.longitude]);
-        setIsAddressSaved(true);
-        
-        // O cálculo da taxa será feito pelo useEffect reativo acima, pois setamos customerCoords e isAddressSaved aqui.
-      }
+      // O preenchimento automático do endereço foi removido para forçar o cliente a inseri-lo novamente
+      // e garantir que a taxa de entrega seja recalculada com os dados mais recentes.
+      
     } else if (user && !isLoadingCustomer) {
       const userMetadata = user.user_metadata;
       form.reset({
