@@ -219,12 +219,12 @@ const Checkout = () => {
     return null;
   }, [restaurant]);
 
-  // --- Lógica de Expiração de Sessão (20 segundos fora da aba) ---
+  // --- Lógica de Expiração de Sessão (20 minutos fora da aba) ---
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.hidden) {
-        console.log("Página oculta. Iniciando timer de expiração de 20s...");
-        // Inicia o timer de 20 segundos
+        console.log("Página oculta. Iniciando timer de expiração de 20 minutos...");
+        // Inicia o timer de 20 minutos (1.200.000 ms)
         inactivityTimerRef.current = setTimeout(async () => {
           console.log("Timer expirado. Deslogando usuário...");
           
@@ -233,7 +233,7 @@ const Checkout = () => {
           
           // Feedback visual
           toast.error("Sessão expirada.", {
-            description: "Você ficou fora da página de checkout por mais de 20 segundos. Por favor, identifique-se novamente.",
+            description: "Você ficou fora da página de checkout por mais de 20 minutos. Por favor, identifique-se novamente.",
             duration: 6000,
           });
           
@@ -245,7 +245,7 @@ const Checkout = () => {
             },
             replace: true 
           });
-        }, 20000); // 20000ms = 20 segundos
+        }, 1200000); // 20 minutos em milissegundos
       } else {
         console.log("Página visível. Cancelando timer de expiração.");
         // Se voltar antes do tempo, cancela o timer
@@ -352,7 +352,6 @@ const Checkout = () => {
   });
 
   // --- HARD RESET NO MOUNT ---
-  // Este efeito garante que, ao carregar a página (F5 ou nova aba), os campos de endereço sejam limpos.
   useEffect(() => {
     addressForm.reset({
       zip_code: '',
@@ -368,7 +367,7 @@ const Checkout = () => {
     setDeliveryFee(0);
     setDeliveryTime(null);
     setIsDeliveryAreaValid(true);
-  }, []); // Array vazio = executa apenas uma vez na montagem
+  }, []);
 
   const deliveryOption = form.watch('delivery_option');
   const selectedPaymentMethodId = form.watch('payment_method_id');
@@ -451,7 +450,6 @@ const Checkout = () => {
 
   // --- Efeito de Inicialização (Carregar dados do cliente) ---
   useEffect(() => {
-    // Apenas reseta o form se o cliente mudar (login/logout/load inicial)
     if (customer) {
       form.reset({
         ...form.getValues(),
@@ -460,8 +458,6 @@ const Checkout = () => {
         cpf_cnpj: formatCpfCnpj(customer.cpf_cnpj || ''),
         change_for: '',
       });
-      // REMOVIDO: O preenchimento automático do endereço.
-      // O useEffect de "Hard Reset" acima garante que o endereço comece vazio.
     } else if (user && !isLoadingCustomer) {
       const userMetadata = user.user_metadata;
       form.reset({
