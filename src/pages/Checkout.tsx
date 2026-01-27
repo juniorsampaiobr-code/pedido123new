@@ -451,6 +451,7 @@ const Checkout = () => {
   // --- Efeito de Inicialização (Carregar dados do cliente) ---
   useEffect(() => {
     if (customer) {
+      // 1. Dados Pessoais
       form.reset({
         ...form.getValues(),
         name: customer.name || '',
@@ -458,7 +459,31 @@ const Checkout = () => {
         cpf_cnpj: formatCpfCnpj(customer.cpf_cnpj || ''),
         change_for: '',
       });
+
+      // 2. Dados de Endereço (Preenchimento Automático)
+      // Se houver endereço salvo e coordenadas, preenchemos o form e marcamos como salvo.
+      // Isso irá disparar o efeito de cálculo de taxa automaticamente.
+      if (customer.street && customer.zip_code) {
+        addressForm.reset({
+          zip_code: customer.zip_code,
+          street: customer.street,
+          number: customer.number || '',
+          complement: customer.complement || '',
+          neighborhood: customer.neighborhood || '',
+          city: customer.city || '',
+        });
+
+        // Se houver coordenadas, configuramos o estado para "Endereço Salvo"
+        if (customer.latitude && customer.longitude) {
+          setCustomerCoords([Number(customer.latitude), Number(customer.longitude)]);
+          setIsAddressSaved(true);
+          const addrString = `${customer.street}|${customer.number}|${customer.complement || ''}|${customer.neighborhood}|${customer.city}|${customer.zip_code}`;
+          setSavedAddressString(addrString);
+        }
+      }
+
     } else if (user && !isLoadingCustomer) {
+      // Fallback para metadata do usuário se não houver registro de customer
       const userMetadata = user.user_metadata;
       form.reset({
         ...form.getValues(),
@@ -468,7 +493,7 @@ const Checkout = () => {
         change_for: '',
       });
     }
-  }, [customer, user, isLoadingCustomer]); 
+  }, [customer, user, isLoadingCustomer, form, addressForm]); 
 
   useEffect(() => {
     if (deliveryOption === 'delivery' && savedAddressString !== null && currentAddressString !== savedAddressString) {
