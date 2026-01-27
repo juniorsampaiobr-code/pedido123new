@@ -184,18 +184,20 @@ const Checkout = () => {
   // Referência para o timer de inatividade
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // MUDANÇA AQUI: staleTime: 0 garante que sempre busca dados novos do servidor
   const { data: restaurant, isLoading: isLoadingRestaurant, isError: isErrorRestaurant, error: errorRestaurant, refetch: refetchRestaurant } = useQuery<Restaurant>({
     queryKey: ['checkoutRestaurantData', restaurantId],
     queryFn: () => fetchRestaurantData(restaurantId!),
     enabled: !!restaurantId,
-    staleTime: Infinity,
+    staleTime: 0, 
   });
 
+  // MUDANÇA AQUI: staleTime: 0 para sempre pegar as zonas atuais
   const { data: deliveryZones, isLoading: isLoadingZones } = useQuery<DeliveryZone[]>({
     queryKey: ['checkoutDeliveryZones', restaurantId],
     queryFn: () => fetchDeliveryZones(restaurant!.id),
     enabled: !!restaurant,
-    staleTime: Infinity,
+    staleTime: 0,
   });
 
   const { data: paymentMethods, isLoading: isLoadingMethods } = useQuery<PaymentMethod[]>({
