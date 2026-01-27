@@ -1143,14 +1143,6 @@ const Checkout = () => {
                   <p className="text-xs sm:text-sm text-muted-foreground">Preencha e salve para calcular a taxa.</p>
                 </CardHeader>
                 <CardContent className="space-y-3 sm:space-y-4 px-3 pb-3 sm:p-6 sm:pt-0">
-                  {restaurant.delivery_enabled === false && (
-                    <Alert variant="default" className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 text-blue-700 p-2 sm:p-4">
-                      <Truck className="h-4 w-4" />
-                      <AlertTitle className="text-sm font-semibold">Frete Grátis Ativo</AlertTitle>
-                      <AlertDescription className="text-xs sm:text-sm">Taxas dinâmicas desativadas. Frete R$ 0,00.</AlertDescription>
-                    </Alert>
-                  )}
-
                   <Form {...addressForm}>
                     <form onSubmit={addressForm.handleSubmit(handleSaveAddress)} id="address-form-inner" className="space-y-3 sm:space-y-4" autoComplete="off">
                       <div className="space-y-1.5 sm:space-y-2">
