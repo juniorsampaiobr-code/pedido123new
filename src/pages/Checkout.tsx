@@ -315,22 +315,71 @@ const Checkout = () => {
     return `${street}|${number}|${complement || ''}|${neighborhood}|${city}|${zip_code}`;
   }, [addressFields]);
 
+  // --- Realtime Listener para atualização automática das taxas ---
   useEffect(() => {
-    setIsAddressSaved(false);
-    setCustomerCoords(null);
-    setDeliveryFee(0);
-    setDeliveryTime(null);
-    setIsDeliveryAreaValid(true);
-    setSavedAddressString(null);
-    addressForm.reset({
-      zip_code: '',
-      street: '',
-      number: '',
-      complement: '',
-      neighborhood: '',
-      city: '',
-    });
+    if (!restaurantId) return;
 
+    const channel = supabase.channel('checkout-updates')
+      .on(
+        'postgres_changes', 
+        { event: '*', schema: 'public', table: 'delivery_zones', filter: `restaurant_id=eq.${restaurantId}` }, 
+        () => {
+          console.log('[Realtime] Zonas de entrega atualizadas. Recarregando...');
+          queryClient.invalidateQueries({ queryKey: ['checkoutDeliveryZones'] });
+          toast.info("As taxas de entrega foram atualizadas.", { duration: 3000 });
+        }
+      )
+      .on(
+        'postgres_changes', 
+        { event: 'UPDATE', schema: 'public', table: 'restaurants', filter: `id=eq.${restaurantId}` }, 
+        () => {
+          console.log('[Realtime] Configurações do restaurante atualizadas. Recarregando...');
+          queryClient.invalidateQueries({ queryKey: ['checkoutRestaurantData'] });
+          toast.info("As configurações da loja foram atualizadas.", { duration: 3000 });
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [restaurantId, queryClient]);
+
+  // --- Efeito para Recalcular Taxa Automaticamente quando Zonas ou Status mudam ---
+  useEffect(() => {
+    // Só recalcula se já temos um endereço salvo e válido, coordenadas e dados do restaurante/zonas
+    if (isAddressSaved && customerCoords && restaurantCoords && deliveryZones && restaurant) {
+      
+      if (restaurant.delivery_enabled === false) {
+        // Se entrega foi desativada globalmente
+        setDeliveryFee(0);
+        setIsDeliveryAreaValid(true);
+        // Mantém o tempo estimado padrão se não tivermos zonas para calcular
+        if (!deliveryTime) setDeliveryTime([30, 45]); 
+      } else {
+        // Se entrega está ativa, recalcula com as zonas atuais
+        const feeResult = calculateDeliveryFee(
+          customerCoords,
+          restaurantCoords,
+          deliveryZones
+        );
+
+        if (feeResult) {
+          setDeliveryFee(feeResult.fee);
+          setDeliveryTime([feeResult.minTime, feeResult.maxTime]);
+          setIsDeliveryAreaValid(true);
+        } else {
+          // Se as zonas mudaram e o endereço agora está fora
+          setIsDeliveryAreaValid(false);
+          setDeliveryFee(0);
+          toast.warning("As zonas de entrega mudaram e seu endereço agora está fora da área de cobertura.");
+        }
+      }
+    }
+  }, [deliveryZones, restaurant?.delivery_enabled, customerCoords, restaurantCoords, isAddressSaved]); // Dependências cruciais para reatividade
+
+  // --- Efeito de Inicialização (Carregar dados do cliente) ---
+  // Removida dependência de 'deliveryZones' e 'restaurant' para evitar resets indesejados quando eles mudam via realtime
+  useEffect(() => {
+    // Apenas reseta o form se o cliente mudar (login/logout/load inicial)
     if (customer) {
       form.reset({
         ...form.getValues(),
@@ -349,38 +398,17 @@ const Checkout = () => {
         const complement = customer.complement || '';
         
         addressForm.reset({
-          zip_code: zip_code,
-          street: street,
-          number: number,
-          complement: complement, 
-          neighborhood: neighborhood,
-          city: city,
+          zip_code, street, number, complement, neighborhood, city,
         });
 
         const initialAddressString = `${street}|${number}|${complement}|${neighborhood}|${city}|${zip_code}`;
         setSavedAddressString(initialAddressString);
-
-        if (restaurantCoords && deliveryZones) {
-          const feeResult = calculateDeliveryFee(
-            [customer.latitude, customer.longitude],
-            restaurantCoords,
-            deliveryZones
-          );
-          if (feeResult) {
-            // CORREÇÃO: Respeitar restaurant.delivery_enabled
-            const finalFee = restaurant?.delivery_enabled === false ? 0 : feeResult.fee;
-            setDeliveryFee(finalFee);
-            setDeliveryTime([feeResult.minTime, feeResult.maxTime]);
-            setIsDeliveryAreaValid(true);
-            setIsAddressSaved(true);
-            setCustomerCoords([customer.latitude, customer.longitude]);
-          } else {
-            setDeliveryFee(0);
-            setIsDeliveryAreaValid(false);
-            setIsAddressSaved(true);
-            setCustomerCoords([customer.latitude, customer.longitude]);
-          }
-        }
+        
+        // Define coordenadas iniciais
+        setCustomerCoords([customer.latitude, customer.longitude]);
+        setIsAddressSaved(true);
+        
+        // O cálculo da taxa será feito pelo useEffect reativo acima, pois setamos customerCoords e isAddressSaved aqui.
       }
     } else if (user && !isLoadingCustomer) {
       const userMetadata = user.user_metadata;
@@ -392,7 +420,7 @@ const Checkout = () => {
         change_for: '',
       });
     }
-  }, [customer, form, user, isLoadingCustomer, addressForm, restaurantCoords, deliveryZones, restaurant]); // Adicionado restaurant às dependências
+  }, [customer, user, isLoadingCustomer]); // Dependências reduzidas para evitar loops/resets
 
   useEffect(() => {
     if (deliveryOption === 'delivery' && savedAddressString !== null && currentAddressString !== savedAddressString) {
@@ -1060,7 +1088,7 @@ const Checkout = () => {
                             id="number" 
                             {...addressForm.register('number')} 
                             placeholder="Nº"
-                            className="h-9 sm:h-12 text-sm"
+                            className="h-9 sm:h-12 text-sm w-full"
                           />
                           {addressForm.formState.errors.number && <p className="text-destructive text-xs sm:text-sm">{addressForm.formState.errors.number.message}</p>}
                         </div>
@@ -1070,7 +1098,7 @@ const Checkout = () => {
                             id="complement" 
                             {...addressForm.register('complement')} 
                             placeholder="Apto, Bloco..."
-                            className="h-9 sm:h-12 text-sm"
+                            className="h-9 sm:h-12 text-sm w-full"
                           />
                         </div>
                       </div>
@@ -1183,6 +1211,7 @@ const Checkout = () => {
                             <div className="flex items-center space-x-2 sm:space-x-3 overflow-hidden min-w-0 w-full">
                               <RadioGroupItem value={method.id} id={method.id} disabled={isDisabled} className="flex-shrink-0" />
                               <div className="min-w-0 flex-1">
+                                {/* IMPORTANTE: Usando whitespace-normal para permitir quebra de texto em nomes longos */}
                                 <p className="font-medium text-xs sm:text-base break-words w-full leading-tight whitespace-normal" translate="no">{method.name}</p>
                                 <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{method.description}</p>
                                 {isDisabled && (
