@@ -419,8 +419,15 @@ const Checkout = () => {
     };
   }, [restaurantId, queryClient]);
 
-  // --- Efeito para Recalcular Taxa Automaticamente quando Zonas ou Status mudam ---
+  // --- Efeito para Recalcular Taxa Automaticamente quando Zonas, Status ou Opção de Entrega mudam ---
   useEffect(() => {
+    // SE FOR RETIRADA, ZERA A TAXA
+    if (deliveryOption === 'pickup') {
+      setDeliveryFee(0);
+      setIsDeliveryAreaValid(true);
+      return;
+    }
+
     if (isAddressSaved && customerCoords && restaurantCoords && deliveryZones && restaurant) {
       console.log('[Checkout] Recalculando taxa devido a mudanças nos dados...', { deliveryZones });
       
@@ -448,7 +455,7 @@ const Checkout = () => {
         }
       }
     }
-  }, [deliveryZones, restaurant?.delivery_enabled, customerCoords, restaurantCoords, isAddressSaved]); 
+  }, [deliveryZones, restaurant?.delivery_enabled, customerCoords, restaurantCoords, isAddressSaved, deliveryOption]); // Adicionado deliveryOption
 
   // --- Efeito de Inicialização (Carregar dados do cliente) ---
   useEffect(() => {
