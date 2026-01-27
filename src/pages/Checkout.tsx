@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -181,6 +181,9 @@ const Checkout = () => {
   const [pendingOnlinePaymentId, setPendingOnlinePaymentId] = useState<string | null>(null);
   const [savedAddressString, setSavedAddressString] = useState<string | null>(null);
 
+  // Referência para o timer de inatividade
+  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const { data: restaurant, isLoading: isLoadingRestaurant, isError: isErrorRestaurant, error: errorRestaurant, refetch: refetchRestaurant } = useQuery<Restaurant>({
     queryKey: ['checkoutRestaurantData', restaurantId],
     queryFn: () => fetchRestaurantData(restaurantId!),
@@ -215,6 +218,53 @@ const Checkout = () => {
     }
     return null;
   }, [restaurant]);
+
+  // --- Lógica de Expiração de Sessão (20 segundos fora da aba) ---
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.hidden) {
+        console.log("Página oculta. Iniciando timer de expiração de 20s...");
+        // Inicia o timer de 20 segundos
+        inactivityTimerRef.current = setTimeout(async () => {
+          console.log("Timer expirado. Deslogando usuário...");
+          
+          // Desloga o usuário
+          await supabase.auth.signOut();
+          
+          // Feedback visual
+          toast.error("Sessão expirada.", {
+            description: "Você ficou fora da página de checkout por mais de 20 segundos. Por favor, identifique-se novamente.",
+            duration: 6000,
+          });
+          
+          // Redireciona para o Auth
+          navigate('/auth', { 
+            state: { 
+              from: '/checkout', 
+              restaurantId 
+            },
+            replace: true 
+          });
+        }, 20000); // 20000ms = 20 segundos
+      } else {
+        console.log("Página visível. Cancelando timer de expiração.");
+        // Se voltar antes do tempo, cancela o timer
+        if (inactivityTimerRef.current) {
+          clearTimeout(inactivityTimerRef.current);
+          inactivityTimerRef.current = null;
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+    };
+  }, [navigate, restaurantId]);
 
   const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, neighborhood: string, lat?: number | null, lng?: number | null) => {
     const DEFAULT_DELIVERY_TIME: [number, number] = [30, 45];
@@ -301,6 +351,25 @@ const Checkout = () => {
     mode: 'onBlur',
   });
 
+  // --- HARD RESET NO MOUNT ---
+  // Este efeito garante que, ao carregar a página (F5 ou nova aba), os campos de endereço sejam limpos.
+  useEffect(() => {
+    addressForm.reset({
+      zip_code: '',
+      street: '',
+      number: '',
+      complement: '',
+      neighborhood: '',
+      city: '',
+    });
+    setIsAddressSaved(false);
+    setCustomerCoords(null);
+    setSavedAddressString(null);
+    setDeliveryFee(0);
+    setDeliveryTime(null);
+    setIsDeliveryAreaValid(true);
+  }, []); // Array vazio = executa apenas uma vez na montagem
+
   const deliveryOption = form.watch('delivery_option');
   const selectedPaymentMethodId = form.watch('payment_method_id');
   const selectedPaymentMethod = paymentMethods?.find(m => m.id === selectedPaymentMethodId);
@@ -319,21 +388,18 @@ const Checkout = () => {
   useEffect(() => {
     if (!restaurantId) return;
 
-    // Listener para Zonas de Entrega
     const zonesChannel = supabase.channel('delivery-zones-changes')
       .on(
         'postgres_changes', 
         { event: '*', schema: 'public', table: 'delivery_zones', filter: `restaurant_id=eq.${restaurantId}` }, 
         () => {
           console.log('[Realtime] Zonas de entrega atualizadas. Invalidando query...');
-          // Usa a chave exata para garantir que o TanStack Query faça o refetch
           queryClient.invalidateQueries({ queryKey: ['checkoutDeliveryZones', restaurantId] });
           toast.info("As taxas de entrega foram atualizadas.", { duration: 3000 });
         }
       )
       .subscribe();
 
-    // Listener para Configurações do Restaurante
     const restaurantChannel = supabase.channel('restaurant-settings-changes')
       .on(
         'postgres_changes', 
@@ -354,7 +420,6 @@ const Checkout = () => {
 
   // --- Efeito para Recalcular Taxa Automaticamente quando Zonas ou Status mudam ---
   useEffect(() => {
-    // Só recalcula se já temos um endereço salvo e válido, coordenadas e dados do restaurante/zonas
     if (isAddressSaved && customerCoords && restaurantCoords && deliveryZones && restaurant) {
       console.log('[Checkout] Recalculando taxa devido a mudanças nos dados...', { deliveryZones });
       
@@ -395,10 +460,8 @@ const Checkout = () => {
         cpf_cnpj: formatCpfCnpj(customer.cpf_cnpj || ''),
         change_for: '',
       });
-
-      // O preenchimento automático do endereço foi removido para forçar o cliente a inseri-lo novamente
-      // e garantir que a taxa de entrega seja recalculada com os dados mais recentes.
-      
+      // REMOVIDO: O preenchimento automático do endereço.
+      // O useEffect de "Hard Reset" acima garante que o endereço comece vazio.
     } else if (user && !isLoadingCustomer) {
       const userMetadata = user.user_metadata;
       form.reset({
@@ -1059,7 +1122,7 @@ const Checkout = () => {
                   )}
 
                   <Form {...addressForm}>
-                    <form onSubmit={addressForm.handleSubmit(handleSaveAddress)} id="address-form-inner" className="space-y-3 sm:space-y-4">
+                    <form onSubmit={addressForm.handleSubmit(handleSaveAddress)} id="address-form-inner" className="space-y-3 sm:space-y-4" autoComplete="off">
                       <div className="space-y-1.5 sm:space-y-2">
                         <Label htmlFor="address-search" className="text-xs sm:text-sm">Buscar Endereço</Label>
                         <AddressAutocomplete onAddressSelect={handleAddressSelect} disabled={isGeocoding} />
@@ -1078,6 +1141,7 @@ const Checkout = () => {
                             {...addressForm.register('number')} 
                             placeholder="Nº"
                             className="h-9 sm:h-12 text-sm"
+                            autoComplete="off"
                           />
                           {addressForm.formState.errors.number && <p className="text-destructive text-xs sm:text-sm">{addressForm.formState.errors.number.message}</p>}
                         </div>
@@ -1088,6 +1152,7 @@ const Checkout = () => {
                             {...addressForm.register('complement')} 
                             placeholder="Apto, Bloco..."
                             className="h-9 sm:h-12 text-sm"
+                            autoComplete="off"
                           />
                         </div>
                       </div>
