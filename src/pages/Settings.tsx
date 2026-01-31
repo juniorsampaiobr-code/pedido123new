@@ -98,7 +98,7 @@ const Settings = () => {
     queryKey: ['restaurantSettings', userRestaurantId],
     queryFn: () => fetchRestaurantData(userRestaurantId!),
     enabled: !!userRestaurantId,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 10, // Otimização: Aumentado para 10 minutos
   });
 
   useEffect(() => {
@@ -278,6 +278,7 @@ const Settings = () => {
     },
     onSuccess: () => {
       toast.success('Configurações salvas com sucesso!');
+      // Invalida a query de settings para forçar o re-fetch (respeitando o staleTime)
       queryClient.invalidateQueries({ queryKey: ['restaurantSettings', userRestaurantId] });
       queryClient.invalidateQueries({ queryKey: ['adminProfile'] });
     },

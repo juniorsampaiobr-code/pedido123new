@@ -114,7 +114,7 @@ const Menu = () => {
     queryKey: ['menuData', restaurantId],
     queryFn: () => fetchMenuData(restaurantId!),
     enabled: !!restaurantId,
-    staleTime: 1000 * 60 * 1,
+    staleTime: 1000 * 60 * 5, // Otimização: Aumentado para 5 minutos
   });
   
   // 2. Busca horários em tempo real
@@ -125,7 +125,7 @@ const Menu = () => {
     queryKey: ['menuCustomerData', user?.id],
     queryFn: () => fetchCustomerData(user!.id),
     enabled: !!user,
-    staleTime: 0,
+    staleTime: 0, // Manter 0 para dados do cliente, pois podem ser atualizados no modal
   });
 
   // Efeito para verificar se o carrinho pertence a outro restaurante

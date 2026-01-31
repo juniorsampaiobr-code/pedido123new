@@ -184,22 +184,23 @@ const Checkout = () => {
   // Referência para o timer de inatividade
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // MUDANÇA AQUI: staleTime: 0 garante que sempre busca dados novos do servidor
+  // MUDANÇA AQUI: staleTime: 1000 * 60 * 5 (5 minutos)
   const { data: restaurant, isLoading: isLoadingRestaurant, isError: isErrorRestaurant, error: errorRestaurant, refetch: refetchRestaurant } = useQuery<Restaurant>({
     queryKey: ['checkoutRestaurantData', restaurantId],
     queryFn: () => fetchRestaurantData(restaurantId!),
     enabled: !!restaurantId,
-    staleTime: 0, 
+    staleTime: 1000 * 60 * 5, 
   });
 
-  // MUDANÇA AQUI: staleTime: 0 para sempre pegar as zonas atuais
+  // MUDANÇA AQUI: staleTime: 1000 * 60 * 5 (5 minutos)
   const { data: deliveryZones, isLoading: isLoadingZones } = useQuery<DeliveryZone[]>({
     queryKey: ['checkoutDeliveryZones', restaurantId],
     queryFn: () => fetchDeliveryZones(restaurant!.id),
     enabled: !!restaurant,
-    staleTime: 0,
+    staleTime: 1000 * 60 * 5,
   });
 
+  // MUDANÇA AQUI: staleTime: Infinity
   const { data: paymentMethods, isLoading: isLoadingMethods } = useQuery<PaymentMethod[]>({
     queryKey: ['checkoutPaymentMethods', restaurantId],
     queryFn: () => fetchPaymentMethods(restaurant!.id),
@@ -207,6 +208,7 @@ const Checkout = () => {
     staleTime: Infinity,
   });
 
+  // MUDANÇA AQUI: staleTime: 0 (Manter 0 para dados do cliente, pois podem ser atualizados no modal)
   const { data: customer, isLoading: isLoadingCustomer, refetch: refetchCustomer } = useQuery<Customer | null>({
     queryKey: ['checkoutCustomerData', user?.id],
     queryFn: () => fetchCustomerData(user!.id),
@@ -395,6 +397,7 @@ const Checkout = () => {
         { event: '*', schema: 'public', table: 'delivery_zones', filter: `restaurant_id=eq.${restaurantId}` }, 
         () => {
           console.log('[Realtime] Zonas de entrega atualizadas. Invalidando query...');
+          // MUDANÇA AQUI: Força o re-fetch, mas o staleTime alto evita re-fetch desnecessário em montagens
           queryClient.invalidateQueries({ queryKey: ['checkoutDeliveryZones', restaurantId] });
           toast.info("As taxas de entrega foram atualizadas.", { duration: 3000 });
         }
@@ -407,6 +410,7 @@ const Checkout = () => {
         { event: 'UPDATE', schema: 'public', table: 'restaurants', filter: `id=eq.${restaurantId}` }, 
         () => {
           console.log('[Realtime] Configurações do restaurante atualizadas. Invalidando query...');
+          // MUDANÇA AQUI: Força o re-fetch
           queryClient.invalidateQueries({ queryKey: ['checkoutRestaurantData', restaurantId] });
           toast.info("As configurações da loja foram atualizadas.", { duration: 3000 });
         }

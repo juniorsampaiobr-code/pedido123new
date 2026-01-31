@@ -130,6 +130,7 @@ const Payments = () => {
     queryKey: ['paymentSettings', userRestaurantId],
     queryFn: () => fetchPaymentSettings(userRestaurantId!), // Usar userRestaurantId
     enabled: !!userRestaurantId, // Só busca se userRestaurantId estiver disponível
+    staleTime: Infinity, // Otimização: Credenciais só mudam manualmente
   });
 
   // Usar userRestaurantId no queryKey e na função fetch
@@ -137,6 +138,7 @@ const Payments = () => {
     queryKey: ['paymentMethods', userRestaurantId],
     queryFn: () => fetchPaymentMethods(userRestaurantId!), // Usar userRestaurantId
     enabled: !!userRestaurantId, // Só busca se userRestaurantId estiver disponível
+    staleTime: 1000 * 60 * 5, // Otimização: Métodos de pagamento não mudam frequentemente
   });
 
   // REMOVENDO QUERY DE STATUS DE CREDENCIAIS
@@ -179,7 +181,8 @@ const Payments = () => {
     },
     onSuccess: (result) => {
       toast.success(result.message);
-      queryClient.invalidateQueries({ queryKey: ['paymentSettings', userRestaurantId] }); // Usar userRestaurantId
+      // Invalida a query de settings para forçar o re-fetch (respeitando o staleTime)
+      queryClient.invalidateQueries({ queryKey: ['paymentSettings', userRestaurantId] }); 
       // Invalida a chave pública do frontend para forçar o recarregamento
       queryClient.invalidateQueries({ queryKey: ['mercadoPagoPublicKey'] }); 
     },
@@ -253,7 +256,8 @@ const Payments = () => {
     },
     onSuccess: () => {
       toast.success('Configurações de métodos de pagamento salvas!');
-      queryClient.invalidateQueries({ queryKey: ['paymentMethods', userRestaurantId] }); // Usar userRestaurantId
+      // Invalida a query de métodos para forçar o re-fetch (respeitando o staleTime)
+      queryClient.invalidateQueries({ queryKey: ['paymentMethods', userRestaurantId] }); 
     },
     onError: (err) => {
       toast.error(`Erro ao salvar métodos: ${err.message}`);

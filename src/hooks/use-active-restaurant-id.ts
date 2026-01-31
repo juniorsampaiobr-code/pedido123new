@@ -25,6 +25,6 @@ export const useActiveRestaurantId = () => {
   return useQuery<string | null>({
     queryKey: ['activeRestaurantId'],
     queryFn: fetchActiveRestaurantId,
-    staleTime: Infinity,
+    staleTime: 1000 * 60 * 60 * 24, // Otimização: 24 horas (Este ID raramente muda)
   });
 };

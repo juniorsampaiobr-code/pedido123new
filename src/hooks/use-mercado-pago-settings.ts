@@ -25,6 +25,6 @@ export const useMercadoPagoPublicKey = (restaurantId: string | undefined) => {
     queryKey: ['mercadoPagoPublicKey', restaurantId],
     queryFn: () => fetchMercadoPagoPublicKey(restaurantId!),
     enabled: !!restaurantId, // Só executa se o ID do restaurante estiver disponível
-    staleTime: Infinity, // Key should only change manually via settings
+    staleTime: 1000 * 60 * 60 * 24, // Otimização: 24 horas (Chave só muda manualmente)
   });
 };
