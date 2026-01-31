@@ -669,6 +669,7 @@ const Checkout = () => {
   });
 
   const handleSaveAddress = (data: AddressFormValues) => {
+    console.log('[Checkout] Iniciando salvamento de endereço:', data);
     // 1. Valida o formulário de endereço
     addressForm.trigger().then(isAddressValid => {
         if (isAddressValid) {
@@ -676,14 +677,17 @@ const Checkout = () => {
             form.trigger(['name', 'phone', 'cpf_cnpj']).then(isContactValid => {
                 if (isContactValid) {
                     // 3. Se ambos válidos, chama a mutação
+                    console.log('[Checkout] Dados de contato válidos, chamando mutação.');
                     saveAddressMutation.mutate(data);
                 } else {
                     // Se o contato falhar, exibe o erro do formulário principal
+                    console.warn('[Checkout] Dados de contato inválidos:', form.getValues());
                     toast.error("Preencha Nome, Telefone e CPF/CNPJ nos Seus Dados antes de salvar o endereço.");
                 }
             });
         } else {
             // Se o endereço falhar, o Zod já deve ter marcado os campos com erro
+            console.warn('[Checkout] Dados de endereço inválidos:', addressForm.formState.errors);
             toast.error("Preencha todos os campos obrigatórios do endereço.");
         }
     });
@@ -1191,11 +1195,37 @@ const Checkout = () => {
                         <AddressAutocomplete onAddressSelect={handleAddressSelect} disabled={isGeocoding} />
                       </div>
 
-                      {/* Campos escondidos preenchidos pelo Autocomplete */}
-                      <input type="hidden" {...addressForm.register('zip_code')} />
+                      {/* Campos preenchidos pelo Autocomplete */}
                       <input type="hidden" {...addressForm.register('street')} />
-                      <input type="hidden" {...addressForm.register('neighborhood')} />
                       <input type="hidden" {...addressForm.register('city')} />
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label htmlFor="neighborhood" className="text-xs sm:text-sm">Bairro *</Label>
+                          <Input 
+                            id="neighborhood" 
+                            {...addressForm.register('neighborhood')} 
+                            placeholder="Seu bairro"
+                            className="h-9 sm:h-12 text-sm"
+                          />
+                          {addressForm.formState.errors.neighborhood && <p className="text-destructive text-xs sm:text-sm">{addressForm.formState.errors.neighborhood.message}</p>}
+                        </div>
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label htmlFor="zip_code" className="text-xs sm:text-sm">CEP *</Label>
+                          <Controller
+                            name="zip_code"
+                            control={addressForm.control}
+                            render={({ field }) => (
+                              <ZipCodeInput 
+                                id="zip_code" 
+                                {...field} 
+                                className="h-9 sm:h-12 text-sm"
+                              />
+                            )}
+                          />
+                          {addressForm.formState.errors.zip_code && <p className="text-destructive text-xs sm:text-sm">{addressForm.formState.errors.zip_code.message}</p>}
+                        </div>
+                      </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
                         <div className="space-y-1.5 sm:space-y-2">
