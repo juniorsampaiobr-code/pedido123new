@@ -92,20 +92,35 @@ export const AddressAutocomplete = ({ onAddressSelect, defaultValue, disabled }:
       });
 
       // FALLBACK DE SEGURANÇA PARA BAIRRO:
-      // Se o bairro ainda estiver vazio, tentamos extrair do formatted_address
-      // O formato comum é "Rua, Numero - Bairro, Cidade - Estado, CEP, Pais"
-      if (!components.neighborhood && place.formatted_address) {
-        console.log('[AddressAutocomplete] Bairro não encontrado nos componentes. Tentando extrair do formatted_address:', place.formatted_address);
+      // Se o bairro ainda estiver vazio ou for igual à rua, tentamos extrair do formatted_address
+      if ((!components.neighborhood || components.neighborhood === components.street) && place.formatted_address) {
+        console.log('[AddressAutocomplete] Bairro ausente ou duplicado. Analisando formatted_address:', place.formatted_address);
+        
+        // Padrão comum no Brasil: "Rua Nome, Numero - Bairro, Cidade - Estado, CEP, Pais"
+        // Ou: "Rua Nome - Bairro, Cidade - Estado, CEP, Pais"
         const parts = place.formatted_address.split(',');
-        if (parts.length >= 2) {
-          // Geralmente o bairro está após o número ou rua
-          // "Rua Alonso Keese - Vila Linopolis I, Santa Bárbara d'Oeste - SP, Brasil"
-          // Aqui parts[0] = "Rua Alonso Keese - Vila Linopolis I"
-          const firstPart = parts[0];
-          if (firstPart.includes(' - ')) {
-            const subParts = firstPart.split(' - ');
-            components.neighborhood = subParts[subParts.length - 1].trim();
-            console.log('[AddressAutocomplete] Bairro extraído do fallback:', components.neighborhood);
+        
+        if (parts.length >= 1) {
+          const mainPart = parts[0]; // "Rua Alonso Keese - Vila Linopolis I"
+          if (mainPart.includes(' - ')) {
+            const subParts = mainPart.split(' - ');
+            // O bairro costuma ser a última parte antes da primeira vírgula
+            const potentialNeighborhood = subParts[subParts.length - 1].trim();
+            
+            // Verifica se não é apenas o número
+            if (!/^\d+$/.test(potentialNeighborhood)) {
+              components.neighborhood = potentialNeighborhood;
+              console.log('[AddressAutocomplete] Bairro extraído com sucesso do texto:', components.neighborhood);
+            }
+          }
+        }
+        
+        // Se ainda não achou, tenta a segunda parte (após a primeira vírgula)
+        if (!components.neighborhood && parts.length >= 2) {
+          const secondPart = parts[1].trim();
+          // Às vezes o bairro vem na segunda parte: "Rua, Numero, Bairro, Cidade"
+          if (!secondPart.includes(components.city)) {
+             components.neighborhood = secondPart;
           }
         }
       }

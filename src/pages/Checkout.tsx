@@ -1233,8 +1233,13 @@ const Checkout = () => {
                             {addressForm.watch('number') ? `, ${addressForm.watch('number')}` : ''}
                             {addressForm.watch('complement') ? ` - ${addressForm.watch('complement')}` : ''}
                           </p>
-                          {/* CORREÇÃO AQUI: Incluindo o bairro (neighborhood) */}
-                          <p>{addressForm.watch('neighborhood')}, {addressForm.watch('city')}</p>
+                          {/* CORREÇÃO AQUI: Incluindo o bairro (neighborhood) com destaque para depuração */}
+                          <p>
+                            <span className={!addressForm.watch('neighborhood') ? "text-destructive font-bold" : ""}>
+                              {addressForm.watch('neighborhood') || "Bairro não identificado"}
+                            </span>
+                            {`, ${addressForm.watch('city')}`}
+                          </p>
                         </div>
                       )}
 
