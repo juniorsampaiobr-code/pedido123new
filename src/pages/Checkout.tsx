@@ -985,6 +985,7 @@ const Checkout = () => {
   const displayAddress = useMemo(() => {
     const [zip_code, street, number, city, neighborhood, complement] = addressFields;
     if (street && number && neighborhood && city && zip_code) {
+      // CORREÇÃO AQUI: Incluindo o bairro (neighborhood) na visualização
       return `${street}, ${number}${complement ? ` - ${complement}` : ''} - ${neighborhood}, ${city}, ${zip_code}`;
     }
     return '';
@@ -1228,7 +1229,8 @@ const Checkout = () => {
                             {addressForm.watch('number') ? `, ${addressForm.watch('number')}` : ''}
                             {addressForm.watch('complement') ? ` - ${addressForm.watch('complement')}` : ''}
                           </p>
-                          <p>{addressForm.watch('neighborhood')} - {addressForm.watch('city')}</p>
+                          {/* CORREÇÃO AQUI: Incluindo o bairro (neighborhood) */}
+                          <p>{addressForm.watch('neighborhood')}, {addressForm.watch('city')}</p>
                         </div>
                       )}
 
