@@ -81,7 +81,9 @@ const formatCpfCnpj = (value: string) => {
 
 // --- Schemas ---
 const addressSchema = z.object({
-  zip_code: z.string().min(1, 'CEP é obrigatório.'),
+  zip_code: z.string().min(1, 'CEP é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length === 8, {
+    message: 'O CEP deve ter 8 dígitos.',
+  }),
   street: z.string().min(1, 'Rua é obrigatória.'),
   number: z.string().min(1, 'Número é obrigatório.'),
   complement: z.string().optional(),
@@ -325,7 +327,7 @@ const Checkout = () => {
         return { coords, fee: 0, time: null, isValid: false };
       }
     } else {
-      return { coords: null, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
+      return { coords, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
     }
   }, [restaurant, restaurantCoords, deliveryZones]);
 
@@ -460,7 +462,7 @@ const Checkout = () => {
         }
       }
     }
-  }, [deliveryZones, restaurant?.delivery_enabled, customerCoords, restaurantCoords, isAddressSaved, deliveryOption]); // Adicionado deliveryOption
+  }, [deliveryZones, restaurant?.delivery_enabled, customerCoords, restaurantCoords, isAddressSaved, deliveryOption, deliveryTime, restaurant]); // Adicionado deliveryOption
 
   // --- Efeito de Inicialização (Carregar dados do cliente) ---
   useEffect(() => {
@@ -507,7 +509,7 @@ const Checkout = () => {
         change_for: '',
       });
     }
-  }, [customer, user, isLoadingCustomer, form, addressForm]); 
+  }, [customer, user, isLoadingCustomer, form, addressForm, isOpen]); 
 
   useEffect(() => {
     if (deliveryOption === 'delivery' && savedAddressString !== null && currentAddressString !== savedAddressString) {
@@ -543,6 +545,8 @@ const Checkout = () => {
       setIsGeocoding(true);
       
       const fullAddress = `${data.street}, ${data.number}${data.complement ? ` - ${data.complement}` : ''}, ${data.neighborhood}, ${data.city}, ${data.zip_code}`;
+      
+      // 1. Geocodificação e Cálculo de Taxa
       const feeResult = await calculateFee(data.zip_code, data.street, data.number, data.city, data.neighborhood);
       setIsGeocoding(false);
 
@@ -554,21 +558,25 @@ const Checkout = () => {
         throw new Error("Não foi possível obter as coordenadas para salvar o endereço.");
       }
 
-      const userAuth = await supabase.auth.getUser();
-      const userId = userAuth.data.user?.id;
-
+      // 2. Validação de Dados de Contato (do formulário principal)
       const contactName = form.getValues('name');
       const contactPhone = form.getValues('phone');
       const contactCpfCnpj = form.getValues('cpf_cnpj');
       
       const cleanedPhone = contactPhone.replace(/\D/g, '');
-      const cleanedCpfCnpj = contactCpfCnpj.replace(/\D/g, '');
+      const cleanedCpfCnpj = contactCpfCnpj.replace(/\D/g, '') || null;
 
       if (!contactName || cleanedPhone.length < 10 || !cleanedCpfCnpj || (cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14)) {
+          // Se a validação falhar, lançamos um erro específico para o usuário
           throw new Error("Preencha Nome, Telefone (10+ dígitos) e CPF/CNPJ (11 ou 14 dígitos) nos Seus Dados antes de salvar o endereço.");
       }
 
+      const userAuth = await supabase.auth.getUser();
+      const userId = userAuth.data.user?.id;
+
+      // 3. Lógica de Salvar/Atualizar Cliente
       if (!customer?.id && !userId) {
+        // Cliente anônimo (não logado e sem registro anterior)
         const mockCustomer: Customer = {
           id: 'anonymous',
           user_id: null,
@@ -594,7 +602,7 @@ const Checkout = () => {
       const customerContactData = {
         name: contactName,
         phone: cleanedPhone,
-        cpf_cnpj: cleanedCpfCnpj || null,
+        cpf_cnpj: cleanedCpfCnpj,
       };
 
       const addressPayload: any = {
@@ -660,11 +668,22 @@ const Checkout = () => {
   });
 
   const handleSaveAddress = (data: AddressFormValues) => {
-    form.trigger(['name', 'phone', 'cpf_cnpj']).then(isContactValid => {
-        if (isContactValid) {
-            saveAddressMutation.mutate(data);
+    // 1. Valida o formulário de endereço
+    addressForm.trigger().then(isAddressValid => {
+        if (isAddressValid) {
+            // 2. Valida os campos de contato (nome, telefone, cpf/cnpj)
+            form.trigger(['name', 'phone', 'cpf_cnpj']).then(isContactValid => {
+                if (isContactValid) {
+                    // 3. Se ambos válidos, chama a mutação
+                    saveAddressMutation.mutate(data);
+                } else {
+                    // Se o contato falhar, exibe o erro do formulário principal
+                    toast.error("Preencha Nome, Telefone e CPF/CNPJ nos Seus Dados antes de salvar o endereço.");
+                }
+            });
         } else {
-            toast.error("Preencha Nome, Telefone e CPF/CNPJ nos Seus Dados antes de salvar o endereço.");
+            // Se o endereço falhar, o Zod já deve ter marcado os campos com erro
+            toast.error("Preencha todos os campos obrigatórios do endereço.");
         }
     });
   };
@@ -937,14 +956,29 @@ const Checkout = () => {
   };
 
   const handleAddressSelect = useCallback((address: any) => {
-    addressForm.setValue('street', address.street);
-    addressForm.setValue('neighborhood', address.neighborhood);
-    addressForm.setValue('city', address.city);
-    addressForm.setValue('zip_code', address.zip_code);
-    addressForm.setValue('number', address.number);
-    addressForm.setValue('complement', ''); 
+    // Preenche todos os campos do addressForm com os dados da geocodificação
+    addressForm.setValue('zip_code', address.zip_code, { shouldValidate: true });
+    addressForm.setValue('street', address.street, { shouldValidate: true });
+    addressForm.setValue('neighborhood', address.neighborhood, { shouldValidate: true });
+    addressForm.setValue('city', address.city, { shouldValidate: true });
+    addressForm.setValue('number', address.number, { shouldValidate: true }); // O número pode vir preenchido
+    addressForm.setValue('complement', '', { shouldValidate: true }); 
     
-    toast.info("Endereço encontrado! Verifique o número e clique em Salvar.");
+    // Se o número não veio preenchido, o usuário precisa preencher manualmente.
+    if (!address.number) {
+        toast.warning("Endereço encontrado! Por favor, preencha o campo 'Número' e clique em Salvar.");
+    } else {
+        toast.info("Endereço encontrado! Verifique o número e clique em Salvar.");
+    }
+    
+    // Limpa o estado de endereço salvo para forçar o usuário a clicar em Salvar
+    setIsAddressSaved(false);
+    setDeliveryFee(0);
+    setDeliveryTime(null);
+    setIsDeliveryAreaValid(true);
+    setCustomerCoords(null);
+    setSavedAddressString(null);
+    
   }, [addressForm]);
 
   const displayAddress = useMemo(() => {
@@ -1155,6 +1189,7 @@ const Checkout = () => {
                         <AddressAutocomplete onAddressSelect={handleAddressSelect} disabled={isGeocoding} />
                       </div>
 
+                      {/* Campos escondidos preenchidos pelo Autocomplete */}
                       <input type="hidden" {...addressForm.register('zip_code')} />
                       <input type="hidden" {...addressForm.register('street')} />
                       <input type="hidden" {...addressForm.register('neighborhood')} />

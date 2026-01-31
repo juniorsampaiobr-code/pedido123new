@@ -62,8 +62,12 @@ export const AddressAutocomplete = ({ onAddressSelect, defaultValue, disabled }:
         if (types.includes('street_number')) {
           components.number = component.long_name;
         }
-        if (types.includes('sublocality_level_1') || types.includes('sublocality')) {
-          components.neighborhood = component.long_name;
+        // CORREÇÃO: Adicionando mais níveis de sublocalidade para capturar o bairro
+        if (types.includes('sublocality_level_1') || types.includes('sublocality') || types.includes('sublocality_level_2') || types.includes('sublocality_level_3')) {
+          // Prioriza o nível mais específico que for encontrado
+          if (!components.neighborhood) {
+            components.neighborhood = component.long_name;
+          }
         }
         if (types.includes('administrative_area_level_2') || types.includes('locality')) {
           components.city = component.long_name;
