@@ -1195,37 +1195,11 @@ const Checkout = () => {
                         <AddressAutocomplete onAddressSelect={handleAddressSelect} disabled={isGeocoding} />
                       </div>
 
-                      {/* Campos preenchidos pelo Autocomplete */}
+                      {/* Campos escondidos preenchidos pelo Autocomplete */}
+                      <input type="hidden" {...addressForm.register('zip_code')} />
                       <input type="hidden" {...addressForm.register('street')} />
+                      <input type="hidden" {...addressForm.register('neighborhood')} />
                       <input type="hidden" {...addressForm.register('city')} />
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
-                        <div className="space-y-1.5 sm:space-y-2">
-                          <Label htmlFor="neighborhood" className="text-xs sm:text-sm">Bairro *</Label>
-                          <Input 
-                            id="neighborhood" 
-                            {...addressForm.register('neighborhood')} 
-                            placeholder="Seu bairro"
-                            className="h-9 sm:h-12 text-sm"
-                          />
-                          {addressForm.formState.errors.neighborhood && <p className="text-destructive text-xs sm:text-sm">{addressForm.formState.errors.neighborhood.message}</p>}
-                        </div>
-                        <div className="space-y-1.5 sm:space-y-2">
-                          <Label htmlFor="zip_code" className="text-xs sm:text-sm">CEP *</Label>
-                          <Controller
-                            name="zip_code"
-                            control={addressForm.control}
-                            render={({ field }) => (
-                              <ZipCodeInput 
-                                id="zip_code" 
-                                {...field} 
-                                className="h-9 sm:h-12 text-sm"
-                              />
-                            )}
-                          />
-                          {addressForm.formState.errors.zip_code && <p className="text-destructive text-xs sm:text-sm">{addressForm.formState.errors.zip_code.message}</p>}
-                        </div>
-                      </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
                         <div className="space-y-1.5 sm:space-y-2">

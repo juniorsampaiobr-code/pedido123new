@@ -53,6 +53,15 @@ export const AddressAutocomplete = ({ onAddressSelect, defaultValue, disabled }:
       };
 
       // Mapeamento dos componentes do Google Maps para o nosso formato
+      // Ordenamos para processar os tipos mais específicos primeiro para o bairro
+      const neighborhoodTypes = [
+        'sublocality_level_1', 
+        'neighborhood', 
+        'sublocality', 
+        'sublocality_level_2', 
+        'sublocality_level_3'
+      ];
+
       place.address_components.forEach((component) => {
         const types = component.types;
 
@@ -62,20 +71,15 @@ export const AddressAutocomplete = ({ onAddressSelect, defaultValue, disabled }:
         if (types.includes('street_number')) {
           components.number = component.long_name;
         }
-        // CORREÇÃO: Adicionando mais níveis de sublocalidade para capturar o bairro
-        if (
-          types.includes('sublocality_level_1') || 
-          types.includes('sublocality') || 
-          types.includes('sublocality_level_2') || 
-          types.includes('sublocality_level_3') ||
-          types.includes('neighborhood') ||
-          types.includes('political')
-        ) {
-          // Prioriza o nível mais específico que for encontrado
-          if (!components.neighborhood) {
+        
+        // Captura o bairro baseado na lista de prioridade
+        for (const type of neighborhoodTypes) {
+          if (types.includes(type) && !components.neighborhood) {
             components.neighborhood = component.long_name;
+            break;
           }
         }
+
         if (types.includes('administrative_area_level_2') || types.includes('locality')) {
           components.city = component.long_name;
         }
@@ -86,6 +90,25 @@ export const AddressAutocomplete = ({ onAddressSelect, defaultValue, disabled }:
           components.zip_code = component.long_name.replace(/\D/g, ''); // Remove não dígitos
         }
       });
+
+      // FALLBACK DE SEGURANÇA PARA BAIRRO:
+      // Se o bairro ainda estiver vazio, tentamos extrair do formatted_address
+      // O formato comum é "Rua, Numero - Bairro, Cidade - Estado, CEP, Pais"
+      if (!components.neighborhood && place.formatted_address) {
+        console.log('[AddressAutocomplete] Bairro não encontrado nos componentes. Tentando extrair do formatted_address:', place.formatted_address);
+        const parts = place.formatted_address.split(',');
+        if (parts.length >= 2) {
+          // Geralmente o bairro está após o número ou rua
+          // "Rua Alonso Keese - Vila Linopolis I, Santa Bárbara d'Oeste - SP, Brasil"
+          // Aqui parts[0] = "Rua Alonso Keese - Vila Linopolis I"
+          const firstPart = parts[0];
+          if (firstPart.includes(' - ')) {
+            const subParts = firstPart.split(' - ');
+            components.neighborhood = subParts[subParts.length - 1].trim();
+            console.log('[AddressAutocomplete] Bairro extraído do fallback:', components.neighborhood);
+          }
+        }
+      }
 
       onAddressSelect(components);
     });
