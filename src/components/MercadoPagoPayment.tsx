@@ -37,6 +37,9 @@ export const MercadoPagoPayment = ({ preferenceId, initPoint, onClose }: Mercado
     
   }, [publicKey, onClose, initPoint]);
 
+  // O componente é montado APENAS se isMercadoPagoOpen for true no Checkout.tsx.
+  // Portanto, o Dialog deve estar aberto enquanto estiver montado.
+  
   if (isLoadingKey || !publicKey) {
     return (
       <Dialog open={true} onOpenChange={onClose}>

@@ -509,7 +509,7 @@ const Checkout = () => {
         change_for: '',
       });
     }
-  }, [customer, user, isLoadingCustomer, form, addressForm, isOpen]); 
+  }, [customer, user, isLoadingCustomer, form, addressForm]); 
 
   useEffect(() => {
     if (deliveryOption === 'delivery' && savedAddressString !== null && currentAddressString !== savedAddressString) {
@@ -518,6 +518,7 @@ const Checkout = () => {
       setDeliveryTime(null);
       setIsDeliveryAreaValid(true);
       setCustomerCoords(null);
+      setSavedAddressString(null);
     }
   }, [currentAddressString, savedAddressString, deliveryOption]);
 
@@ -617,7 +618,7 @@ const Checkout = () => {
         neighborhood: data.neighborhood,
         city: data.city,
         zip_code: data.zip_code,
-        complement: data.complement || null,
+        complement: data.complement || null
       };
 
       const selectColumns = '*, street, number, neighborhood, city, zip_code, complement';
