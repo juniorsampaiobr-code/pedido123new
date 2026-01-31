@@ -34,7 +34,8 @@ import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
-type Customer = Tables<'customers'> & { complement?: string | null };
+// Incluindo todos os campos de endereço e complement
+type Customer = Tables<'customers'>; 
 type DeliveryZone = Tables<'delivery_zones'>;
 type PaymentMethod = Tables<'payment_methods'>;
 type CartItem = {
@@ -147,7 +148,7 @@ const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[
 const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
   const { data, error } = await supabase
     .from('customers')
-    .select('*')
+    .select('*, complement') // Incluindo complement
     .eq('user_id', userId)
     .limit(1)
     .single();

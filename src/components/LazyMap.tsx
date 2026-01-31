@@ -1,8 +1,6 @@
 import React, { lazy, Suspense, useMemo } from 'react';
 import { LoadingSpinner } from './LoadingSpinner';
 
-// Removendo import 'leaflet/dist/leaflet.css';
-
 // Define o tipo das props esperadas pelo componente MapComponent
 interface MapComponentProps {
   center: [number, number];
