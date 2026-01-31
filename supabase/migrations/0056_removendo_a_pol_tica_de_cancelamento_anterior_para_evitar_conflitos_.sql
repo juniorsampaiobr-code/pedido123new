@@ -1,1 +1,0 @@
-DROP POLICY IF EXISTS "Allow authenticated users to cancel their own orders" ON public.orders;

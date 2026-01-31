@@ -1,1 +1,0 @@
-DROP POLICY IF EXISTS "Allow update for checkout" ON public.customers;
