@@ -91,38 +91,36 @@ export const AddressAutocomplete = ({ onAddressSelect, defaultValue, disabled }:
         }
       });
 
-      // FALLBACK DE SEGURANÇA PARA BAIRRO:
-      // Se o bairro ainda estiver vazio ou for igual à rua, tentamos extrair do formatted_address
-      if ((!components.neighborhood || components.neighborhood === components.street) && place.formatted_address) {
-        console.log('[AddressAutocomplete] Bairro ausente ou duplicado. Analisando formatted_address:', place.formatted_address);
-        
-        // Padrão comum no Brasil: "Rua Nome, Numero - Bairro, Cidade - Estado, CEP, Pais"
-        // Ou: "Rua Nome - Bairro, Cidade - Estado, CEP, Pais"
-        const parts = place.formatted_address.split(',');
-        
-        if (parts.length >= 1) {
-          const mainPart = parts[0]; // "Rua Alonso Keese - Vila Linopolis I"
-          if (mainPart.includes(' - ')) {
-            const subParts = mainPart.split(' - ');
-            // O bairro costuma ser a última parte antes da primeira vírgula
-            const potentialNeighborhood = subParts[subParts.length - 1].trim();
-            
-            // Verifica se não é apenas o número
-            if (!/^\d+$/.test(potentialNeighborhood)) {
-              components.neighborhood = potentialNeighborhood;
-              console.log('[AddressAutocomplete] Bairro extraído com sucesso do texto:', components.neighborhood);
-            }
+      // FALLBACK DE SEGURANÇA PARA BAIRRO (VERSÃO ULTRA-ROBUSTA):
+      if (!components.neighborhood || components.neighborhood === components.street) {
+        const fullText = place.formatted_address || '';
+        console.log('[AddressAutocomplete] Iniciando extração forçada de bairro do texto:', fullText);
+
+        // 1. Tenta extrair entre o primeiro " - " e a primeira vírgula
+        // Ex: "Rua Alonso Keese - Vila Linopolis I, Santa Bárbara d'Oeste..."
+        const dashMatch = fullText.match(/ - ([^,]+)/);
+        if (dashMatch && dashMatch[1]) {
+          const found = dashMatch[1].trim();
+          if (!/^\d+$/.test(found)) { // Garante que não é só o número
+            components.neighborhood = found;
+          }
+        }
+
+        // 2. Se falhar, tenta pegar o que está entre a primeira e a segunda vírgula
+        // Ex: "Rua Nome, 123, Bairro, Cidade"
+        if (!components.neighborhood || components.neighborhood === components.street) {
+          const parts = fullText.split(',');
+          if (parts.length >= 3) {
+            components.neighborhood = parts[2].trim();
           }
         }
         
-        // Se ainda não achou, tenta a segunda parte (após a primeira vírgula)
-        if (!components.neighborhood && parts.length >= 2) {
-          const secondPart = parts[1].trim();
-          // Às vezes o bairro vem na segunda parte: "Rua, Numero, Bairro, Cidade"
-          if (!secondPart.includes(components.city)) {
-             components.neighborhood = secondPart;
-          }
+        // 3. Limpeza final: se o bairro ainda for igual à rua, limpa para não confundir
+        if (components.neighborhood === components.street) {
+          components.neighborhood = '';
         }
+        
+        console.log('[AddressAutocomplete] Resultado final da extração de bairro:', components.neighborhood);
       }
 
       onAddressSelect(components);
