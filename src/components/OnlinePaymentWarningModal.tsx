@@ -26,7 +26,7 @@ export const OnlinePaymentWarningModal = ({ isOpen, onConfirm }: OnlinePaymentWa
           <AlertDialogDescription>
             Você escolheu o pagamento online (Pix ou Cartão).
             <br /><br />
-            Ao prosseguir, você será redirecionado para o checkout do Mercado Pago.
+            Ao prosseguir, você será redirecionado para o checkout seguro do Mercado Pago.
             <br /><br />
             **IMPORTANTE:** Se você escolher **PIX**, após o pagamento, você pode precisar clicar no botão **"Voltar ao site"** na tela do Mercado Pago para que seu pedido seja finalizado e rastreado corretamente.
           </AlertDialogDescription>
