@@ -81,11 +81,11 @@ const addressSchema = z.object({
     message: 'O CEP deve ter 8 dígitos.',
   }),
   street: z.string().min(1, 'Rua é obrigatória.'),
-  number: z.string().min(1, 'Número é obrigatório.'),
+  number: z.string().optional(), // REMOVIDO O .min(1, ...)
   complement: z.string().optional(),
   neighborhood: z.string().min(1, 'Bairro é obrigatório.'),
   city: z.string().min(1, 'Cidade é obrigatória.'),
-  state: z.string().min(1, 'Estado é obrigatória.'), // ADDED
+  state: z.string().min(1, 'Estado é obrigatória.'),
 });
 
 type AddressFormValues = z.infer<typeof addressSchema>;
@@ -336,11 +336,11 @@ const Checkout = () => {
     defaultValues: {
       zip_code: '',
       street: '',
-      number: '',
+      number: '', // Mantido no defaultValues, mas não será usado no campo de input
       complement: '',
       neighborhood: '',
       city: '',
-      state: '', // ADDED
+      state: '',
     },
     mode: 'onBlur',
   });
@@ -350,11 +350,11 @@ const Checkout = () => {
     addressForm.reset({
       zip_code: '',
       street: '',
-      number: '',
+      number: '', // Mantido no reset
       complement: '',
       neighborhood: '',
       city: '',
-      state: '', // ADDED
+      state: '',
     });
     setIsAddressSaved(false);
     setCustomerCoords(null);
@@ -375,7 +375,7 @@ const Checkout = () => {
   const addressFields = addressForm.watch(['zip_code', 'street', 'number', 'city', 'neighborhood', 'complement', 'state']);
   const currentAddressString = useMemo(() => {
     const [zip_code, street, number, city, neighborhood, complement, state] = addressFields;
-    return `${street}|${number}|${complement || ''}|${neighborhood}|${city}|${zip_code}|${state}`;
+    return `${street}|${number || ''}|${complement || ''}|${neighborhood}|${city}|${zip_code}|${state}`;
   }, [addressFields]);
 
   // --- Realtime Listener para atualização automática das taxas ---
@@ -443,7 +443,7 @@ const Checkout = () => {
         if (customer.latitude && customer.longitude) {
           setCustomerCoords([Number(customer.latitude), Number(customer.longitude)]);
           setIsAddressSaved(true);
-          const addrString = `${customer.street}|${customer.number}|${customer.complement || ''}|${customer.neighborhood}|${customer.city}|${customer.zip_code}|${customer.state}`; // UPDATED
+          const addrString = `${customer.street}|${customer.number || ''}|${customer.complement || ''}|${customer.neighborhood}|${customer.city}|${customer.zip_code}|${customer.state}`; // UPDATED
           setSavedAddressString(addrString);
         }
       }
@@ -493,11 +493,15 @@ const Checkout = () => {
   const saveAddressMutation = useMutation({
     mutationFn: async (data: AddressFormValues): Promise<{ customer: Customer | null, feeResult: { coords: { lat: number, lng: number } | null, fee: number, time: [number, number] | null, isValid: boolean } }> => {
       setIsGeocoding(true);
+      
+      // O número deve vir do Autocomplete (data.number) ou ser vazio
+      const finalNumber = data.number || '';
+      
       // UPDATED: Include state in fullAddress for geocoding
-      const fullAddress = `${data.street}, ${data.number}${data.complement ? ` - ${data.complement}` : ''}, ${data.neighborhood}, ${data.city}, ${data.state}, ${data.zip_code}`;
+      const fullAddress = `${data.street}, ${finalNumber}${data.complement ? ` - ${data.complement}` : ''}, ${data.neighborhood}, ${data.city}, ${data.state}, ${data.zip_code}`;
 
       // 1. Geocodificação e Cálculo de Taxa
-      const feeResult = await calculateFee(data.zip_code, data.street, data.number, data.city, data.neighborhood, data.state);
+      const feeResult = await calculateFee(data.zip_code, data.street, finalNumber, data.city, data.neighborhood, data.state);
       setIsGeocoding(false);
 
       if (!feeResult.isValid) {
@@ -539,7 +543,7 @@ const Checkout = () => {
           longitude: feeResult.coords.lng,
           cpf_cnpj: cleanedCpfCnpj,
           street: data.street,
-          number: data.number,
+          number: finalNumber, // Usando finalNumber
           neighborhood: data.neighborhood,
           city: data.city,
           zip_code: data.zip_code,
@@ -563,7 +567,7 @@ const Checkout = () => {
         latitude: feeResult.coords.lat,
         longitude: feeResult.coords.lng,
         street: data.street,
-        number: data.number,
+        number: finalNumber, // Usando finalNumber
         neighborhood: data.neighborhood,
         city: data.city,
         zip_code: data.zip_code,
@@ -607,7 +611,8 @@ const Checkout = () => {
       setIsDeliveryAreaValid(feeResult.isValid);
       setIsAddressSaved(true);
       setCustomerCoords([feeResult.coords!.lat, feeResult.coords!.lng]);
-      const newAddressString = `${variables.street}|${variables.number}|${variables.complement || ''}|${variables.neighborhood}|${variables.city}|${variables.zip_code}|${variables.state}`; // UPDATED
+      const finalNumber = variables.number || ''; // Usando o número que veio do Autocomplete
+      const newAddressString = `${variables.street}|${finalNumber}|${variables.complement || ''}|${variables.neighborhood}|${variables.city}|${variables.zip_code}|${variables.state}`; // UPDATED
       setSavedAddressString(newAddressString);
       toast.success('Endereço salvo e taxa de entrega calculada!');
     },
@@ -637,7 +642,8 @@ const Checkout = () => {
       }
 
       const currentAddress = addressForm.getValues();
-      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
+      // Usando currentAddress.number (que veio do Autocomplete)
+      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number || ''}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
 
       const customerPayload: any = {
         user_id: user?.id || null,
@@ -649,7 +655,7 @@ const Checkout = () => {
         latitude: customerCoords ? customerCoords[0] : null,
         longitude: customerCoords ? customerCoords[1] : null,
         street: addressForm.getValues('street') || null,
-        number: addressForm.getValues('number') || null,
+        number: addressForm.getValues('number') || null, // Usando o valor do Autocomplete
         neighborhood: addressForm.getValues('neighborhood') || null,
         city: addressForm.getValues('city') || null,
         zip_code: addressForm.getValues('zip_code') || null,
@@ -720,7 +726,8 @@ const Checkout = () => {
       }
 
       const currentAddress = addressForm.getValues();
-      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
+      // Usando currentAddress.number (que veio do Autocomplete)
+      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number || ''}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
 
       const orderPayload: TablesInsert<'orders'> = {
         restaurant_id: restaurant.id,
@@ -892,16 +899,15 @@ const Checkout = () => {
     addressForm.setValue('street', address.street, { shouldValidate: true });
     addressForm.setValue('neighborhood', address.neighborhood, { shouldValidate: true });
     addressForm.setValue('city', address.city, { shouldValidate: true });
-    addressForm.setValue('state', address.state, { shouldValidate: true }); // ADDED
-    addressForm.setValue('number', address.number, { shouldValidate: true }); // O número pode vir preenchido
-    addressForm.setValue('complement', '', { shouldValidate: true }); // Se o número não veio preenchido, o usuário precisa preencher manualmente.
+    addressForm.setValue('state', address.state, { shouldValidate: true });
+    addressForm.setValue('number', address.number, { shouldValidate: true }); // Mantém o número preenchido pelo Autocomplete
+    addressForm.setValue('complement', '', { shouldValidate: true }); 
 
-    // O número pode vir preenchido
-    // Se o número não veio preenchido, o usuário precisa preencher manualmente.
+    // Se o número não veio preenchido, avisa o usuário
     if (!address.number) {
-      toast.warning("Endereço encontrado! Por favor, preencha o campo 'Número' e clique em Salvar.");
+      toast.warning("Endereço encontrado! Por favor, adicione o complemento (se houver) e clique em Salvar.");
     } else {
-      toast.info("Endereço encontrado! Verifique o número e clique em Salvar.");
+      toast.info("Endereço encontrado! Verifique o complemento e clique em Salvar.");
     }
 
     // Limpa o estado de endereço salvo para forçar o usuário a clicar em Salvar
@@ -922,7 +928,7 @@ const Checkout = () => {
     
     const parts = [];
     
-    // 1. Rua e Número
+    // 1. Rua e Número (Número agora é opcional, vindo do Autocomplete)
     if (street) parts.push(street);
     if (number) parts.push(number);
     
@@ -1139,7 +1145,7 @@ const Checkout = () => {
                   <Form {...addressForm}>
                     <form onSubmit={addressForm.handleSubmit(handleSaveAddress)} id="address-form-inner" className="space-y-3 sm:space-y-4" autoComplete="off">
                       <div className="space-y-1.5 sm:space-y-2">
-                        <Label htmlFor="address-search" className="text-xs sm:text-sm">Buscar Endereço</Label>
+                        <Label htmlFor="address-search" className="text-xs sm:text-sm">Buscar Endereço *</Label>
                         <AddressAutocomplete onAddressSelect={handleAddressSelect} disabled={isGeocoding} />
                       </div>
 
@@ -1148,14 +1154,10 @@ const Checkout = () => {
                       <input type="hidden" {...addressForm.register('street')} />
                       <input type="hidden" {...addressForm.register('neighborhood')} />
                       <input type="hidden" {...addressForm.register('city')} />
-                      <input type="hidden" {...addressForm.register('state')} /> {/* ADDED */}
+                      <input type="hidden" {...addressForm.register('state')} />
+                      <input type="hidden" {...addressForm.register('number')} /> {/* Mantido como hidden para salvar o valor do Autocomplete */}
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
-                        <div className="space-y-1.5 sm:space-y-2">
-                          <Label htmlFor="number" className="text-xs sm:text-sm">Número *</Label>
-                          <Input id="number" {...addressForm.register('number')} placeholder="Nº" className="h-9 sm:h-12 text-sm" autoComplete="off" />
-                          {addressForm.formState.errors.number && <p className="text-destructive text-xs sm:text-sm">{addressForm.formState.errors.number.message}</p>}
-                        </div>
+                      <div className="grid grid-cols-1 gap-3 sm:gap-4 min-w-0">
                         <div className="space-y-1.5 sm:space-y-2">
                           <Label htmlFor="complement" className="text-xs sm:text-sm">Complemento</Label>
                           <Input id="complement" {...addressForm.register('complement')} placeholder="Apto, Bloco..." className="h-9 sm:h-12 text-sm" autoComplete="off" />
@@ -1335,7 +1337,7 @@ const Checkout = () => {
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4 px-3 pb-3 sm:p-6 sm:pt-0">
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                  {items.map((item) => (
+                  {items.map((item: CartItem) => (
                     <div key={item.product.id} className="flex justify-between text-xs sm:text-sm">
                       <span className="truncate max-w-[70%]">{item.quantity}x {item.product.name}</span>
                       <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.subtotal)}</span>
