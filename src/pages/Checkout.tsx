@@ -923,12 +923,11 @@ const Checkout = () => {
     const parts = [];
     if (street) parts.push(street);
     if (number) parts.push(number);
+    if (neighborhood) parts.push(neighborhood);
     
     let addressLine = parts.join(', ');
-    if (complement) addressLine += ` - ${complement}`;
     
     const locationParts = [];
-    if (neighborhood) locationParts.push(neighborhood);
     if (city) locationParts.push(city);
     if (state) locationParts.push(state);
     
@@ -943,6 +942,11 @@ const Checkout = () => {
     
     if (formattedZip) {
         locationLine += (locationLine ? ', CEP: ' : 'CEP: ') + formattedZip;
+    }
+    
+    // Adiciona o complemento no final
+    if (complement) {
+        locationLine += (locationLine ? ', ' : '') + complement;
     }
     
     // Combina as linhas, garantindo que não haja vírgulas extras
