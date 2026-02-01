@@ -164,6 +164,8 @@ export type Database = {
           neighborhood: string | null
           city: string | null
           zip_code: string | null
+          complement: string | null
+          state: string | null // ADDED
         }
         Insert: {
           address?: string | null
@@ -182,6 +184,8 @@ export type Database = {
           neighborhood?: string | null
           city?: string | null
           zip_code?: string | null
+          complement?: string | null
+          state?: string | null // ADDED
         }
         Update: {
           address?: string | null
@@ -200,6 +204,8 @@ export type Database = {
           neighborhood?: string | null
           city?: string | null
           zip_code?: string | null
+          complement?: string | null
+          state?: string | null // ADDED
         }
         Relationships: []
       }
@@ -312,8 +318,8 @@ export type Database = {
           updated_at: string | null
           payment_method_id: string | null
           change_for: number | null
-          min_delivery_time_minutes: number | null // NOVO
-          max_delivery_time_minutes: number | null // NOVO
+          min_delivery_time_minutes: number | null
+          max_delivery_time_minutes: number | null
         }
         Insert: {
           created_at?: string | null
@@ -328,8 +334,8 @@ export type Database = {
           updated_at?: string | null
           payment_method_id?: string | null
           change_for?: number | null
-          min_delivery_time_minutes?: number | null // NOVO
-          max_delivery_time_minutes?: number | null // NOVO
+          min_delivery_time_minutes?: number | null
+          max_delivery_time_minutes?: number | null
         }
         Update: {
           created_at?: string | null
@@ -344,8 +350,8 @@ export type Database = {
           updated_at?: string | null
           payment_method_id?: string | null
           change_for?: number | null
-          min_delivery_time_minutes?: number | null // NOVO
-          max_delivery_time_minutes?: number | null // NOVO
+          min_delivery_time_minutes?: number | null
+          max_delivery_time_minutes?: number | null
         }
         Relationships: [
           {
@@ -419,7 +425,7 @@ export type Database = {
           mercado_pago_public_key: string | null
           restaurant_id: string
           updated_at: string | null
-          mercado_pago_access_token: string | null // NOVO
+          mercado_pago_access_token: string | null
         }
         Insert: {
           created_at?: string | null
@@ -427,7 +433,7 @@ export type Database = {
           mercado_pago_public_key?: string | null
           restaurant_id: string
           updated_at?: string | null
-          mercado_pago_access_token?: string | null // NOVO
+          mercado_pago_access_token?: string | null
         }
         Update: {
           created_at?: string | null
@@ -435,7 +441,7 @@ export type Database = {
           mercado_pago_public_key?: string | null
           restaurant_id?: string
           updated_at?: string | null
-          mercado_pago_access_token?: string | null // NOVO
+          mercado_pago_access_token?: string | null
         }
         Relationships: [
           {
@@ -609,25 +615,25 @@ export type Database = {
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
-          restaurant_id: string | null // Adicionado
+          restaurant_id: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
-          restaurant_id: string | null // Adicionado
+          restaurant_id: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
-          restaurant_id?: string | null // Adicionado
+          restaurant_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "user_roles_restaurant_id_fkey" // Adicionado
+            foreignKeyName: "user_roles_restaurant_id_fkey"
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"

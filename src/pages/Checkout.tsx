@@ -85,6 +85,7 @@ const addressSchema = z.object({
   complement: z.string().optional(),
   neighborhood: z.string().min(1, 'Bairro é obrigatório.'),
   city: z.string().min(1, 'Cidade é obrigatória.'),
+  state: z.string().min(1, 'Estado é obrigatório.'), // ADDED
 });
 
 type AddressFormValues = z.infer<typeof addressSchema>;
@@ -146,7 +147,7 @@ const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[
 const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
   const { data, error } = await supabase
     .from('customers')
-    .select('*, complement') // Incluindo complement
+    .select('*, complement, state') // Incluindo complement e state
     .eq('user_id', userId)
     .limit(1)
     .single();
@@ -258,11 +259,11 @@ const Checkout = () => {
     };
   }, [navigate, restaurantId]);
 
-  const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, neighborhood: string, lat?: number | null, lng?: number | null) => {
+  const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, neighborhood: string, state: string, lat?: number | null, lng?: number | null) => {
     const DEFAULT_DELIVERY_TIME: [number, number] = [30, 45];
 
     if (restaurant && restaurant.delivery_enabled === false) {
-      const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${zip_code}`;
+      const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${state}, ${zip_code}`;
       let coords: { lat: number, lng: number } | null = null;
       if (lat && lng) {
         coords = { lat, lng };
@@ -289,7 +290,7 @@ const Checkout = () => {
       return { coords: null, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
     }
 
-    const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${zip_code}`;
+    const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${state}, ${zip_code}`;
     let coords: { lat: number, lng: number } | null = null;
     if (lat && lng) {
       coords = { lat, lng };
@@ -339,6 +340,7 @@ const Checkout = () => {
       complement: '',
       neighborhood: '',
       city: '',
+      state: '', // ADDED
     },
     mode: 'onBlur',
   });
@@ -352,6 +354,7 @@ const Checkout = () => {
       complement: '',
       neighborhood: '',
       city: '',
+      state: '', // ADDED
     });
     setIsAddressSaved(false);
     setCustomerCoords(null);
@@ -368,10 +371,11 @@ const Checkout = () => {
   const isCashPayment = selectedPaymentMethod?.name?.includes('Dinheiro');
   const totalAmount = cartSubtotal + deliveryFee;
 
-  const addressFields = addressForm.watch(['zip_code', 'street', 'number', 'city', 'neighborhood', 'complement']);
+  // UPDATED: Added 'state' to watch list
+  const addressFields = addressForm.watch(['zip_code', 'street', 'number', 'city', 'neighborhood', 'complement', 'state']);
   const currentAddressString = useMemo(() => {
-    const [zip_code, street, number, city, neighborhood, complement] = addressFields;
-    return `${street}|${number}|${complement || ''}|${neighborhood}|${city}|${zip_code}`;
+    const [zip_code, street, number, city, neighborhood, complement, state] = addressFields;
+    return `${street}|${number}|${complement || ''}|${neighborhood}|${city}|${zip_code}|${state}`;
   }, [addressFields]);
 
   // --- Realtime Listener para atualização automática das taxas ---
@@ -409,42 +413,6 @@ const Checkout = () => {
     };
   }, [restaurantId, queryClient]);
 
-  // --- Efeito para Recalcular Taxa Automaticamente quando Zonas, Status ou Opção de Entrega mudam ---
-  useEffect(() => {
-    // SE FOR RETIRADA, ZERA A TAXA
-    if (deliveryOption === 'pickup') {
-      setDeliveryFee(0);
-      setIsDeliveryAreaValid(true);
-      return;
-    }
-
-    if (isAddressSaved && customerCoords && restaurantCoords && deliveryZones && restaurant) {
-      console.log('[Checkout] Recalculando taxa devido a mudanças nos dados...', { deliveryZones });
-      if (restaurant.delivery_enabled === false) {
-        setDeliveryFee(0);
-        setIsDeliveryAreaValid(true);
-        if (!deliveryTime) setDeliveryTime([30, 45]);
-      } else {
-        const feeResult = calculateDeliveryFee(
-          customerCoords,
-          restaurantCoords,
-          deliveryZones
-        );
-        if (feeResult) {
-          console.log('[Checkout] Nova taxa calculada:', feeResult.fee);
-          setDeliveryFee(feeResult.fee);
-          setDeliveryTime([feeResult.minTime, feeResult.maxTime]);
-          setIsDeliveryAreaValid(true);
-        } else {
-          console.warn('[Checkout] Endereço agora fora da área de entrega.');
-          setIsDeliveryAreaValid(false);
-          setDeliveryFee(0);
-          toast.warning("As zonas de entrega mudaram e seu endereço agora está fora da área de cobertura.");
-        }
-      }
-    }
-  }, [deliveryZones, restaurant?.delivery_enabled, customerCoords, restaurantCoords, isAddressSaved, deliveryOption, deliveryTime, restaurant]); // Adicionado deliveryOption
-
   // --- Efeito de Inicialização (Carregar dados do cliente) ---
   useEffect(() => {
     if (customer) {
@@ -468,13 +436,14 @@ const Checkout = () => {
           complement: customer.complement || '',
           neighborhood: customer.neighborhood || '',
           city: customer.city || '',
+          state: customer.state || '', // ADDED
         });
 
         // Se houver coordenadas, configuramos o estado para "Endereço Salvo"
         if (customer.latitude && customer.longitude) {
           setCustomerCoords([Number(customer.latitude), Number(customer.longitude)]);
           setIsAddressSaved(true);
-          const addrString = `${customer.street}|${customer.number}|${customer.complement || ''}|${customer.neighborhood}|${customer.city}|${customer.zip_code}`;
+          const addrString = `${customer.street}|${customer.number}|${customer.complement || ''}|${customer.neighborhood}|${customer.city}|${customer.zip_code}|${customer.state}`; // UPDATED
           setSavedAddressString(addrString);
         }
       }
@@ -524,10 +493,11 @@ const Checkout = () => {
   const saveAddressMutation = useMutation({
     mutationFn: async (data: AddressFormValues): Promise<{ customer: Customer | null, feeResult: { coords: { lat: number, lng: number } | null, fee: number, time: [number, number] | null, isValid: boolean } }> => {
       setIsGeocoding(true);
-      const fullAddress = `${data.street}, ${data.number}${data.complement ? ` - ${data.complement}` : ''}, ${data.neighborhood}, ${data.city}, ${data.zip_code}`;
+      // UPDATED: Include state in fullAddress for geocoding
+      const fullAddress = `${data.street}, ${data.number}${data.complement ? ` - ${data.complement}` : ''}, ${data.neighborhood}, ${data.city}, ${data.state}, ${data.zip_code}`;
 
       // 1. Geocodificação e Cálculo de Taxa
-      const feeResult = await calculateFee(data.zip_code, data.street, data.number, data.city, data.neighborhood);
+      const feeResult = await calculateFee(data.zip_code, data.street, data.number, data.city, data.neighborhood, data.state);
       setIsGeocoding(false);
 
       if (!feeResult.isValid) {
@@ -573,7 +543,8 @@ const Checkout = () => {
           neighborhood: data.neighborhood,
           city: data.city,
           zip_code: data.zip_code,
-          complement: data.complement || null
+          complement: data.complement || null,
+          state: data.state, // ADDED
         };
         return { customer: mockCustomer, feeResult };
       }
@@ -596,10 +567,11 @@ const Checkout = () => {
         neighborhood: data.neighborhood,
         city: data.city,
         zip_code: data.zip_code,
-        complement: data.complement || null
+        complement: data.complement || null,
+        state: data.state, // ADDED
       };
 
-      const selectColumns = '*, street, number, neighborhood, city, zip_code, complement';
+      const selectColumns = '*, street, number, neighborhood, city, zip_code, complement, state'; // UPDATED
       let savedCustomer: Customer;
 
       if (customer?.id) {
@@ -635,7 +607,7 @@ const Checkout = () => {
       setIsDeliveryAreaValid(feeResult.isValid);
       setIsAddressSaved(true);
       setCustomerCoords([feeResult.coords!.lat, feeResult.coords!.lng]);
-      const newAddressString = `${variables.street}|${variables.number}|${variables.complement || ''}|${variables.neighborhood}|${variables.city}|${variables.zip_code}`;
+      const newAddressString = `${variables.street}|${variables.number}|${variables.complement || ''}|${variables.neighborhood}|${variables.city}|${variables.zip_code}|${variables.state}`; // UPDATED
       setSavedAddressString(newAddressString);
       toast.success('Endereço salvo e taxa de entrega calculada!');
     },
@@ -646,33 +618,10 @@ const Checkout = () => {
     }
   });
 
-  const handleSaveAddress = (data: AddressFormValues) => {
-    console.log('[Checkout] Iniciando salvamento de endereço:', data);
-    // 1. Valida o formulário de endereço
-    addressForm.trigger().then(isAddressValid => {
-      if (isAddressValid) {
-        // 2. Valida os campos de contato (nome, telefone, cpf/cnpj)
-        form.trigger(['name', 'phone', 'cpf_cnpj']).then(isContactValid => {
-          if (isContactValid) {
-            // 3. Se ambos válidos, chama a mutação
-            console.log('[Checkout] Dados de contato válidos, chamando mutação.');
-            saveAddressMutation.mutate(data);
-          } else {
-            // Se o contato falhar, exibe o erro do formulário principal
-            console.warn('[Checkout] Dados de contato inválidos:', form.getValues());
-            toast.error("Preencha Nome, Telefone e CPF/CNPJ nos Seus Dados antes de salvar o endereço.");
-          }
-        });
-      } else {
-        // Se o endereço falhar, o Zod já deve ter marcado os campos com erro
-        console.warn('[Checkout] Dados de endereço inválidos:', addressForm.formState.errors);
-        toast.error("Preencha todos os campos obrigatórios do endereço.");
-      }
-    });
-  };
-
   const createCustomerMutation = useMutation({
     mutationFn: async (data: CheckoutFormValues): Promise<Customer> => {
+      if (!restaurant) throw new Error('Dados do restaurante não disponíveis.');
+
       const userAuth = await supabase.auth.getUser();
       const userId = userAuth.data.user?.id;
       const cleanedPhone = data.phone.replace(/\D/g, '');
@@ -683,7 +632,7 @@ const Checkout = () => {
       }
 
       const currentAddress = addressForm.getValues();
-      const fullAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.zip_code}` : null;
+      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null; // UPDATED
 
       const customerPayload: any = {
         user_id: user?.id || null,
@@ -691,7 +640,7 @@ const Checkout = () => {
         phone: cleanedPhone,
         email: user?.email || null,
         cpf_cnpj: cleanedCpfCnpj,
-        address: fullAddress,
+        address: deliveryAddress,
         latitude: customerCoords ? customerCoords[0] : null,
         longitude: customerCoords ? customerCoords[1] : null,
         street: addressForm.getValues('street') || null,
@@ -700,13 +649,14 @@ const Checkout = () => {
         city: addressForm.getValues('city') || null,
         zip_code: addressForm.getValues('zip_code') || null,
         complement: addressForm.getValues('complement') || null,
+        state: addressForm.getValues('state') || null, // ADDED
       };
 
       if (!user) {
         customerPayload.email = null;
       }
 
-      const selectColumns = '*, street, number, neighborhood, city, zip_code, complement';
+      const selectColumns = '*, street, number, neighborhood, city, zip_code, complement, state'; // UPDATED
       if (user) {
         if (customer) {
           const { data: updatedCustomer, error: updateError } = await supabase
@@ -765,7 +715,7 @@ const Checkout = () => {
       }
 
       const currentAddress = addressForm.getValues();
-      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.zip_code}` : null;
+      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
 
       const orderPayload: TablesInsert<'orders'> = {
         restaurant_id: restaurant.id,
@@ -937,6 +887,7 @@ const Checkout = () => {
     addressForm.setValue('street', address.street, { shouldValidate: true });
     addressForm.setValue('neighborhood', address.neighborhood, { shouldValidate: true });
     addressForm.setValue('city', address.city, { shouldValidate: true });
+    addressForm.setValue('state', address.state, { shouldValidate: true }); // ADDED
     addressForm.setValue('number', address.number, { shouldValidate: true }); // O número pode vir preenchido
     addressForm.setValue('complement', '', { shouldValidate: true }); // Se o número não veio preenchido, o usuário precisa preencher manualmente.
 
@@ -959,15 +910,15 @@ const Checkout = () => {
 
   // CORREÇÃO FINAL: Atualizando a função displayAddress para garantir que o bairro seja exibido
   const displayAddress = useMemo(() => {
-    const [zip_code, street, number, city, neighborhood, complement] = addressFields;
+    const [zip_code, street, number, city, neighborhood, complement, state] = addressFields; // UPDATED
     
     // Garante que os campos obrigatórios estão preenchidos antes de formatar
-    if (!street || !number || !neighborhood || !city || !zip_code) return '';
+    if (!street || !number || !neighborhood || !city || !zip_code || !state) return ''; // UPDATED
     
     const complementPart = complement ? ` - ${complement}` : '';
     
-    // Formato: Rua, Número - Complemento, Bairro, Cidade, CEP
-    const fullAddress = `${street}, ${number}${complementPart}, ${neighborhood}, ${city}, ${formatCpfCnpj(zip_code)}`;
+    // Formato: Rua, Número - Complemento, Bairro, Cidade - Estado, CEP
+    const fullAddress = `${street}, ${number}${complementPart}, ${neighborhood}, ${city} - ${state}, ${formatCpfCnpj(zip_code)}`;
     
     return fullAddress;
   }, [addressFields]);
@@ -1162,6 +1113,7 @@ const Checkout = () => {
                       <input type="hidden" {...addressForm.register('street')} />
                       <input type="hidden" {...addressForm.register('neighborhood')} />
                       <input type="hidden" {...addressForm.register('city')} />
+                      <input type="hidden" {...addressForm.register('state')} /> {/* ADDED */}
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
                         <div className="space-y-1.5 sm:space-y-2">
@@ -1190,7 +1142,7 @@ const Checkout = () => {
                               </span>
                             )}
                             {addressForm.watch('neighborhood') && addressForm.watch('city') ? ' - ' : ''}
-                            {addressForm.watch('city')}
+                            {addressForm.watch('city')} - {addressForm.watch('state')}
                           </p>
                         </div>
                       )}
