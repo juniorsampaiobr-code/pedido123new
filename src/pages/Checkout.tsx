@@ -923,6 +923,11 @@ const Checkout = () => {
     const parts = [];
     if (street) parts.push(street);
     if (number) parts.push(number);
+    
+    // Adiciona o complemento logo após o número, se existir
+    if (complement) parts.push(`(Comp: ${complement})`);
+    
+    // Adiciona o bairro
     if (neighborhood) parts.push(neighborhood);
     
     let addressLine = parts.join(', ');
@@ -940,13 +945,9 @@ const Checkout = () => {
         formattedZip = `${cleanedZip.slice(0, 5)}-${cleanedZip.slice(5)}`;
     }
     
+    // Adiciona o CEP no final da linha de localização, se existir
     if (formattedZip) {
         locationLine += (locationLine ? ', CEP: ' : 'CEP: ') + formattedZip;
-    }
-    
-    // Adiciona o complemento no final
-    if (complement) {
-        locationLine += (locationLine ? ', ' : '') + complement;
     }
     
     // Combina as linhas, garantindo que não haja vírgulas extras
