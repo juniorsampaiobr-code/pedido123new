@@ -98,25 +98,31 @@ export const AddressAutocomplete = ({ onAddressSelect, defaultValue, disabled }:
 
         // 1. Tenta extrair entre o primeiro " - " e a primeira vírgula
         // Ex: "Rua Alonso Keese - Vila Linopolis I, Santa Bárbara d'Oeste..."
-        // NOVO: Garantimos que não pegue siglas de estado como "SP", "RJ", etc.
+        // NOVO: Filtro rigoroso para ignorar CEPs (00000-000) e siglas de estado (SP)
         const dashMatch = fullText.match(/ - ([^,]+)/);
         if (dashMatch && dashMatch[1]) {
           const found = dashMatch[1].trim();
-          // Verifica se não é apenas o número E não é uma sigla de estado (2 letras maiúsculas)
-          if (!/^\d+$/.test(found) && !/^[A-Z]{2}$/.test(found)) {
+          const isZipCode = /^\d{5}-\d{3}$/.test(found) || /^\d{8}$/.test(found);
+          const isState = /^[A-Z]{2}$/.test(found);
+          const isOnlyNumbers = /^\d+$/.test(found);
+
+          if (!isZipCode && !isState && !isOnlyNumbers) {
             components.neighborhood = found;
           }
         }
 
-        // 2. Fallback específico para o formato onde o bairro vem após o nome da rua mas o regex acima falhou
+        // 2. Fallback específico: analisa a primeira parte (antes da vírgula)
         if (!components.neighborhood || components.neighborhood === components.street) {
            const parts = fullText.split(',');
            const firstPart = parts[0]; // "Rua Alonso Keese - Vila Linopolis I"
            if (firstPart.includes(' - ')) {
              const subParts = firstPart.split(' - ');
-             // O bairro é o que vem após o nome da rua
-             const found = subParts[1].trim();
-             if (!/^[A-Z]{2}$/.test(found)) {
+             // O bairro costuma ser o que vem após o nome da rua no primeiro bloco
+             const found = subParts[subParts.length - 1].trim();
+             const isZipCode = /^\d{5}-\d{3}$/.test(found) || /^\d{8}$/.test(found);
+             const isState = /^[A-Z]{2}$/.test(found);
+             
+             if (!isZipCode && !isState && !/^\d+$/.test(found)) {
                components.neighborhood = found;
              }
            }
