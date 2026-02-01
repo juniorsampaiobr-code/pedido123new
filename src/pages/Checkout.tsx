@@ -960,11 +960,30 @@ const Checkout = () => {
   // CORREÇÃO: Atualizando a função displayAddress para incluir o bairro
   const displayAddress = useMemo(() => {
     const [zip_code, street, number, city, neighborhood, complement] = addressFields;
-    if (street && number && neighborhood && city && zip_code) {
-      // Incluindo o bairro (neighborhood) na visualização
-      return `${street}, ${number}${complement ? ` - ${complement}` : ''} - ${neighborhood}, ${city}, ${zip_code}`;
+    
+    // Constrói a primeira linha (Rua, Número, Complemento)
+    let line1 = `${street}, ${number}`;
+    if (complement) {
+      line1 += ` - ${complement}`;
     }
-    return '';
+    
+    // Constrói a segunda linha (Bairro, Cidade, CEP)
+    let line2 = '';
+    if (neighborhood) {
+      line2 += `${neighborhood}`;
+    }
+    if (city) {
+      line2 += `${line2 ? ', ' : ''}${city}`;
+    }
+    if (zip_code) {
+      line2 += `${line2 ? ', ' : ''}${formatCpfCnpj(zip_code)}`; // Usando formatCpfCnpj para formatar o CEP
+    }
+    
+    // Combina as linhas
+    if (line1 && line2) {
+        return `${line1} - ${line2}`;
+    }
+    return line1 || line2;
   }, [addressFields]);
 
   if (!restaurantId) {
