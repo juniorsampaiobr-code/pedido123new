@@ -617,6 +617,11 @@ const Checkout = () => {
       setIsAddressSaved(false);
     }
   });
+  
+  // CORREÇÃO: Definição da função handleSaveAddress
+  const handleSaveAddress = (data: AddressFormValues) => {
+    saveAddressMutation.mutate(data);
+  };
 
   const createCustomerMutation = useMutation({
     mutationFn: async (data: CheckoutFormValues): Promise<Customer> => {
