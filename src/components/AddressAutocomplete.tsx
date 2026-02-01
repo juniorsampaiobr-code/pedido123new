@@ -53,7 +53,7 @@ export const AddressAutocomplete = ({ onAddressSelect, defaultValue, disabled }:
       };
 
       // Mapeamento dos componentes do Google Maps para o nosso formato
-      // Ordenamos para processar os tipos mais específicos primeiro para o bairro
+      // Tipos de bairro mais comuns no Brasil
       const neighborhoodTypes = [
         'sublocality_level_1', 
         'neighborhood', 
@@ -91,53 +91,38 @@ export const AddressAutocomplete = ({ onAddressSelect, defaultValue, disabled }:
         }
       });
 
-      // FALLBACK DE SEGURANÇA PARA BAIRRO (VERSÃO ULTRA-ROBUSTA):
+      // --- LÓGICA DE FALLBACK ROBUSTA PARA BAIRRO ---
+      // Se o bairro ainda estiver vazio ou for igual à rua (erro comum do Google Maps)
       if (!components.neighborhood || components.neighborhood === components.street) {
         const fullText = place.formatted_address || '';
         console.log('[AddressAutocomplete] Iniciando extração forçada de bairro do texto:', fullText);
 
-        // 1. Tenta extrair entre o primeiro " - " e a primeira vírgula
-        // Ex: "Rua Alonso Keese - Vila Linopolis I, Santa Bárbara d'Oeste..."
-        // NOVO: Filtro rigoroso para ignorar CEPs (00000-000) e siglas de estado (SP)
-        const dashMatch = fullText.match(/ - ([^,]+)/);
-        if (dashMatch && dashMatch[1]) {
-          const found = dashMatch[1].trim();
-          const isZipCode = /^\d{5}-\d{3}$/.test(found) || /^\d{8}$/.test(found);
-          const isState = /^[A-Z]{2}$/.test(found);
-          const isOnlyNumbers = /^\d+$/.test(found);
-
-          if (!isZipCode && !isState && !isOnlyNumbers) {
-            components.neighborhood = found;
-          }
-        }
-
-        // 2. Fallback específico: analisa a primeira parte (antes da vírgula)
-        if (!components.neighborhood || components.neighborhood === components.street) {
-           const parts = fullText.split(',');
-           const firstPart = parts[0]; // "Rua Alonso Keese - Vila Linopolis I"
-           if (firstPart.includes(' - ')) {
-             const subParts = firstPart.split(' - ');
-             // O bairro costuma ser o que vem após o nome da rua no primeiro bloco
-             const found = subParts[subParts.length - 1].trim();
-             const isZipCode = /^\d{5}-\d{3}$/.test(found) || /^\d{8}$/.test(found);
-             const isState = /^[A-Z]{2}$/.test(found);
-             
-             if (!isZipCode && !isState && !/^\d+$/.test(found)) {
-               components.neighborhood = found;
-             }
-           }
-        }
-
-        // 2. Se falhar, tenta pegar o que está entre a primeira e a segunda vírgula
-        // Ex: "Rua Nome, 123, Bairro, Cidade"
-        if (!components.neighborhood || components.neighborhood === components.street) {
-          const parts = fullText.split(',');
-          if (parts.length >= 3) {
-            components.neighborhood = parts[2].trim();
-          }
+        // 1. Tenta extrair o que está entre a rua e a cidade/estado, usando vírgulas como delimitadores
+        const parts = fullText.split(',');
+        
+        // Encontra a parte que contém a rua (geralmente a primeira)
+        const streetPartIndex = parts.findIndex(p => p.includes(components.street));
+        
+        // Se a rua foi encontrada e há pelo menos 3 partes (rua, número/bairro, cidade)
+        if (streetPartIndex !== -1 && parts.length > streetPartIndex + 1) {
+            let potentialNeighborhood = parts[streetPartIndex + 1].trim();
+            
+            // Se a parte contém o número, o bairro pode estar na próxima parte
+            if (potentialNeighborhood.includes(components.number) && parts.length > streetPartIndex + 2) {
+                potentialNeighborhood = parts[streetPartIndex + 2].trim();
+            }
+            
+            // Limpeza: remove números, CEPs e siglas de estado
+            const isZipCode = /^\d{5}-\d{3}$/.test(potentialNeighborhood) || /^\d{8}$/.test(potentialNeighborhood);
+            const isState = /^[A-Z]{2}$/.test(potentialNeighborhood);
+            const isOnlyNumbers = /^\d+$/.test(potentialNeighborhood);
+            
+            if (!isZipCode && !isState && !isOnlyNumbers && potentialNeighborhood.length > 2) {
+                components.neighborhood = potentialNeighborhood;
+            }
         }
         
-        // 3. Limpeza final: se o bairro ainda for igual à rua, limpa para não confundir
+        // 2. Fallback final: se o bairro ainda for igual à rua, limpa para não confundir
         if (components.neighborhood === components.street) {
           components.neighborhood = '';
         }
