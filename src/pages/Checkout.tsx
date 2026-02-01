@@ -618,7 +618,7 @@ const Checkout = () => {
     }
   });
   
-  // CORREÇÃO: Definição da função handleSaveAddress
+  // Definição da função handleSaveAddress
   const handleSaveAddress = (data: AddressFormValues) => {
     saveAddressMutation.mutate(data);
   };
@@ -913,7 +913,7 @@ const Checkout = () => {
     setSavedAddressString(null);
   }, [addressForm]);
 
-  // CORREÇÃO: Ajustando a lógica de exibição para ser mais tolerante e mostrar o que foi preenchido.
+  // CORREÇÃO FINAL: Ajustando a função displayAddress para garantir que o bairro seja exibido
   const displayAddress = useMemo(() => {
     const [zip_code, street, number, city, neighborhood, complement, state] = addressFields;
     
@@ -934,9 +934,15 @@ const Checkout = () => {
     
     let locationLine = locationParts.join(' - ');
     
-    if (zip_code) {
-        const formattedZip = formatCpfCnpj(zip_code); // Reutilizando a função de formatação de CPF/CNPJ para CEP (que só remove não-dígitos)
-        locationLine += (locationLine ? ', ' : '') + formattedZip;
+    // Formata o CEP apenas se ele tiver 8 dígitos (limpando não-dígitos antes)
+    const cleanedZip = zip_code.replace(/\D/g, '');
+    let formattedZip = '';
+    if (cleanedZip.length === 8) {
+        formattedZip = `${cleanedZip.slice(0, 5)}-${cleanedZip.slice(5)}`;
+    }
+    
+    if (formattedZip) {
+        locationLine += (locationLine ? ', CEP: ' : 'CEP: ') + formattedZip;
     }
     
     // Combina as linhas, garantindo que não haja vírgulas extras
