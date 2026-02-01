@@ -637,7 +637,7 @@ const Checkout = () => {
       }
 
       const currentAddress = addressForm.getValues();
-      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null; // UPDATED
+      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
 
       const customerPayload: any = {
         user_id: user?.id || null,
