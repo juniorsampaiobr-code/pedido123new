@@ -35,7 +35,7 @@ import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
 // Incluindo todos os campos de endereço e complement
-type Customer = Tables<'customers'>; 
+type Customer = Tables<'customers'>;
 type DeliveryZone = Tables<'delivery_zones'>;
 type PaymentMethod = Tables<'payment_methods'>;
 type CartItem = {
@@ -49,21 +49,17 @@ type CartItem = {
 const formatPhoneNumber = (value: string) => {
   if (!value) return '';
   let cleaned = value.replace(/\D/g, '');
-  
   if (cleaned.length > 11) cleaned = cleaned.slice(0, 11);
   if (cleaned.length > 0) cleaned = `(${cleaned}`;
   if (cleaned.length > 3) cleaned = `${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
   if (cleaned.length > 10) cleaned = `${cleaned.slice(0, 10)}-${cleaned.slice(10)}`;
-  
   return cleaned;
 };
 
 const formatCpfCnpj = (value: string) => {
   if (!value) return '';
   let cleaned = value.replace(/\D/g, '');
-
   if (cleaned.length > 14) cleaned = cleaned.slice(0, 14);
-
   if (cleaned.length <= 11) {
     // CPF
     if (cleaned.length > 9) cleaned = `${cleaned.slice(0, 9)}-${cleaned.slice(9)}`;
@@ -183,7 +179,6 @@ const Checkout = () => {
   const [isOnlineWarningModalOpen, setIsOnlineWarningModalOpen] = useState(false);
   const [pendingOnlinePaymentId, setPendingOnlinePaymentId] = useState<string | null>(null);
   const [savedAddressString, setSavedAddressString] = useState<string | null>(null);
-
   // Referência para o timer de inatividade
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -192,7 +187,7 @@ const Checkout = () => {
     queryKey: ['checkoutRestaurantData', restaurantId],
     queryFn: () => fetchRestaurantData(restaurantId!),
     enabled: !!restaurantId,
-    staleTime: 1000 * 60 * 5, 
+    staleTime: 1000 * 60 * 5,
   });
 
   // MUDANÇA AQUI: staleTime: 1000 * 60 * 5 (5 minutos)
@@ -234,24 +229,15 @@ const Checkout = () => {
         // Inicia o timer de 20 minutos (1.200.000 ms)
         inactivityTimerRef.current = setTimeout(async () => {
           console.log("Timer expirado. Deslogando usuário...");
-          
           // Desloga o usuário
           await supabase.auth.signOut();
-          
           // Feedback visual
           toast.error("Sessão expirada.", {
             description: "Você ficou fora da página de checkout por mais de 20 minutos. Por favor, identifique-se novamente.",
             duration: 6000,
           });
-          
           // Redireciona para o Auth
-          navigate('/auth', { 
-            state: { 
-              from: '/checkout', 
-              restaurantId 
-            },
-            replace: true 
-          });
+          navigate('/auth', { state: { from: '/checkout', restaurantId }, replace: true });
         }, 1200000); // 20 minutos em milissegundos
       } else {
         console.log("Página visível. Cancelando timer de expiração.");
@@ -264,7 +250,6 @@ const Checkout = () => {
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (inactivityTimerRef.current) {
@@ -275,7 +260,7 @@ const Checkout = () => {
 
   const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, neighborhood: string, lat?: number | null, lng?: number | null) => {
     const DEFAULT_DELIVERY_TIME: [number, number] = [30, 45];
-    
+
     if (restaurant && restaurant.delivery_enabled === false) {
       const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${zip_code}`;
       let coords: { lat: number, lng: number } | null = null;
@@ -384,7 +369,6 @@ const Checkout = () => {
   const totalAmount = cartSubtotal + deliveryFee;
 
   const addressFields = addressForm.watch(['zip_code', 'street', 'number', 'city', 'neighborhood', 'complement']);
-
   const currentAddressString = useMemo(() => {
     const [zip_code, street, number, city, neighborhood, complement] = addressFields;
     return `${street}|${number}|${complement || ''}|${neighborhood}|${city}|${zip_code}`;
@@ -393,11 +377,10 @@ const Checkout = () => {
   // --- Realtime Listener para atualização automática das taxas ---
   useEffect(() => {
     if (!restaurantId) return;
-
     const zonesChannel = supabase.channel('delivery-zones-changes')
       .on(
-        'postgres_changes', 
-        { event: '*', schema: 'public', table: 'delivery_zones', filter: `restaurant_id=eq.${restaurantId}` }, 
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'delivery_zones', filter: `restaurant_id=eq.${restaurantId}` },
         () => {
           console.log('[Realtime] Zonas de entrega atualizadas. Invalidando query...');
           // MUDANÇA AQUI: Força o re-fetch, mas o staleTime alto evita re-fetch desnecessário em montagens
@@ -409,8 +392,8 @@ const Checkout = () => {
 
     const restaurantChannel = supabase.channel('restaurant-settings-changes')
       .on(
-        'postgres_changes', 
-        { event: 'UPDATE', schema: 'public', table: 'restaurants', filter: `id=eq.${restaurantId}` }, 
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'restaurants', filter: `id=eq.${restaurantId}` },
         () => {
           console.log('[Realtime] Configurações do restaurante atualizadas. Invalidando query...');
           // MUDANÇA AQUI: Força o re-fetch
@@ -420,8 +403,8 @@ const Checkout = () => {
       )
       .subscribe();
 
-    return () => { 
-      supabase.removeChannel(zonesChannel); 
+    return () => {
+      supabase.removeChannel(zonesChannel);
       supabase.removeChannel(restaurantChannel);
     };
   }, [restaurantId, queryClient]);
@@ -437,18 +420,16 @@ const Checkout = () => {
 
     if (isAddressSaved && customerCoords && restaurantCoords && deliveryZones && restaurant) {
       console.log('[Checkout] Recalculando taxa devido a mudanças nos dados...', { deliveryZones });
-      
       if (restaurant.delivery_enabled === false) {
         setDeliveryFee(0);
         setIsDeliveryAreaValid(true);
-        if (!deliveryTime) setDeliveryTime([30, 45]); 
+        if (!deliveryTime) setDeliveryTime([30, 45]);
       } else {
         const feeResult = calculateDeliveryFee(
           customerCoords,
           restaurantCoords,
           deliveryZones
         );
-
         if (feeResult) {
           console.log('[Checkout] Nova taxa calculada:', feeResult.fee);
           setDeliveryFee(feeResult.fee);
@@ -497,7 +478,6 @@ const Checkout = () => {
           setSavedAddressString(addrString);
         }
       }
-
     } else if (user && !isLoadingCustomer) {
       // Fallback para metadata do usuário se não houver registro de customer
       const userMetadata = user.user_metadata;
@@ -509,7 +489,7 @@ const Checkout = () => {
         change_for: '',
       });
     }
-  }, [customer, user, isLoadingCustomer, form, addressForm]); 
+  }, [customer, user, isLoadingCustomer, form, addressForm]);
 
   useEffect(() => {
     if (deliveryOption === 'delivery' && savedAddressString !== null && currentAddressString !== savedAddressString) {
@@ -544,9 +524,8 @@ const Checkout = () => {
   const saveAddressMutation = useMutation({
     mutationFn: async (data: AddressFormValues): Promise<{ customer: Customer | null, feeResult: { coords: { lat: number, lng: number } | null, fee: number, time: [number, number] | null, isValid: boolean } }> => {
       setIsGeocoding(true);
-      
       const fullAddress = `${data.street}, ${data.number}${data.complement ? ` - ${data.complement}` : ''}, ${data.neighborhood}, ${data.city}, ${data.zip_code}`;
-      
+
       // 1. Geocodificação e Cálculo de Taxa
       const feeResult = await calculateFee(data.zip_code, data.street, data.number, data.city, data.neighborhood);
       setIsGeocoding(false);
@@ -563,13 +542,12 @@ const Checkout = () => {
       const contactName = form.getValues('name');
       const contactPhone = form.getValues('phone');
       const contactCpfCnpj = form.getValues('cpf_cnpj');
-      
       const cleanedPhone = contactPhone.replace(/\D/g, '');
       const cleanedCpfCnpj = contactCpfCnpj.replace(/\D/g, '') || null;
 
       if (!contactName || cleanedPhone.length < 10 || !cleanedCpfCnpj || (cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14)) {
-          // Se a validação falhar, lançamos um erro específico para o usuário
-          throw new Error("Preencha Nome, Telefone (10+ dígitos) e CPF/CNPJ (11 ou 14 dígitos) nos Seus Dados antes de salvar o endereço.");
+        // Se a validação falhar, lançamos um erro específico para o usuário
+        throw new Error("Preencha Nome, Telefone (10+ dígitos) e CPF/CNPJ (11 ou 14 dígitos) nos Seus Dados antes de salvar o endereço.");
       }
 
       const userAuth = await supabase.auth.getUser();
@@ -622,8 +600,8 @@ const Checkout = () => {
       };
 
       const selectColumns = '*, street, number, neighborhood, city, zip_code, complement';
-
       let savedCustomer: Customer;
+
       if (customer?.id) {
         const { data: updatedCustomer, error: updateError } = await supabase
           .from('customers')
@@ -672,24 +650,24 @@ const Checkout = () => {
     console.log('[Checkout] Iniciando salvamento de endereço:', data);
     // 1. Valida o formulário de endereço
     addressForm.trigger().then(isAddressValid => {
-        if (isAddressValid) {
-            // 2. Valida os campos de contato (nome, telefone, cpf/cnpj)
-            form.trigger(['name', 'phone', 'cpf_cnpj']).then(isContactValid => {
-                if (isContactValid) {
-                    // 3. Se ambos válidos, chama a mutação
-                    console.log('[Checkout] Dados de contato válidos, chamando mutação.');
-                    saveAddressMutation.mutate(data);
-                } else {
-                    // Se o contato falhar, exibe o erro do formulário principal
-                    console.warn('[Checkout] Dados de contato inválidos:', form.getValues());
-                    toast.error("Preencha Nome, Telefone e CPF/CNPJ nos Seus Dados antes de salvar o endereço.");
-                }
-            });
-        } else {
-            // Se o endereço falhar, o Zod já deve ter marcado os campos com erro
-            console.warn('[Checkout] Dados de endereço inválidos:', addressForm.formState.errors);
-            toast.error("Preencha todos os campos obrigatórios do endereço.");
-        }
+      if (isAddressValid) {
+        // 2. Valida os campos de contato (nome, telefone, cpf/cnpj)
+        form.trigger(['name', 'phone', 'cpf_cnpj']).then(isContactValid => {
+          if (isContactValid) {
+            // 3. Se ambos válidos, chama a mutação
+            console.log('[Checkout] Dados de contato válidos, chamando mutação.');
+            saveAddressMutation.mutate(data);
+          } else {
+            // Se o contato falhar, exibe o erro do formulário principal
+            console.warn('[Checkout] Dados de contato inválidos:', form.getValues());
+            toast.error("Preencha Nome, Telefone e CPF/CNPJ nos Seus Dados antes de salvar o endereço.");
+          }
+        });
+      } else {
+        // Se o endereço falhar, o Zod já deve ter marcado os campos com erro
+        console.warn('[Checkout] Dados de endereço inválidos:', addressForm.formState.errors);
+        toast.error("Preencha todos os campos obrigatórios do endereço.");
+      }
     });
   };
 
@@ -701,14 +679,11 @@ const Checkout = () => {
       const cleanedCpfCnpj = data.cpf_cnpj?.replace(/\D/g, '') || null;
 
       if (!data.name || cleanedPhone.length < 10 || (cleanedCpfCnpj && cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14)) {
-          throw new Error("Dados de contato incompletos ou inválidos.");
+        throw new Error("Dados de contato incompletos ou inválidos.");
       }
 
       const currentAddress = addressForm.getValues();
-      
-      const fullAddress = deliveryOption === 'delivery' ? 
-        `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.zip_code}` : 
-        null;
+      const fullAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.zip_code}` : null;
 
       const customerPayload: any = {
         user_id: user?.id || null,
@@ -726,13 +701,12 @@ const Checkout = () => {
         zip_code: addressForm.getValues('zip_code') || null,
         complement: addressForm.getValues('complement') || null,
       };
-      
+
       if (!user) {
-          customerPayload.email = null;
+        customerPayload.email = null;
       }
 
       const selectColumns = '*, street, number, neighborhood, city, zip_code, complement';
-
       if (user) {
         if (customer) {
           const { data: updatedCustomer, error: updateError } = await supabase
@@ -791,10 +765,7 @@ const Checkout = () => {
       }
 
       const currentAddress = addressForm.getValues();
-
-      const deliveryAddress = deliveryOption === 'delivery' ? 
-        `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.zip_code}` : 
-        null;
+      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.zip_code}` : null;
 
       const orderPayload: TablesInsert<'orders'> = {
         restaurant_id: restaurant.id,
@@ -967,15 +938,16 @@ const Checkout = () => {
     addressForm.setValue('neighborhood', address.neighborhood, { shouldValidate: true });
     addressForm.setValue('city', address.city, { shouldValidate: true });
     addressForm.setValue('number', address.number, { shouldValidate: true }); // O número pode vir preenchido
-    addressForm.setValue('complement', '', { shouldValidate: true }); 
-    
+    addressForm.setValue('complement', '', { shouldValidate: true }); // Se o número não veio preenchido, o usuário precisa preencher manualmente.
+
+    // O número pode vir preenchido
     // Se o número não veio preenchido, o usuário precisa preencher manualmente.
     if (!address.number) {
-        toast.warning("Endereço encontrado! Por favor, preencha o campo 'Número' e clique em Salvar.");
+      toast.warning("Endereço encontrado! Por favor, preencha o campo 'Número' e clique em Salvar.");
     } else {
-        toast.info("Endereço encontrado! Verifique o número e clique em Salvar.");
+      toast.info("Endereço encontrado! Verifique o número e clique em Salvar.");
     }
-    
+
     // Limpa o estado de endereço salvo para forçar o usuário a clicar em Salvar
     setIsAddressSaved(false);
     setDeliveryFee(0);
@@ -983,13 +955,13 @@ const Checkout = () => {
     setIsDeliveryAreaValid(true);
     setCustomerCoords(null);
     setSavedAddressString(null);
-    
   }, [addressForm]);
 
+  // CORREÇÃO: Atualizando a função displayAddress para incluir o bairro
   const displayAddress = useMemo(() => {
     const [zip_code, street, number, city, neighborhood, complement] = addressFields;
     if (street && number && neighborhood && city && zip_code) {
-      // CORREÇÃO AQUI: Incluindo o bairro (neighborhood) na visualização
+      // Incluindo o bairro (neighborhood) na visualização
       return `${street}, ${number}${complement ? ` - ${complement}` : ''} - ${neighborhood}, ${city}, ${zip_code}`;
     }
     return '';
@@ -1043,28 +1015,12 @@ const Checkout = () => {
 
   return (
     <div className="min-h-screen bg-background w-full overflow-x-hidden">
-      {/* 
-        Ajustado padding horizontal (px-3 em vez de px-4) para telas menores 
-        para ganhar mais espaço útil
-      */}
+      {/* Ajustado padding horizontal (px-3 em vez de px-4) para telas menores para ganhar mais espaço útil */}
       <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-8 max-w-5xl space-y-6 sm:space-y-8">
-        <CustomerProfileModal
-          isOpen={isProfileModalOpen}
-          onClose={() => setIsProfileModalOpen(false)}
-          customer={customer}
-        />
-
-        <OnlinePaymentWarningModal
-          isOpen={isOnlineWarningModalOpen}
-          onConfirm={handleOnlineWarningConfirm}
-        />
-
+        <CustomerProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} customer={customer} />
+        <OnlinePaymentWarningModal isOpen={isOnlineWarningModalOpen} onConfirm={handleOnlineWarningConfirm} />
         {isMercadoPagoOpen && mpInitPoint && (
-          <MercadoPagoPayment
-            preferenceId={mpPreferenceId!}
-            initPoint={mpInitPoint}
-            onClose={() => setIsMercadoPagoOpen(false)}
-          />
+          <MercadoPagoPayment preferenceId={mpPreferenceId!} initPoint={mpInitPoint} onClose={() => setIsMercadoPagoOpen(false)} />
         )}
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1083,7 +1039,8 @@ const Checkout = () => {
           {user && (
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
               <Button variant="outline" size="sm" onClick={() => setIsProfileModalOpen(true)} aria-label="Meu Perfil e Pedidos" className="flex-1 sm:flex-none text-xs sm:text-sm h-8 sm:h-9">
-                <UserIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" /> <span className="truncate">Perfil / Pedidos</span>
+                <UserIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="truncate">Perfil / Pedidos</span>
               </Button>
               <Button variant="outline" size="sm" onClick={handleLogout} className="flex-shrink-0 text-xs sm:text-sm h-8 sm:h-9">
                 <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Sair
@@ -1204,24 +1161,12 @@ const Checkout = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
                         <div className="space-y-1.5 sm:space-y-2">
                           <Label htmlFor="number" className="text-xs sm:text-sm">Número *</Label>
-                          <Input 
-                            id="number" 
-                            {...addressForm.register('number')} 
-                            placeholder="Nº"
-                            className="h-9 sm:h-12 text-sm"
-                            autoComplete="off"
-                          />
+                          <Input id="number" {...addressForm.register('number')} placeholder="Nº" className="h-9 sm:h-12 text-sm" autoComplete="off" />
                           {addressForm.formState.errors.number && <p className="text-destructive text-xs sm:text-sm">{addressForm.formState.errors.number.message}</p>}
                         </div>
                         <div className="space-y-1.5 sm:space-y-2">
                           <Label htmlFor="complement" className="text-xs sm:text-sm">Complemento</Label>
-                          <Input 
-                            id="complement" 
-                            {...addressForm.register('complement')} 
-                            placeholder="Apto, Bloco..."
-                            className="h-9 sm:h-12 text-sm"
-                            autoComplete="off"
-                          />
+                          <Input id="complement" {...addressForm.register('complement')} placeholder="Apto, Bloco..." className="h-9 sm:h-12 text-sm" autoComplete="off" />
                         </div>
                       </div>
 
@@ -1229,8 +1174,7 @@ const Checkout = () => {
                         <div className="bg-muted p-2 sm:p-3 rounded text-xs sm:text-sm break-words overflow-hidden">
                           <p><strong>Endereço:</strong></p>
                           <p>
-                            {addressForm.watch('street')}
-                            {addressForm.watch('number') ? `, ${addressForm.watch('number')}` : ''}
+                            {addressForm.watch('street')} {addressForm.watch('number') ? `, ${addressForm.watch('number')}` : ''}
                             {addressForm.watch('complement') ? ` - ${addressForm.watch('complement')}` : ''}
                           </p>
                           {/* Exibindo bairro e cidade */}
@@ -1278,8 +1222,7 @@ const Checkout = () => {
                           <Truck className="h-4 w-4" />
                           <AlertTitle className="text-sm">Entrega Disponível</AlertTitle>
                           <AlertDescription className="text-xs">
-                            Taxa: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}. 
-                            Tempo: {deliveryTime ? `${deliveryTime[0]}-${deliveryTime[1]}` : '30-45'} min.
+                            Taxa: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deliveryFee)}. Tempo: {deliveryTime ? `${deliveryTime[0]}-${deliveryTime[1]}` : '30-45'} min.
                           </AlertDescription>
                         </Alert>
                       )}
@@ -1288,12 +1231,7 @@ const Checkout = () => {
 
                   {isAddressSaved && customerCoords && displayAddress && (
                     <div className="mt-4 w-full overflow-hidden rounded-md border">
-                      <ClientLocationMap
-                        latitude={customerCoords[0]}
-                        longitude={customerCoords[1]}
-                        address={displayAddress}
-                        className="w-full"
-                      />
+                      <ClientLocationMap latitude={customerCoords[0]} longitude={customerCoords[1]} address={displayAddress} className="w-full" />
                     </div>
                   )}
                 </CardContent>
