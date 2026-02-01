@@ -1182,9 +1182,14 @@ const Checkout = () => {
                             {addressForm.watch('street')} {addressForm.watch('number') ? `, ${addressForm.watch('number')}` : ''}
                             {addressForm.watch('complement') ? ` - ${addressForm.watch('complement')}` : ''}
                           </p>
-                          {/* Exibindo bairro e cidade */}
-                          <p>
-                            {addressForm.watch('neighborhood') ? `${addressForm.watch('neighborhood')}, ` : ''}
+                          {/* Exibindo bairro e cidade com destaque para o bairro */}
+                          <p className="mt-1">
+                            {addressForm.watch('neighborhood') && (
+                              <span className="font-semibold text-primary">
+                                {addressForm.watch('neighborhood')}
+                              </span>
+                            )}
+                            {addressForm.watch('neighborhood') && addressForm.watch('city') ? ' - ' : ''}
                             {addressForm.watch('city')}
                           </p>
                         </div>
