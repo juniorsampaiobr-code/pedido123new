@@ -921,31 +921,33 @@ const Checkout = () => {
     if (!street) return ''; 
     
     const parts = [];
+    
+    // 1. Rua e Número
     if (street) parts.push(street);
     if (number) parts.push(number);
     
-    // Adiciona o complemento logo após o número, se existir
+    // 2. Complemento (entre parênteses)
     if (complement) parts.push(`(Comp: ${complement})`);
     
-    // Adiciona o bairro
+    // 3. Bairro
     if (neighborhood) parts.push(neighborhood);
     
     let addressLine = parts.join(', ');
     
+    // 4. Cidade e Estado
     const locationParts = [];
     if (city) locationParts.push(city);
     if (state) locationParts.push(state);
     
     let locationLine = locationParts.join(' - ');
     
-    // Formata o CEP apenas se ele tiver 8 dígitos (limpando não-dígitos antes)
+    // 5. CEP
     const cleanedZip = zip_code.replace(/\D/g, '');
     let formattedZip = '';
     if (cleanedZip.length === 8) {
         formattedZip = `${cleanedZip.slice(0, 5)}-${cleanedZip.slice(5)}`;
     }
     
-    // Adiciona o CEP no final da linha de localização, se existir
     if (formattedZip) {
         locationLine += (locationLine ? ', CEP: ' : 'CEP: ') + formattedZip;
     }
