@@ -85,7 +85,7 @@ const addressSchema = z.object({
   complement: z.string().optional(),
   neighborhood: z.string().min(1, 'Bairro é obrigatório.'),
   city: z.string().min(1, 'Cidade é obrigatória.'),
-  state: z.string().min(1, 'Estado é obrigatório.'), // ADDED
+  state: z.string().min(1, 'Estado é obrigatória.'), // ADDED
 });
 
 type AddressFormValues = z.infer<typeof addressSchema>;
@@ -913,17 +913,34 @@ const Checkout = () => {
     setSavedAddressString(null);
   }, [addressForm]);
 
-  // CORREÇÃO FINAL: Atualizando a função displayAddress para garantir que o bairro seja exibido
+  // CORREÇÃO: Ajustando a lógica de exibição para ser mais tolerante e mostrar o que foi preenchido.
   const displayAddress = useMemo(() => {
-    const [zip_code, street, number, city, neighborhood, complement, state] = addressFields; // UPDATED
+    const [zip_code, street, number, city, neighborhood, complement, state] = addressFields;
     
-    // Garante que os campos obrigatórios estão preenchidos antes de formatar
-    if (!street || !number || !neighborhood || !city || !zip_code || !state) return ''; // UPDATED
+    // Se a rua não estiver preenchida, não há endereço para exibir
+    if (!street) return ''; 
     
-    const complementPart = complement ? ` - ${complement}` : '';
+    const parts = [];
+    if (street) parts.push(street);
+    if (number) parts.push(number);
     
-    // Formato: Rua, Número - Complemento, Bairro, Cidade - Estado, CEP
-    const fullAddress = `${street}, ${number}${complementPart}, ${neighborhood}, ${city} - ${state}, ${formatCpfCnpj(zip_code)}`;
+    let addressLine = parts.join(', ');
+    if (complement) addressLine += ` - ${complement}`;
+    
+    const locationParts = [];
+    if (neighborhood) locationParts.push(neighborhood);
+    if (city) locationParts.push(city);
+    if (state) locationParts.push(state);
+    
+    let locationLine = locationParts.join(' - ');
+    
+    if (zip_code) {
+        const formattedZip = formatCpfCnpj(zip_code); // Reutilizando a função de formatação de CPF/CNPJ para CEP (que só remove não-dígitos)
+        locationLine += (locationLine ? ', ' : '') + formattedZip;
+    }
+    
+    // Combina as linhas, garantindo que não haja vírgulas extras
+    const fullAddress = [addressLine, locationLine].filter(Boolean).join(', ');
     
     return fullAddress;
   }, [addressFields]);
@@ -1132,23 +1149,11 @@ const Checkout = () => {
                         </div>
                       </div>
 
-                      {addressForm.watch('street') && (
+                      {/* NOVO BLOCO DE VISUALIZAÇÃO AJUSTADO */}
+                      {displayAddress && (
                         <div className="bg-muted p-2 sm:p-3 rounded text-xs sm:text-sm break-words overflow-hidden">
                           <p><strong>Endereço:</strong></p>
-                          <p>
-                            {addressForm.watch('street')} {addressForm.watch('number') ? `, ${addressForm.watch('number')}` : ''}
-                            {addressForm.watch('complement') ? ` - ${addressForm.watch('complement')}` : ''}
-                          </p>
-                          {/* Exibindo bairro e cidade com destaque para o bairro */}
-                          <p className="mt-1">
-                            {addressForm.watch('neighborhood') && (
-                              <span className="font-semibold text-primary">
-                                {addressForm.watch('neighborhood')}
-                              </span>
-                            )}
-                            {addressForm.watch('neighborhood') && addressForm.watch('city') ? ' - ' : ''}
-                            {addressForm.watch('city')} - {addressForm.watch('state')}
-                          </p>
+                          <p className="text-sm text-foreground">{displayAddress}</p>
                         </div>
                       )}
 
