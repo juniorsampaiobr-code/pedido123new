@@ -961,17 +961,15 @@ const Checkout = () => {
   const displayAddress = useMemo(() => {
     const [zip_code, street, number, city, neighborhood, complement] = addressFields;
     
-    // Filtra e junta apenas os campos preenchidos
-    const parts = [
-      street && number ? `${street}, ${number}` : street,
-      complement,
-      neighborhood,
-      city,
-      zip_code ? formatCpfCnpj(zip_code) : null,
-    ].filter(Boolean); // Remove valores nulos/vazios
-
-    // Formata a string final
-    return parts.join(' - ');
+    // Garante que os campos obrigatórios estão preenchidos antes de formatar
+    if (!street || !number || !neighborhood || !city || !zip_code) return '';
+    
+    const complementPart = complement ? ` - ${complement}` : '';
+    
+    // Formato: Rua, Número - Complemento, Bairro, Cidade, CEP
+    const fullAddress = `${street}, ${number}${complementPart}, ${neighborhood}, ${city}, ${formatCpfCnpj(zip_code)}`;
+    
+    return fullAddress;
   }, [addressFields]);
 
   if (!restaurantId) {
@@ -1177,19 +1175,17 @@ const Checkout = () => {
                         </div>
                       </div>
 
-                      {/* CORREÇÃO: Bloco de visualização do endereço */}
                       {addressForm.watch('street') && (
                         <div className="bg-muted p-2 sm:p-3 rounded text-xs sm:text-sm break-words overflow-hidden">
                           <p><strong>Endereço:</strong></p>
                           <p>
-                            {addressForm.watch('street')}
-                            {addressForm.watch('number') ? `, ${addressForm.watch('number')}` : ''}
+                            {addressForm.watch('street')} {addressForm.watch('number') ? `, ${addressForm.watch('number')}` : ''}
                             {addressForm.watch('complement') ? ` - ${addressForm.watch('complement')}` : ''}
                           </p>
+                          {/* Exibindo bairro e cidade */}
                           <p>
-                            {addressForm.watch('neighborhood') ? `${addressForm.watch('neighborhood')}` : ''}
-                            {addressForm.watch('city') ? `, ${addressForm.watch('city')}` : ''}
-                            {addressForm.watch('zip_code') ? ` - ${formatCpfCnpj(addressForm.watch('zip_code'))}` : ''}
+                            {addressForm.watch('neighborhood') ? `${addressForm.watch('neighborhood')}, ` : ''}
+                            {addressForm.watch('city')}
                           </p>
                         </div>
                       )}
