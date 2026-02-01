@@ -81,7 +81,7 @@ const addressSchema = z.object({
     message: 'O CEP deve ter 8 dígitos.',
   }),
   street: z.string().min(1, 'Rua é obrigatória.'),
-  number: z.string().optional(), // REMOVIDO O .min(1, ...)
+  number: z.string().min(1, 'Número é obrigatório.'), // REINTRODUZIDO E OBRIGATÓRIO
   complement: z.string().optional(),
   neighborhood: z.string().min(1, 'Bairro é obrigatório.'),
   city: z.string().min(1, 'Cidade é obrigatória.'),
@@ -182,6 +182,7 @@ const Checkout = () => {
   const [savedAddressString, setSavedAddressString] = useState<string | null>(null);
   // Referência para o timer de inatividade
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const numberInputRef = useRef<HTMLInputElement>(null); // Referência para o campo Número
 
   // MUDANÇA AQUI: staleTime: 1000 * 60 * 5 (5 minutos)
   const { data: restaurant, isLoading: isLoadingRestaurant, isError: isErrorRestaurant, error: errorRestaurant, refetch: refetchRestaurant } = useQuery<Restaurant>({
@@ -336,7 +337,7 @@ const Checkout = () => {
     defaultValues: {
       zip_code: '',
       street: '',
-      number: '', // Mantido no defaultValues, mas não será usado no campo de input
+      number: '',
       complement: '',
       neighborhood: '',
       city: '',
@@ -350,7 +351,7 @@ const Checkout = () => {
     addressForm.reset({
       zip_code: '',
       street: '',
-      number: '', // Mantido no reset
+      number: '',
       complement: '',
       neighborhood: '',
       city: '',
@@ -375,7 +376,7 @@ const Checkout = () => {
   const addressFields = addressForm.watch(['zip_code', 'street', 'number', 'city', 'neighborhood', 'complement', 'state']);
   const currentAddressString = useMemo(() => {
     const [zip_code, street, number, city, neighborhood, complement, state] = addressFields;
-    return `${street}|${number || ''}|${complement || ''}|${neighborhood}|${city}|${zip_code}|${state}`;
+    return `${street}|${number}|${complement || ''}|${neighborhood}|${city}|${zip_code}|${state}`;
   }, [addressFields]);
 
   // --- Realtime Listener para atualização automática das taxas ---
@@ -494,8 +495,14 @@ const Checkout = () => {
     mutationFn: async (data: AddressFormValues): Promise<{ customer: Customer | null, feeResult: { coords: { lat: number, lng: number } | null, fee: number, time: [number, number] | null, isValid: boolean } }> => {
       setIsGeocoding(true);
       
-      // O número deve vir do Autocomplete (data.number) ou ser vazio
+      // O número deve vir do Autocomplete (data.number) ou ser preenchido manualmente
       const finalNumber = data.number || '';
+      
+      // Validação extra: Se o número estiver vazio, falha a validação
+      if (!finalNumber) {
+        setIsGeocoding(false);
+        throw new Error("O campo 'Número' é obrigatório para calcular a taxa de entrega.");
+      }
       
       // UPDATED: Include state in fullAddress for geocoding
       const fullAddress = `${data.street}, ${finalNumber}${data.complement ? ` - ${data.complement}` : ''}, ${data.neighborhood}, ${data.city}, ${data.state}, ${data.zip_code}`;
@@ -620,6 +627,11 @@ const Checkout = () => {
       toast.error(`Erro ao salvar endereço: ${err.message}`);
       setIsDeliveryAreaValid(false);
       setIsAddressSaved(false);
+      
+      // Se o erro for sobre o número, foca o campo
+      if (err.message.includes("'Número' é obrigatório") && numberInputRef.current) {
+        numberInputRef.current.focus();
+      }
     }
   });
   
@@ -642,8 +654,8 @@ const Checkout = () => {
       }
 
       const currentAddress = addressForm.getValues();
-      // Usando currentAddress.number (que veio do Autocomplete)
-      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number || ''}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
+      // Usando currentAddress.number (que veio do Autocomplete ou foi preenchido)
+      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
 
       const customerPayload: any = {
         user_id: user?.id || null,
@@ -726,8 +738,8 @@ const Checkout = () => {
       }
 
       const currentAddress = addressForm.getValues();
-      // Usando currentAddress.number (que veio do Autocomplete)
-      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number || ''}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
+      // Usando currentAddress.number (que veio do Autocomplete ou foi preenchido)
+      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
 
       const orderPayload: TablesInsert<'orders'> = {
         restaurant_id: restaurant.id,
@@ -903,11 +915,13 @@ const Checkout = () => {
     addressForm.setValue('number', address.number, { shouldValidate: true }); // Mantém o número preenchido pelo Autocomplete
     addressForm.setValue('complement', '', { shouldValidate: true }); 
 
-    // Se o número não veio preenchido, avisa o usuário
+    // Se o número não veio preenchido, avisa o usuário e foca o campo
     if (!address.number) {
-      toast.warning("Endereço encontrado! Por favor, adicione o complemento (se houver) e clique em Salvar.");
+      toast.warning("Endereço encontrado! Por favor, preencha o campo 'Número' e clique em Salvar.");
+      // Foca o campo número
+      setTimeout(() => numberInputRef.current?.focus(), 100);
     } else {
-      toast.info("Endereço encontrado! Verifique o complemento e clique em Salvar.");
+      toast.info("Endereço encontrado! Verifique o número e clique em Salvar.");
     }
 
     // Limpa o estado de endereço salvo para forçar o usuário a clicar em Salvar
@@ -928,7 +942,7 @@ const Checkout = () => {
     
     const parts = [];
     
-    // 1. Rua e Número (Número agora é opcional, vindo do Autocomplete)
+    // 1. Rua e Número
     if (street) parts.push(street);
     if (number) parts.push(number);
     
@@ -1155,9 +1169,22 @@ const Checkout = () => {
                       <input type="hidden" {...addressForm.register('neighborhood')} />
                       <input type="hidden" {...addressForm.register('city')} />
                       <input type="hidden" {...addressForm.register('state')} />
-                      <input type="hidden" {...addressForm.register('number')} /> {/* Mantido como hidden para salvar o valor do Autocomplete */}
 
-                      <div className="grid grid-cols-1 gap-3 sm:gap-4 min-w-0">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
+                        {/* CAMPO NÚMERO REINTRODUZIDO */}
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label htmlFor="number" className="text-xs sm:text-sm">Número *</Label>
+                          <Input 
+                            id="number" 
+                            {...addressForm.register('number')} 
+                            placeholder="Nº" 
+                            className="h-9 sm:h-12 text-sm" 
+                            autoComplete="off" 
+                            ref={numberInputRef} // Adicionando a referência
+                          />
+                          {addressForm.formState.errors.number && <p className="text-destructive text-xs sm:text-sm">{addressForm.formState.errors.number.message}</p>}
+                        </div>
+                        {/* CAMPO COMPLEMENTO */}
                         <div className="space-y-1.5 sm:space-y-2">
                           <Label htmlFor="complement" className="text-xs sm:text-sm">Complemento</Label>
                           <Input id="complement" {...addressForm.register('complement')} placeholder="Apto, Bloco..." className="h-9 sm:h-12 text-sm" autoComplete="off" />
