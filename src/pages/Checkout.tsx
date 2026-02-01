@@ -957,33 +957,21 @@ const Checkout = () => {
     setSavedAddressString(null);
   }, [addressForm]);
 
-  // CORREÇÃO: Atualizando a função displayAddress para incluir o bairro
+  // CORREÇÃO FINAL: Atualizando a função displayAddress para garantir que o bairro seja exibido
   const displayAddress = useMemo(() => {
     const [zip_code, street, number, city, neighborhood, complement] = addressFields;
     
-    // Constrói a primeira linha (Rua, Número, Complemento)
-    let line1 = `${street}, ${number}`;
-    if (complement) {
-      line1 += ` - ${complement}`;
-    }
-    
-    // Constrói a segunda linha (Bairro, Cidade, CEP)
-    let line2 = '';
-    if (neighborhood) {
-      line2 += `${neighborhood}`;
-    }
-    if (city) {
-      line2 += `${line2 ? ', ' : ''}${city}`;
-    }
-    if (zip_code) {
-      line2 += `${line2 ? ', ' : ''}${formatCpfCnpj(zip_code)}`; // Usando formatCpfCnpj para formatar o CEP
-    }
-    
-    // Combina as linhas
-    if (line1 && line2) {
-        return `${line1} - ${line2}`;
-    }
-    return line1 || line2;
+    // Filtra e junta apenas os campos preenchidos
+    const parts = [
+      street && number ? `${street}, ${number}` : street,
+      complement,
+      neighborhood,
+      city,
+      zip_code ? formatCpfCnpj(zip_code) : null,
+    ].filter(Boolean); // Remove valores nulos/vazios
+
+    // Formata a string final
+    return parts.join(' - ');
   }, [addressFields]);
 
   if (!restaurantId) {
@@ -1189,17 +1177,19 @@ const Checkout = () => {
                         </div>
                       </div>
 
+                      {/* CORREÇÃO: Bloco de visualização do endereço */}
                       {addressForm.watch('street') && (
                         <div className="bg-muted p-2 sm:p-3 rounded text-xs sm:text-sm break-words overflow-hidden">
                           <p><strong>Endereço:</strong></p>
                           <p>
-                            {addressForm.watch('street')} {addressForm.watch('number') ? `, ${addressForm.watch('number')}` : ''}
+                            {addressForm.watch('street')}
+                            {addressForm.watch('number') ? `, ${addressForm.watch('number')}` : ''}
                             {addressForm.watch('complement') ? ` - ${addressForm.watch('complement')}` : ''}
                           </p>
-                          {/* Exibindo bairro e cidade */}
                           <p>
-                            {addressForm.watch('neighborhood') ? `${addressForm.watch('neighborhood')}, ` : ''}
-                            {addressForm.watch('city')}
+                            {addressForm.watch('neighborhood') ? `${addressForm.watch('neighborhood')}` : ''}
+                            {addressForm.watch('city') ? `, ${addressForm.watch('city')}` : ''}
+                            {addressForm.watch('zip_code') ? ` - ${formatCpfCnpj(addressForm.watch('zip_code'))}` : ''}
                           </p>
                         </div>
                       )}
