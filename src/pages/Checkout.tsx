@@ -31,6 +31,7 @@ import { OnlinePaymentWarningModal } from '@/components/OnlinePaymentWarningModa
 import { cn } from '@/lib/utils';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, } from '@/components/ui/form';
 import { AddressAutocomplete } from '@/components/AddressAutocomplete';
+
 // --- Tipos ---
 type Restaurant = Tables<'restaurants'>;
 // Incluindo todos os campos de endereço e complement
@@ -43,6 +44,7 @@ type CartItem = {
   notes: string;
   subtotal: number;
 };
+
 // --- Helpers de Formatação ---
 const formatPhoneNumber = (value: string) => {
   if (!value) return '';
@@ -53,6 +55,7 @@ const formatPhoneNumber = (value: string) => {
   if (cleaned.length > 10) cleaned = `${cleaned.slice(0, 10)}-${cleaned.slice(10)}`;
   return cleaned;
 };
+
 const formatCpfCnpj = (value: string) => {
   if (!value) return '';
   let cleaned = value.replace(/\D/g, '');
@@ -71,20 +74,22 @@ const formatCpfCnpj = (value: string) => {
   }
   return cleaned;
 };
+
 // --- Schemas ---
 const addressSchema = z.object({
   zip_code: z.string().min(1, 'CEP é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length === 8, {
     message: 'O CEP deve ter 8 dígitos.',
   }),
   street: z.string().min(1, 'Rua é obrigatória.'),
-  number: z.string().optional(),
-  // Mantido opcional
+  number: z.string().optional(), // Mantido opcional
   complement: z.string().optional(),
   neighborhood: z.string().min(1, 'Bairro é obrigatório.'),
   city: z.string().min(1, 'Cidade é obrigatória.'),
   state: z.string().min(1, 'Estado é obrigatória.'),
 });
+
 type AddressFormValues = z.infer<typeof addressSchema>;
+
 const checkoutSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório.'),
   phone: z.string().min(1, 'Telefone é obrigatório.').transform(val => val.replace(/\D/g, '')).refine(val => val.length >= 10, {
@@ -100,7 +105,9 @@ const checkoutSchema = z.object({
   payment_method_id: z.string().min(1, 'Selecione um método de pagamento.'),
   change_for: z.string().optional(),
 });
+
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
+
 // --- Funções de Fetch ---
 const fetchRestaurantData = async (restaurantId: string): Promise<Restaurant> => {
   const { data, error } = await supabase
@@ -114,6 +121,7 @@ const fetchRestaurantData = async (restaurantId: string): Promise<Restaurant> =>
   if (!data) throw new Error('Restaurante não encontrado ou inativo.');
   return data as Restaurant;
 };
+
 const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]> => {
   const { data, error } = await supabase
     .from('delivery_zones')
@@ -124,6 +132,7 @@ const fetchDeliveryZones = async (restaurantId: string): Promise<DeliveryZone[]>
   if (error) throw new Error(`Erro ao buscar zonas de entrega: ${error.message}`);
   return data;
 };
+
 const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[]> => {
   const { data, error } = await supabase
     .from('payment_methods')
@@ -134,17 +143,18 @@ const fetchPaymentMethods = async (restaurantId: string): Promise<PaymentMethod[
   if (error) throw new Error(`Erro ao buscar métodos de pagamento: ${error.message}`);
   return data;
 };
+
 const fetchCustomerData = async (userId: string): Promise<Customer | null> => {
   const { data, error } = await supabase
     .from('customers')
-    .select('*, complement, state')
-    // Incluindo complement e state
+    .select('*, complement, state') // Incluindo complement e state
     .eq('user_id', userId)
     .limit(1)
     .single();
   if (error && error.code !== 'PGRST116') throw new Error(error.message);
   return data as Customer || null;
 };
+
 // --- Componente Principal ---
 const Checkout = () => {
   const navigate = useNavigate();
@@ -170,10 +180,10 @@ const Checkout = () => {
   const [isOnlineWarningModalOpen, setIsOnlineWarningModalOpen] = useState(false);
   const [pendingOnlinePaymentId, setPendingOnlinePaymentId] = useState<string | null>(null);
   const [savedAddressString, setSavedAddressString] = useState<string | null>(null);
-  const [showNumberMissingWarning, setShowNumberMissingWarning] = useState(false);
-  // NOVO ESTADO
+  const [showNumberMissingWarning, setShowNumberMissingWarning] = useState(false); // NOVO ESTADO
   // Referência para o timer de inatividade
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // MUDANÇA AQUI: staleTime: 1000 * 60 * 5 (5 minutos)
   const { data: restaurant, isLoading: isLoadingRestaurant, isError: isErrorRestaurant, error: errorRestaurant, refetch: refetchRestaurant } = useQuery<Restaurant>({
     queryKey: ['checkoutRestaurantData', restaurantId],
@@ -181,6 +191,7 @@ const Checkout = () => {
     enabled: !!restaurantId,
     staleTime: 1000 * 60 * 5,
   });
+
   // MUDANÇA AQUI: staleTime: 1000 * 60 * 5 (5 minutos)
   const { data: deliveryZones, isLoading: isLoadingZones } = useQuery<DeliveryZone[]>({
     queryKey: ['checkoutDeliveryZones', restaurantId],
@@ -188,6 +199,7 @@ const Checkout = () => {
     enabled: !!restaurant,
     staleTime: 1000 * 60 * 5,
   });
+
   // MUDANÇA AQUI: staleTime: Infinity
   const { data: paymentMethods, isLoading: isLoadingMethods } = useQuery<PaymentMethod[]>({
     queryKey: ['checkoutPaymentMethods', restaurantId],
@@ -195,6 +207,7 @@ const Checkout = () => {
     enabled: !!restaurant,
     staleTime: Infinity,
   });
+
   // MUDANÇA AQUI: staleTime: 0 (Manter 0 para dados do cliente, pois podem ser atualizados no modal)
   const { data: customer, isLoading: isLoadingCustomer, refetch: refetchCustomer } = useQuery<Customer | null>({
     queryKey: ['checkoutCustomerData', user?.id],
@@ -202,12 +215,14 @@ const Checkout = () => {
     enabled: !!user,
     staleTime: 0,
   });
+
   const restaurantCoords: [number, number] | null = useMemo(() => {
     if (restaurant?.latitude && restaurant?.longitude) {
       return [restaurant.latitude, restaurant.longitude];
     }
     return null;
   }, [restaurant]);
+
   // --- Lógica de Expiração de Sessão (20 minutos fora da aba) ---
   useEffect(() => {
     const handleVisibilityChange = async () => {
@@ -235,6 +250,7 @@ const Checkout = () => {
         }
       }
     };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -243,8 +259,10 @@ const Checkout = () => {
       }
     };
   }, [navigate, restaurantId]);
+
   const calculateFee = useCallback(async (zip_code: string, street: string, number: string, city: string, neighborhood: string, state: string, lat?: number | null, lng?: number | null) => {
     const DEFAULT_DELIVERY_TIME: [number, number] = [30, 45];
+
     if (restaurant && restaurant.delivery_enabled === false) {
       const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${state}, ${zip_code}`;
       let coords: { lat: number, lng: number } | null = null;
@@ -268,9 +286,11 @@ const Checkout = () => {
       }
       return { coords, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
     }
+
     if (!restaurant || !restaurantCoords) {
       return { coords: null, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
     }
+
     const fullAddress = `${street}, ${number}, ${neighborhood}, ${city}, ${state}, ${zip_code}`;
     let coords: { lat: number, lng: number } | null = null;
     if (lat && lng) {
@@ -281,6 +301,7 @@ const Checkout = () => {
     if (!coords) {
       return { coords: null, fee: 0, time: null, isValid: false };
     }
+
     if (deliveryZones && deliveryZones.length > 0) {
       const feeResult = calculateDeliveryFee(
         [coords.lat, coords.lng],
@@ -296,6 +317,7 @@ const Checkout = () => {
       return { coords, fee: 0, time: DEFAULT_DELIVERY_TIME, isValid: true };
     }
   }, [restaurant, restaurantCoords, deliveryZones]);
+
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
@@ -309,6 +331,7 @@ const Checkout = () => {
     },
     mode: 'onBlur',
   });
+
   const addressForm = useForm<AddressFormValues>({
     resolver: zodResolver(addressSchema),
     defaultValues: {
@@ -322,6 +345,7 @@ const Checkout = () => {
     },
     mode: 'onBlur',
   });
+
   // --- HARD RESET NO MOUNT ---
   useEffect(() => {
     addressForm.reset({
@@ -339,67 +363,58 @@ const Checkout = () => {
     setDeliveryFee(0);
     setDeliveryTime(null);
     setIsDeliveryAreaValid(true);
-    setShowNumberMissingWarning(false);
-    // Limpa o aviso
+    setShowNumberMissingWarning(false); // Limpa o aviso
   }, []);
+
   const deliveryOption = form.watch('delivery_option');
   const selectedPaymentMethodId = form.watch('payment_method_id');
   const selectedPaymentMethod = paymentMethods?.find(m => m.id === selectedPaymentMethodId);
   const isOnlinePayment = selectedPaymentMethod?.name?.includes('online');
   const isCashPayment = selectedPaymentMethod?.name?.includes('Dinheiro');
   const totalAmount = cartSubtotal + deliveryFee;
+
   // UPDATED: Added 'state' to watch list
   const addressFields = addressForm.watch(['zip_code', 'street', 'number', 'city', 'neighborhood', 'complement', 'state']);
   const currentAddressString = useMemo(() => {
     const [zip_code, street, number, city, neighborhood, complement, state] = addressFields;
     return `${street}|${number || ''}|${complement || ''}|${neighborhood}|${city}|${zip_code}|${state}`;
   }, [addressFields]);
+
   // --- Realtime Listener para atualização automática das taxas ---
   useEffect(() => {
     if (!restaurantId) return;
     const zonesChannel = supabase.channel('delivery-zones-changes')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'delivery_zones',
-          filter: `restaurant_id=eq.${restaurantId}`
-        },
+        { event: '*', schema: 'public', table: 'delivery_zones', filter: `restaurant_id=eq.${restaurantId}` },
         () => {
           console.log('[Realtime] Zonas de entrega atualizadas. Invalidando query...');
           // MUDANÇA AQUI: Força o re-fetch, mas o staleTime alto evita re-fetch desnecessário em montagens
           queryClient.invalidateQueries({ queryKey: ['checkoutDeliveryZones', restaurantId] });
-          toast.info("As taxas de entrega foram atualizadas.", {
-            duration: 3000
-          });
+          toast.info("As taxas de entrega foram atualizadas.", { duration: 3000 });
         }
       )
       .subscribe();
+
     const restaurantChannel = supabase.channel('restaurant-settings-changes')
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'restaurants',
-          filter: `id=eq.${restaurantId}`
-        },
+        { event: 'UPDATE', schema: 'public', table: 'restaurants', filter: `id=eq.${restaurantId}` },
         () => {
           console.log('[Realtime] Configurações do restaurante atualizadas. Invalidando query...');
           // MUDANÇA AQUI: Força o re-fetch
           queryClient.invalidateQueries({ queryKey: ['checkoutRestaurantData', restaurantId] });
-          toast.info("As configurações da loja foram atualizadas.", {
-            duration: 3000
-          });
+          toast.info("As configurações da loja foram atualizadas.", { duration: 3000 });
         }
       )
       .subscribe();
+
     return () => {
       supabase.removeChannel(zonesChannel);
       supabase.removeChannel(restaurantChannel);
     };
   }, [restaurantId, queryClient]);
+
   // --- Efeito de Inicialização (Carregar dados do cliente) ---
   useEffect(() => {
     if (customer) {
@@ -411,6 +426,7 @@ const Checkout = () => {
         cpf_cnpj: formatCpfCnpj(customer.cpf_cnpj || ''),
         change_for: '',
       });
+
       // 2. Dados de Endereço (Preenchimento Automático)
       // Se houver endereço salvo e coordenadas, preenchemos o form e marcamos como salvo.
       // Isso irá disparar o efeito de cálculo de taxa automaticamente.
@@ -422,15 +438,14 @@ const Checkout = () => {
           complement: customer.complement || '',
           neighborhood: customer.neighborhood || '',
           city: customer.city || '',
-          state: customer.state || '',
-          // ADDED
+          state: customer.state || '', // ADDED
         });
+
         // Se houver coordenadas, configuramos o estado para "Endereço Salvo"
         if (customer.latitude && customer.longitude) {
           setCustomerCoords([Number(customer.latitude), Number(customer.longitude)]);
           setIsAddressSaved(true);
-          const addrString = `${customer.street}|${customer.number || ''}|${customer.complement || ''}|${customer.neighborhood}|${customer.city}|${customer.zip_code}|${customer.state}`;
-          // UPDATED
+          const addrString = `${customer.street}|${customer.number || ''}|${customer.complement || ''}|${customer.neighborhood}|${customer.city}|${customer.zip_code}|${customer.state}`; // UPDATED
           setSavedAddressString(addrString);
         }
       }
@@ -446,6 +461,7 @@ const Checkout = () => {
       });
     }
   }, [customer, user, isLoadingCustomer, form, addressForm]);
+
   useEffect(() => {
     if (deliveryOption === 'delivery' && savedAddressString !== null && currentAddressString !== savedAddressString) {
       setIsAddressSaved(false);
@@ -454,19 +470,17 @@ const Checkout = () => {
       setIsDeliveryAreaValid(true);
       setCustomerCoords(null);
       setSavedAddressString(null);
-      setShowNumberMissingWarning(false);
-      // Limpa o aviso ao mudar o endereço
+      setShowNumberMissingWarning(false); // Limpa o aviso ao mudar o endereço
     }
   }, [currentAddressString, savedAddressString, deliveryOption]);
+
   const changeForString = form.watch('change_for');
   useEffect(() => {
     if (isCashPayment && changeForString && changeForString.trim() !== '') {
       const cleanedValue = changeForString.replace(',', '.');
       const changeForValue = parseFloat(cleanedValue);
       if (isNaN(changeForValue)) {
-        form.setError('change_for', {
-          message: 'O troco deve ser um número válido.'
-        });
+        form.setError('change_for', { message: 'O troco deve ser um número válido.' });
       } else if (changeForValue < totalAmount) {
         form.setError('change_for', {
           message: `O troco deve ser maior ou igual ao total do pedido (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}).`
@@ -478,39 +492,50 @@ const Checkout = () => {
       form.clearErrors('change_for');
     }
   }, [isCashPayment, changeForString, totalAmount, form]);
+
   const saveAddressMutation = useMutation({
     mutationFn: async (data: AddressFormValues): Promise<{ customer: Customer | null, feeResult: { coords: { lat: number, lng: number } | null, fee: number, time: [number, number] | null, isValid: boolean } }> => {
       setIsGeocoding(true);
+      
       const finalNumber = data.number || '';
+      
       // VALIDAÇÃO EXPLÍCITA DO NÚMERO AQUI
       if (deliveryOption === 'delivery' && !finalNumber) {
-        setIsGeocoding(false);
-        // Lança um erro que será capturado pelo onError e exibido como toast
-        throw new Error("O número da residência é obrigatório para a entrega. Por favor, inclua o número na busca (Ex: Rua X, 123) e clique em Salvar.");
+          setIsGeocoding(false);
+          // Lança um erro que será capturado pelo onError e exibido como toast
+          throw new Error("O número da residência é obrigatório para a entrega. Por favor, inclua o número na busca (Ex: Rua X, 123) e clique em Salvar.");
       }
+      
       // UPDATED: Include state in fullAddress for geocoding
       const fullAddress = `${data.street}, ${finalNumber}${data.complement ? ` - ${data.complement}` : ''}, ${data.neighborhood}, ${data.city}, ${data.state}, ${data.zip_code}`;
+
       // 1. Geocodificação e Cálculo de Taxa
       const feeResult = await calculateFee(data.zip_code, data.street, finalNumber, data.city, data.neighborhood, data.state);
       setIsGeocoding(false);
+
       if (!feeResult.isValid) {
         throw new Error(restaurant?.delivery_enabled === false ? "O endereço está errado ou incompleto, revise todos os campos." : "Endereço fora da área de entrega.");
       }
+
       if (!feeResult.coords) {
         throw new Error("Não foi possível obter as coordenadas para salvar o endereço.");
       }
+
       // 2. Validação de Dados de Contato (do formulário principal)
       const contactName = form.getValues('name');
       const contactPhone = form.getValues('phone');
       const contactCpfCnpj = form.getValues('cpf_cnpj');
       const cleanedPhone = contactPhone.replace(/\D/g, '');
       const cleanedCpfCnpj = contactCpfCnpj.replace(/\D/g, '') || null;
+
       if (!contactName || cleanedPhone.length < 10 || !cleanedCpfCnpj || (cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14)) {
         // Se a validação falhar, lançamos um erro específico para o usuário
         throw new Error("Preencha Nome, Telefone (10+ dígitos) e CPF/CNPJ (11 ou 14 dígitos) nos Seus Dados antes de salvar o endereço.");
       }
+
       const userAuth = await supabase.auth.getUser();
       const userId = userAuth.data.user?.id;
+
       // 3. Lógica de Salvar/Atualizar Cliente
       if (!customer?.id && !userId) {
         // Cliente anônimo (não logado e sem registro anterior)
@@ -527,22 +552,22 @@ const Checkout = () => {
           longitude: feeResult.coords.lng,
           cpf_cnpj: cleanedCpfCnpj,
           street: data.street,
-          number: finalNumber,
-          // Usando finalNumber
+          number: finalNumber, // Usando finalNumber
           neighborhood: data.neighborhood,
           city: data.city,
           zip_code: data.zip_code,
           complement: data.complement || null,
-          state: data.state,
-          // ADDED
+          state: data.state, // ADDED
         };
         return { customer: mockCustomer, feeResult };
       }
+
       const customerContactData = {
         name: contactName,
         phone: cleanedPhone,
         cpf_cnpj: cleanedCpfCnpj,
       };
+
       const addressPayload: any = {
         user_id: user?.id || null,
         ...customerContactData,
@@ -551,18 +576,17 @@ const Checkout = () => {
         latitude: feeResult.coords.lat,
         longitude: feeResult.coords.lng,
         street: data.street,
-        number: finalNumber,
-        // Usando finalNumber
+        number: finalNumber, // Usando finalNumber
         neighborhood: data.neighborhood,
         city: data.city,
         zip_code: data.zip_code,
         complement: data.complement || null,
-        state: data.state,
-        // ADDED
+        state: data.state, // ADDED
       };
-      const selectColumns = '*, street, number, neighborhood, city, zip_code, complement, state';
-      // UPDATED
+
+      const selectColumns = '*, street, number, neighborhood, city, zip_code, complement, state'; // UPDATED
       let savedCustomer: Customer;
+
       if (customer?.id) {
         const { data: updatedCustomer, error: updateError } = await supabase
           .from('customers')
@@ -583,6 +607,7 @@ const Checkout = () => {
       } else {
         throw new Error('Não foi possível identificar o cliente para salvar.');
       }
+
       return { customer: savedCustomer, feeResult };
     },
     onSuccess: (result, variables) => {
@@ -595,13 +620,10 @@ const Checkout = () => {
       setIsDeliveryAreaValid(feeResult.isValid);
       setIsAddressSaved(true);
       setCustomerCoords([feeResult.coords!.lat, feeResult.coords!.lng]);
-      const finalNumber = variables.number || '';
-      // Usando o número que veio do Autocomplete
-      const newAddressString = `${variables.street}|${finalNumber}|${variables.complement || ''}|${variables.neighborhood}|${variables.city}|${variables.zip_code}|${variables.state}`;
-      // UPDATED
+      const finalNumber = variables.number || ''; // Usando o número que veio do Autocomplete
+      const newAddressString = `${variables.street}|${finalNumber}|${variables.complement || ''}|${variables.neighborhood}|${variables.city}|${variables.zip_code}|${variables.state}`; // UPDATED
       setSavedAddressString(newAddressString);
-      setShowNumberMissingWarning(false);
-      // Sucesso: Limpa o aviso
+      setShowNumberMissingWarning(false); // Sucesso: Limpa o aviso
       toast.success('Endereço salvo e taxa de entrega calculada!');
     },
     onError: (err) => {
@@ -610,23 +632,29 @@ const Checkout = () => {
       setIsAddressSaved(false);
     }
   });
+  
   // Definição da função handleSaveAddress
   const handleSaveAddress = (data: AddressFormValues) => {
     saveAddressMutation.mutate(data);
   };
+
   const createCustomerMutation = useMutation({
     mutationFn: async (data: CheckoutFormValues): Promise<Customer> => {
       if (!restaurant) throw new Error('Dados do restaurante não disponíveis.');
+
       const userAuth = await supabase.auth.getUser();
       const userId = userAuth.data.user?.id;
       const cleanedPhone = data.phone.replace(/\D/g, '');
       const cleanedCpfCnpj = data.cpf_cnpj?.replace(/\D/g, '') || null;
+
       if (!data.name || cleanedPhone.length < 10 || (cleanedCpfCnpj && cleanedCpfCnpj.length !== 11 && cleanedCpfCnpj.length !== 14)) {
         throw new Error("Dados de contato incompletos ou inválidos.");
       }
+
       const currentAddress = addressForm.getValues();
       // Usando currentAddress.number (que veio do Autocomplete)
       const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number || ''}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
+
       const customerPayload: any = {
         user_id: user?.id || null,
         name: data.name,
@@ -637,20 +665,19 @@ const Checkout = () => {
         latitude: customerCoords ? customerCoords[0] : null,
         longitude: customerCoords ? customerCoords[1] : null,
         street: addressForm.getValues('street') || null,
-        number: addressForm.getValues('number') || null,
-        // Usando o valor do Autocomplete
+        number: addressForm.getValues('number') || null, // Usando o valor do Autocomplete
         neighborhood: addressForm.getValues('neighborhood') || null,
         city: addressForm.getValues('city') || null,
         zip_code: addressForm.getValues('zip_code') || null,
         complement: addressForm.getValues('complement') || null,
-        state: addressForm.getValues('state') || null,
-        // ADDED
+        state: addressForm.getValues('state') || null, // ADDED
       };
+
       if (!user) {
         customerPayload.email = null;
       }
-      const selectColumns = '*, street, number, neighborhood, city, zip_code, complement, state';
-      // UPDATED
+
+      const selectColumns = '*, street, number, neighborhood, city, zip_code, complement, state'; // UPDATED
       if (user) {
         if (customer) {
           const { data: updatedCustomer, error: updateError } = await supabase
@@ -687,9 +714,11 @@ const Checkout = () => {
       toast.error(`Erro ao salvar dados do cliente: ${err.message}`);
     }
   });
+
   const createOrderMutation = useMutation({
     mutationFn: async ({ customerId, data }: { customerId: string, data: CheckoutFormValues }) => {
       if (!restaurant) throw new Error('Dados do restaurante não disponíveis.');
+
       let changeForValue: number | null = null;
       if (isCashPayment && data.change_for && data.change_for.trim() !== '') {
         const cleanedValue = data.change_for.replace(',', '.');
@@ -698,15 +727,18 @@ const Checkout = () => {
           changeForValue = numValue;
         }
       }
+
       let [minTime, maxTime] = deliveryTime || [null, null];
       if ((deliveryOption === 'delivery' || deliveryOption === 'pickup') && (!minTime || !maxTime)) {
         const fallbackTime = deliveryOption === 'pickup' ? [15, 30] : [30, 45];
         minTime = fallbackTime[0];
         maxTime = fallbackTime[1];
       }
+
       const currentAddress = addressForm.getValues();
       // Usando currentAddress.number (que veio do Autocomplete)
       const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number || ''}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
+
       const orderPayload: TablesInsert<'orders'> = {
         restaurant_id: restaurant.id,
         customer_id: customerId,
@@ -720,12 +752,14 @@ const Checkout = () => {
         min_delivery_time_minutes: minTime,
         max_delivery_time_minutes: maxTime,
       };
+
       const { data: newOrder, error: orderError } = await supabase
         .from('orders')
         .insert(orderPayload)
         .select('id')
         .single();
       if (orderError) throw orderError;
+
       const orderItemsPayload: TablesInsert<'order_items'>[] = items.map(item => ({
         order_id: newOrder.id,
         product_id: item.product.id,
@@ -734,10 +768,12 @@ const Checkout = () => {
         subtotal: parseFloat(item.subtotal.toFixed(2)),
         notes: item.notes,
       }));
+
       const { error: itemsError } = await supabase
         .from('order_items')
         .insert(orderItemsPayload);
       if (itemsError) throw itemsError;
+
       return newOrder.id;
     },
     onSuccess: (orderId) => {
@@ -747,6 +783,7 @@ const Checkout = () => {
       toast.error(`Erro ao criar pedido: ${err.message}`);
     }
   });
+
   const onSubmit = async (data: CheckoutFormValues) => {
     if (isCashPayment && data.change_for && data.change_for.trim() !== '') {
       const cleanedValue = data.change_for.replace(',', '.');
@@ -763,11 +800,13 @@ const Checkout = () => {
         return;
       }
     }
+
     if (items.length === 0) {
       toast.error('Seu carrinho está vazio.');
       navigate(`/menu/${restaurantId}`);
       return;
     }
+
     if (deliveryOption === 'delivery') {
       if (!isAddressSaved) {
         toast.error('Você deve salvar e validar o endereço de entrega antes de finalizar o pedido.');
@@ -778,6 +817,7 @@ const Checkout = () => {
         return;
       }
     }
+
     let customerId: string;
     try {
       const newCustomer = await createCustomerMutation.mutateAsync(data);
@@ -786,6 +826,7 @@ const Checkout = () => {
       toast.error(`Falha ao salvar cliente: ${e.message}`);
       return;
     }
+
     let orderId: string;
     try {
       orderId = await createOrderMutation.mutateAsync({ customerId, data });
@@ -793,6 +834,7 @@ const Checkout = () => {
       toast.error(`Falha ao criar pedido: ${e.message}`);
       return;
     }
+
     if (isOnlinePayment) {
       await handleMercadoPagoCheckout(orderId, data);
     } else {
@@ -800,6 +842,7 @@ const Checkout = () => {
       navigate(`/order-success/${orderId}`, { replace: true });
     }
   };
+
   const handleMercadoPagoCheckout = async (orderId: string, data: CheckoutFormValues) => {
     if (!restaurant) return;
     const clientUrl = window.location.origin + window.location.pathname;
@@ -808,6 +851,7 @@ const Checkout = () => {
       price: item.product.price,
       quantity: item.quantity,
     }));
+
     const loadingToastId = toast.loading("Preparando pagamento online...");
     try {
       const { data: mpData, error: mpError } = await supabase.functions.invoke('create-payment-preference', {
@@ -822,6 +866,7 @@ const Checkout = () => {
         },
       });
       if (mpError) throw mpError;
+
       const { init_point } = mpData as { init_point: string };
       setMpPreferenceId(orderId);
       setMpInitPoint(init_point);
@@ -833,11 +878,13 @@ const Checkout = () => {
       setIsMercadoPagoOpen(false);
     }
   };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success("Você saiu da sua conta.");
     navigate('/auth', { replace: true });
   };
+
   const handlePaymentMethodChange = (newMethodId: string, isOnline: boolean, isMpConfigured: boolean) => {
     if (isOnline && isMpConfigured) {
       setPendingOnlinePaymentId(newMethodId);
@@ -847,6 +894,7 @@ const Checkout = () => {
       setPendingOnlinePaymentId(null);
     }
   };
+
   const handleOnlineWarningConfirm = () => {
     if (pendingOnlinePaymentId) {
       form.setValue('payment_method_id', pendingOnlinePaymentId, { shouldValidate: true });
@@ -854,6 +902,7 @@ const Checkout = () => {
     setIsOnlineWarningModalOpen(false);
     setPendingOnlinePaymentId(null);
   };
+
   const handleAddressSelect = useCallback((address: any) => {
     // Preenche todos os campos do addressForm com os dados da geocodificação
     addressForm.setValue('zip_code', address.zip_code, { shouldValidate: true });
@@ -861,9 +910,9 @@ const Checkout = () => {
     addressForm.setValue('neighborhood', address.neighborhood, { shouldValidate: true });
     addressForm.setValue('city', address.city, { shouldValidate: true });
     addressForm.setValue('state', address.state, { shouldValidate: true });
-    addressForm.setValue('number', address.number, { shouldValidate: true });
-    // Mantém o número preenchido pelo Autocomplete
-    addressForm.setValue('complement', '', { shouldValidate: true });
+    addressForm.setValue('number', address.number, { shouldValidate: true }); // Mantém o número preenchido pelo Autocomplete
+    addressForm.setValue('complement', '', { shouldValidate: true }); 
+
     // Se o número não veio preenchido, exibe o aviso fixo
     if (!address.number) {
       setShowNumberMissingWarning(true);
@@ -872,6 +921,7 @@ const Checkout = () => {
       setShowNumberMissingWarning(false);
       toast.info("Endereço encontrado! Verifique o complemento e clique em Salvar.");
     }
+
     // Limpa o estado de endereço salvo para forçar o usuário a clicar em Salvar
     setIsAddressSaved(false);
     setDeliveryFee(0);
@@ -880,40 +930,52 @@ const Checkout = () => {
     setCustomerCoords(null);
     setSavedAddressString(null);
   }, [addressForm]);
+
   // CORREÇÃO FINAL: Ajustando a função displayAddress para garantir que o bairro seja exibido
   const displayAddress = useMemo(() => {
     const [zip_code, street, number, city, neighborhood, complement, state] = addressFields;
+    
     // Se a rua não estiver preenchida, não há endereço para exibir
-    if (!street) return '';
+    if (!street) return ''; 
+    
     const parts = [];
+    
     // 1. Rua e Número
     if (street) parts.push(street);
     if (number) parts.push(number);
-    // 2. Bairro
+    
+    // 2. Complemento (entre parênteses)
+    if (complement) parts.push(`(Comp: ${complement})`);
+    
+    // 3. Bairro
     if (neighborhood) parts.push(neighborhood);
+    
     let addressLine = parts.join(', ');
-    // 3. Cidade e Estado
+    
+    // 4. Cidade e Estado
     const locationParts = [];
     if (city) locationParts.push(city);
     if (state) locationParts.push(state);
+    
     let locationLine = locationParts.join(' - ');
-    // 4. CEP
+    
+    // 5. CEP
     const cleanedZip = zip_code.replace(/\D/g, '');
     let formattedZip = '';
     if (cleanedZip.length === 8) {
-      formattedZip = `${cleanedZip.slice(0, 5)}-${cleanedZip.slice(5)}`;
+        formattedZip = `${cleanedZip.slice(0, 5)}-${cleanedZip.slice(5)}`;
     }
+    
     if (formattedZip) {
-      locationLine += (locationLine ? ', CEP: ' : 'CEP: ') + formattedZip;
+        locationLine += (locationLine ? ', CEP: ' : 'CEP: ') + formattedZip;
     }
-    // 5. Complemento (entre parênteses)
-    if (complement) {
-      locationLine += (locationLine ? ', ' : '') + `(Comp: ${complement})`;
-    }
+    
     // Combina as linhas, garantindo que não haja vírgulas extras
     const fullAddress = [addressLine, locationLine].filter(Boolean).join(', ');
+    
     return fullAddress;
   }, [addressFields]);
+
   if (!restaurantId) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -928,15 +990,18 @@ const Checkout = () => {
       </div>
     );
   }
+
   if (items.length === 0) {
     useEffect(() => {
       navigate(`/menu/${restaurantId}`);
     }, [navigate, restaurantId]);
     return <LoadingSpinner />;
   }
+
   if (isLoadingRestaurant || isLoadingZones || isLoadingMethods || isLoadingAuth) {
     return <LoadingSpinner />;
   }
+
   if (isErrorRestaurant || !restaurant) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -953,8 +1018,10 @@ const Checkout = () => {
       </div>
     );
   }
+
   const isFormSubmitting = createCustomerMutation.isPending || createOrderMutation.isPending || saveAddressMutation.isPending;
   const isCheckoutDisabled = isFormSubmitting || isGeocoding || (deliveryOption === 'delivery' && !isAddressSaved);
+
   return (
     <div className="min-h-screen bg-background w-full overflow-x-hidden">
       {/* Ajustado padding horizontal (px-3 em vez de px-4) para telas menores para ganhar mais espaço útil */}
@@ -964,6 +1031,7 @@ const Checkout = () => {
         {isMercadoPagoOpen && mpInitPoint && (
           <MercadoPagoPayment preferenceId={mpPreferenceId!} initPoint={mpInitPoint} onClose={() => setIsMercadoPagoOpen(false)} />
         )}
+
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <Link to={`/menu/${restaurantId}`}>
@@ -989,6 +1057,7 @@ const Checkout = () => {
             </div>
           )}
         </div>
+
         <div className="grid lg:grid-cols-3 gap-6 sm:gap-8 w-full">
           <div className="lg:col-span-2 space-y-6 min-w-0">
             <Card className="w-full overflow-hidden">
@@ -1014,12 +1083,20 @@ const Checkout = () => {
                       </div>
                       <div className="space-y-1.5 sm:space-y-2">
                         <Label htmlFor="phone" className="text-xs sm:text-sm">Telefone *</Label>
-                        <Controller name="phone" control={form.control} render={({ field }) => <PhoneInput id="phone" {...field} className="h-9 sm:h-12 text-sm w-full" />} />
+                        <Controller
+                          name="phone"
+                          control={form.control}
+                          render={({ field }) => <PhoneInput id="phone" {...field} className="h-9 sm:h-12 text-sm w-full" />}
+                        />
                         {form.formState.errors.phone && <p className="text-destructive text-xs sm:text-sm">{form.formState.errors.phone.message}</p>}
                       </div>
                       <div className="space-y-1.5 sm:space-y-2">
                         <Label htmlFor="cpf_cnpj" className="text-xs sm:text-sm">CPF/CNPJ *</Label>
-                        <Controller name="cpf_cnpj" control={form.control} render={({ field }) => <CpfCnpjInput id="cpf_cnpj" {...field} className="h-9 sm:h-12 text-sm w-full" />} />
+                        <Controller
+                          name="cpf_cnpj"
+                          control={form.control}
+                          render={({ field }) => <CpfCnpjInput id="cpf_cnpj" {...field} className="h-9 sm:h-12 text-sm w-full" />}
+                        />
                         {form.formState.errors.cpf_cnpj && <p className="text-destructive text-xs sm:text-sm">{form.formState.errors.cpf_cnpj.message}</p>}
                       </div>
                     </div>
@@ -1027,6 +1104,7 @@ const Checkout = () => {
                 </Form>
               </CardContent>
             </Card>
+
             <Card className="w-full overflow-hidden">
               <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
                 <CardTitle className="text-base sm:text-xl flex items-center gap-2">
@@ -1034,23 +1112,37 @@ const Checkout = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-3 pb-3 sm:p-6 sm:pt-0">
-                <Controller name="delivery_option" control={form.control} render={({ field }) => (
-                  <RadioGroup onValueChange={field.onChange} value={field.value} className="grid grid-cols-2 gap-2 sm:gap-4 min-w-0 w-full"
-                  >
-                    <Label htmlFor="delivery" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center w-full max-w-full">
-                      <RadioGroupItem value="delivery" id="delivery" className="sr-only" />
-                      <Truck className="mb-1.5 sm:mb-3 h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0" />
-                      <span translate="no" className="text-xs sm:text-base break-words w-full">Entrega</span>
-                    </Label>
-                    <Label htmlFor="pickup" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center w-full max-w-full">
-                      <RadioGroupItem value="pickup" id="pickup" className="sr-only" />
-                      <MapPin className="mb-1.5 sm:mb-3 h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0" />
-                      <span translate="no" className="text-xs sm:text-base break-words w-full">Retirada no Local</span>
-                    </Label>
-                  </RadioGroup>
-                )} />
+                <Controller
+                  name="delivery_option"
+                  control={form.control}
+                  render={({ field }) => (
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      className="grid grid-cols-2 gap-2 sm:gap-4 min-w-0 w-full"
+                    >
+                      <Label
+                        htmlFor="delivery"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center w-full max-w-full"
+                      >
+                        <RadioGroupItem value="delivery" id="delivery" className="sr-only" />
+                        <Truck className="mb-1.5 sm:mb-3 h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0" />
+                        <span translate="no" className="text-xs sm:text-base break-words w-full">Entrega</span>
+                      </Label>
+                      <Label
+                        htmlFor="pickup"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-2 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer text-center w-full max-w-full"
+                      >
+                        <RadioGroupItem value="pickup" id="pickup" className="sr-only" />
+                        <MapPin className="mb-1.5 sm:mb-3 h-4 w-4 sm:h-6 sm:w-6 flex-shrink-0" />
+                        <span translate="no" className="text-xs sm:text-base break-words w-full">Retirada no Local</span>
+                      </Label>
+                    </RadioGroup>
+                  )}
+                />
               </CardContent>
             </Card>
+
             {deliveryOption === 'delivery' && (
               <Card className={cn("w-full overflow-hidden", !isAddressSaved && "border-destructive ring-2 ring-destructive/50")}>
                 <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
@@ -1068,6 +1160,7 @@ const Checkout = () => {
                         <Label htmlFor="address-search" className="text-xs sm:text-sm">Buscar Endereço (Rua, Nº, Bairro) *</Label>
                         <AddressAutocomplete onAddressSelect={handleAddressSelect} disabled={isGeocoding} />
                       </div>
+                      
                       {/* NOVO: Aviso Fixo */}
                       {showNumberMissingWarning && (
                         <Alert variant="destructive" className="p-2 sm:p-4">
@@ -1078,13 +1171,15 @@ const Checkout = () => {
                           </AlertDescription>
                         </Alert>
                       )}
+
                       {/* Campos escondidos preenchidos pelo Autocomplete */}
                       <input type="hidden" {...addressForm.register('zip_code')} />
                       <input type="hidden" {...addressForm.register('street')} />
                       <input type="hidden" {...addressForm.register('neighborhood')} />
                       <input type="hidden" {...addressForm.register('city')} />
                       <input type="hidden" {...addressForm.register('state')} />
-                      <input type="hidden" {...addressForm.register('number')} />
+                      <input type="hidden" {...addressForm.register('number')} /> 
+
                       <div className="grid grid-cols-1 gap-3 sm:gap-4 min-w-0">
                         {/* CAMPO COMPLEMENTO */}
                         <div className="space-y-1.5 sm:space-y-2">
@@ -1092,6 +1187,7 @@ const Checkout = () => {
                           <Input id="complement" {...addressForm.register('complement')} placeholder="Apto, Bloco..." className="h-9 sm:h-12 text-sm" autoComplete="off" />
                         </div>
                       </div>
+
                       {/* NOVO BLOCO DE VISUALIZAÇÃO AJUSTADO */}
                       {displayAddress && (
                         <div className="bg-muted p-2 sm:p-3 rounded text-xs sm:text-sm break-words overflow-hidden">
@@ -1099,22 +1195,29 @@ const Checkout = () => {
                           <p className="text-sm text-foreground">{displayAddress}</p>
                         </div>
                       )}
-                      <Button type="submit" className="w-full h-auto py-2 text-xs sm:text-base mt-2 whitespace-normal" disabled={saveAddressMutation.isPending || isGeocoding}
+
+                      <Button
+                        type="submit"
+                        className="w-full h-auto py-2 text-xs sm:text-base mt-2 whitespace-normal"
+                        disabled={saveAddressMutation.isPending || isGeocoding}
                       >
                         {saveAddressMutation.isPending || isGeocoding ? (
                           <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin mr-2" />
                         ) : (
                           <Save className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
-                        )} Salvar e Calcular
+                        )}
+                        Salvar e Calcular
                       </Button>
                     </form>
                   </Form>
+
                   {isGeocoding && (
                     <Alert className="flex items-center gap-2 p-2 sm:p-4">
                       <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
                       <AlertTitle className="text-xs sm:text-sm">Calculando...</AlertTitle>
                     </Alert>
                   )}
+
                   {isAddressSaved && !isGeocoding && (
                     <>
                       {restaurant.delivery_enabled !== false && !isDeliveryAreaValid && (
@@ -1124,6 +1227,7 @@ const Checkout = () => {
                           <AlertDescription className="text-xs">Endereço fora da área de cobertura.</AlertDescription>
                         </Alert>
                       )}
+
                       {(restaurant.delivery_enabled === false || (isDeliveryAreaValid && deliveryTime)) && (
                         <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 text-green-700 p-2 sm:p-4">
                           <Truck className="h-4 w-4" />
@@ -1135,6 +1239,7 @@ const Checkout = () => {
                       )}
                     </>
                   )}
+
                   {isAddressSaved && customerCoords && displayAddress && (
                     <div className="mt-4 w-full overflow-hidden rounded-md border">
                       <ClientLocationMap latitude={customerCoords[0]} longitude={customerCoords[1]} address={displayAddress} className="w-full" />
@@ -1143,6 +1248,7 @@ const Checkout = () => {
                 </CardContent>
               </Card>
             )}
+
             <Card className="w-full overflow-hidden">
               <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
                 <CardTitle className="text-base sm:text-xl flex items-center gap-2">
@@ -1150,43 +1256,54 @@ const Checkout = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-3 pb-3 sm:p-6 sm:pt-0">
-                <Controller name="payment_method_id" control={form.control} render={({ field }) => (
-                  <RadioGroup onValueChange={(newMethodId) => {
-                    const method = paymentMethods?.find(m => m.id === newMethodId);
-                    const isOnline = method?.name?.includes('online');
-                    const isMpConfigured = !!mpPublicKey && mpPublicKey.trim() !== '';
-                    handlePaymentMethodChange(newMethodId, !!isOnline, isMpConfigured);
-                  }} value={field.value} className="space-y-2 sm:space-y-3 w-full"
-                  >
-                    {paymentMethods?.map(method => {
-                      const isMpOnline = method.name?.includes('online');
-                      const isMpConfigured = !!mpPublicKey && mpPublicKey.trim() !== '';
-                      const isDisabled = isMpOnline && !isMpConfigured;
-                      return (
-                        <Label key={method.id} htmlFor={method.id} className={cn(
-                          "flex items-center justify-between rounded-md border-2 border-muted bg-popover p-2.5 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer w-full max-w-full",
-                          isDisabled && "opacity-50 cursor-not-allowed"
-                        )}
-                        >
-                          <div className="flex items-center space-x-2 sm:space-x-3 overflow-hidden min-w-0 w-full">
-                            <RadioGroupItem value={method.id} id={method.id} disabled={isDisabled} className="flex-shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              {/* IMPORTANTE: Usando whitespace-normal para permitir quebra de texto em nomes longos */}
-                              <p className="font-medium text-xs sm:text-base break-words w-full leading-tight whitespace-normal" translate="no">{method.name}</p>
-                              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{method.description}</p>
-                              {isDisabled && (
-                                <p className="text-[10px] text-destructive mt-0.5">Indisponível no momento.</p>
-                              )}
+                <Controller
+                  name="payment_method_id"
+                  control={form.control}
+                  render={({ field }) => (
+                    <RadioGroup
+                      onValueChange={(newMethodId) => {
+                        const method = paymentMethods?.find(m => m.id === newMethodId);
+                        const isOnline = method?.name?.includes('online');
+                        const isMpConfigured = !!mpPublicKey && mpPublicKey.trim() !== '';
+                        handlePaymentMethodChange(newMethodId, !!isOnline, isMpConfigured);
+                      }}
+                      value={field.value}
+                      className="space-y-2 sm:space-y-3 w-full"
+                    >
+                      {paymentMethods?.map(method => {
+                        const isMpOnline = method.name?.includes('online');
+                        const isMpConfigured = !!mpPublicKey && mpPublicKey.trim() !== '';
+                        const isDisabled = isMpOnline && !isMpConfigured;
+                        return (
+                          <Label
+                            key={method.id}
+                            htmlFor={method.id}
+                            className={cn(
+                              "flex items-center justify-between rounded-md border-2 border-muted bg-popover p-2.5 sm:p-4 hover:bg-accent hover:text-accent-foreground [&:has([data-state=checked])]:border-primary cursor-pointer w-full max-w-full",
+                              isDisabled && "opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            <div className="flex items-center space-x-2 sm:space-x-3 overflow-hidden min-w-0 w-full">
+                              <RadioGroupItem value={method.id} id={method.id} disabled={isDisabled} className="flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                {/* IMPORTANTE: Usando whitespace-normal para permitir quebra de texto em nomes longos */}
+                                <p className="font-medium text-xs sm:text-base break-words w-full leading-tight whitespace-normal" translate="no">{method.name}</p>
+                                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{method.description}</p>
+                                {isDisabled && (
+                                  <p className="text-[10px] text-destructive mt-0.5">Indisponível no momento.</p>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </Label>
-                      );
-                    })}
-                  </RadioGroup>
-                )} />
+                          </Label>
+                        );
+                      })}
+                    </RadioGroup>
+                  )}
+                />
                 {form.formState.errors.payment_method_id && <p className="text-destructive text-xs sm:text-sm mt-2">{form.formState.errors.payment_method_id.message}</p>}
               </CardContent>
             </Card>
+
             {isCashPayment && (
               <Card className="w-full overflow-hidden">
                 <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
@@ -1197,7 +1314,14 @@ const Checkout = () => {
                 <CardContent className="px-3 pb-3 sm:p-6 sm:pt-0">
                   <div className="space-y-1.5 sm:space-y-2">
                     <Label htmlFor="change_for" className="text-xs sm:text-sm">Precisa de troco para quanto?</Label>
-                    <Input id="change_for" type="number" step="0.01" placeholder={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)} {...form.register('change_for')} className="h-9 sm:h-12 text-sm w-full" />
+                    <Input
+                      id="change_for"
+                      type="number"
+                      step="0.01"
+                      placeholder={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}
+                      {...form.register('change_for')}
+                      className="h-9 sm:h-12 text-sm w-full"
+                    />
                     {form.formState.errors.change_for?.message && (
                       <p className="text-destructive text-xs sm:text-sm">{form.formState.errors.change_for.message}</p>
                     )}
@@ -1208,6 +1332,7 @@ const Checkout = () => {
                 </CardContent>
               </Card>
             )}
+
             <Card className="w-full overflow-hidden">
               <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
                 <CardTitle className="text-base sm:text-xl flex items-center gap-2">
@@ -1217,11 +1342,18 @@ const Checkout = () => {
               <CardContent className="px-3 pb-3 sm:p-6 sm:pt-0">
                 <div className="space-y-1.5 sm:space-y-2">
                   <Label htmlFor="notes" className="text-xs sm:text-sm">Notas para o restaurante</Label>
-                  <Textarea id="notes" {...form.register('notes')} rows={3} placeholder="Ex: Entregar na portaria, sem pimenta..." className="text-sm w-full" />
+                  <Textarea
+                    id="notes"
+                    {...form.register('notes')}
+                    rows={3}
+                    placeholder="Ex: Entregar na portaria, sem pimenta..."
+                    className="text-sm w-full"
+                  />
                 </div>
               </CardContent>
             </Card>
           </div>
+
           <div className="lg:col-span-1 space-y-6 sticky top-4 self-start min-w-0">
             <Card className="shadow-lg w-full overflow-hidden">
               <CardHeader className="px-3 sm:px-6 py-3 sm:py-6">
@@ -1252,7 +1384,11 @@ const Checkout = () => {
                   <span>Total</span>
                   <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalAmount)}</span>
                 </div>
-                <Button type="submit" form="checkout-form" className="w-full h-10 sm:h-12 text-sm sm:text-lg" disabled={isCheckoutDisabled}
+                <Button
+                  type="submit"
+                  form="checkout-form"
+                  className="w-full h-10 sm:h-12 text-sm sm:text-lg"
+                  disabled={isCheckoutDisabled}
                 >
                   {isCheckoutDisabled ? (
                     <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin mr-2" />
@@ -1277,4 +1413,5 @@ const Checkout = () => {
     </div>
   );
 };
+
 export default Checkout;
