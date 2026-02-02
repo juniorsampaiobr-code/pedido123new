@@ -15,28 +15,11 @@ import { toast } from "sonner";
 import { useOutletContext } from "react-router-dom";
 import { DashboardContextType } from "@/layouts/DashboardLayout";
 import { PaginationComponent } from "@/components/PaginationComponent";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger, } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from '@/components/ui/select';
 
 type Order = Tables<'orders'> & { customer: Tables<'customers'> | null };
-
 const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: React.ElementType, color: string }> = {
   pending: { label: 'Pendente', icon: Clock, color: 'bg-yellow-500 hover:bg-yellow-600' },
   preparing: { label: 'Em Preparação', icon: Package, color: 'bg-orange-500 hover:bg-orange-600' },
@@ -68,19 +51,14 @@ const PAGE_SIZE = 12;
 const fetchOrders = async (restaurantId: string, status: Enums<'order_status'> | 'all', page: number): Promise<FetchOrdersResult> => {
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
-
   let query = supabase.from('orders').select('*, customer:customers(name, phone)', { count: 'exact' }).eq('restaurant_id', restaurantId);
-  
   if (status !== 'all') {
     query = query.eq('status', status);
   }
-  
   const { data, error, count } = await query
     .order('created_at', { ascending: false })
     .range(from, to);
-
   if (error) throw new Error(`Erro ao buscar pedidos: ${error.message}`);
-  
   return { orders: data as Order[], count: count || 0 };
 };
 
@@ -91,7 +69,6 @@ const fetchPaymentMethodName = async (paymentMethodId: string): Promise<string> 
     .select('name')
     .eq('id', paymentMethodId)
     .single();
-
   if (error) {
     console.error("Erro ao buscar nome do método de pagamento:", error);
     return 'Método Desconhecido';
@@ -135,23 +112,19 @@ const generatePrintContent = (order: Order, items: any[], paymentMethodName: str
         <h2 style="margin: 0;">PEDIDO #${orderNumber}</h2>
         <p style="margin: 5px 0;">${createdAt}</p>
       </div>
-      
       <div style="margin-bottom: 15px;">
         <h3 style="margin: 0 0 5px 0;">Cliente</h3>
         <p style="margin: 0;">${customerName}</p>
         <p style="margin: 0;">${customerPhone}</p>
       </div>
-      
       <div style="margin-bottom: 15px;">
         <h3 style="margin: 0 0 5px 0;">Entrega</h3>
         <p style="margin: 0;">${deliveryAddress}</p>
       </div>
-      
       <div style="margin-bottom: 15px;">
         <h3 style="margin: 0 0 5px 0;">Itens</h3>
         ${itemsHtml}
       </div>
-      
       <div style="border-top: 1px dashed #000; padding-top: 10px; margin-bottom: 15px;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
           <span>Subtotal:</span>
@@ -166,21 +139,18 @@ const generatePrintContent = (order: Order, items: any[], paymentMethodName: str
           <span>${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total_amount)}</span>
         </div>
       </div>
-      
       <div style="margin-bottom: 15px;">
         <h3 style="margin: 0 0 5px 0;">Pagamento</h3>
         <p style="margin: 0;">${paymentMethodName}</p>
         ${changeFor ? `<p style="margin: 0;">${changeFor}</p>` : ''}
         ${paymentNote}
       </div>
-      
       ${order.notes ? `
         <div style="margin-bottom: 15px;">
           <h3 style="margin: 0 0 5px 0;">Observações</h3>
           <p style="margin: 0;">${order.notes}</p>
         </div>
       ` : ''}
-      
       <div style="text-align: center; margin-top: 20px;">
         <p style="font-size: 12px;">Obrigado pela preferência!</p>
       </div>
@@ -188,10 +158,10 @@ const generatePrintContent = (order: Order, items: any[], paymentMethodName: str
   `;
 };
 
-const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSelected, onSelect, onPrint }: { 
-  order: Order, 
-  onViewDetails: (order: Order) => void, 
-  onAccept: (orderId: string) => void, 
+const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSelected, onSelect, onPrint }: {
+  order: Order,
+  onViewDetails: (order: Order) => void,
+  onAccept: (orderId: string) => void,
   onDecline: (orderId: string) => void,
   onDelete: (orderId: string) => void,
   isSelected: boolean;
@@ -201,18 +171,14 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSele
   const statusInfo = ORDER_STATUS_MAP[order.status || 'pending'];
   const customerName = order.customer?.name || 'Cliente Desconhecido';
   const orderNumber = order.id ? order.id.slice(-4) : 'N/A';
-  
+
   // NOVO: Verifica se o pedido está aguardando pagamento
   const isPendingPayment = order.status === 'pending_payment';
 
   return (
     <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col relative">
       <div className="absolute top-3 left-3 z-10">
-        <Checkbox 
-          checked={isSelected} 
-          onCheckedChange={(checked) => onSelect(order.id, !!checked)} 
-          className="h-5 w-5"
-        />
+        <Checkbox checked={isSelected} onCheckedChange={(checked) => onSelect(order.id, !!checked)} className="h-5 w-5" />
       </div>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pl-12">
         <CardTitle className="text-lg font-bold flex items-center gap-2">Pedido #{orderNumber}</CardTitle>
@@ -231,17 +197,14 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSele
               <Button variant="default" size="sm" onClick={() => onAccept(order.id)}><Check className="h-4 w-4 mr-1" /> Aceitar</Button>
             </>
           )}
-          
           {/* Se for 'pending_payment', podemos mostrar uma mensagem ou apenas os botões de detalhes/impressão */}
           {isPendingPayment && (
             <Badge variant="secondary" className="bg-gray-100 text-gray-600">Aguardando Pagamento</Badge>
           )}
-          
           <Button variant="outline" size="sm" onClick={() => onViewDetails(order)}>Detalhes</Button>
           <Button variant="outline" size="icon" onClick={() => onPrint(order)}>
             <Printer className="h-4 w-4" />
           </Button>
-          
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10">
@@ -257,10 +220,7 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSele
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={() => onDelete(order.id)}
-                  className="bg-destructive hover:bg-destructive/90"
-                >
+                <AlertDialogAction onClick={() => onDelete(order.id)} className="bg-destructive hover:bg-destructive/90">
                   Excluir Permanentemente
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -272,9 +232,9 @@ const OrderCard = ({ order, onViewDetails, onAccept, onDecline, onDelete, isSele
   );
 };
 
-const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSelectedOrders, totalOrdersInView, onPrint }: { 
-  status: Enums<'order_status'> | 'all', 
-  onViewDetails: (order: Order) => void, 
+const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSelectedOrders, totalOrdersInView, onPrint }: {
+  status: Enums<'order_status'> | 'all',
+  onViewDetails: (order: Order) => void,
   restaurantId: string,
   selectedOrders: string[],
   setSelectedOrders: React.Dispatch<React.SetStateAction<string[]>>,
@@ -283,7 +243,6 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
 }) => {
   const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
-
   const { data, isLoading, isError, error, refetch } = useQuery<FetchOrdersResult>({
     queryKey: ['orders', status, restaurantId, currentPage],
     queryFn: () => fetchOrders(restaurantId, status, currentPage - 1),
@@ -299,7 +258,7 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
       // CORREÇÃO: Se o status for 'pending_payment', não deve ser aceito/recusado aqui.
       // A lógica de aceitar/recusar só deve ser chamada para 'pending'.
       // Se for 'pending', muda para 'preparing'.
-      const statusToSet = newStatus === 'pending' ? 'preparing' : newStatus; 
+      const statusToSet = newStatus === 'pending' ? 'preparing' : newStatus;
       const { error } = await supabase.from('orders').update({ status: statusToSet }).eq('id', orderId);
       if (error) throw new Error(error.message);
       return statusToSet;
@@ -327,27 +286,30 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
     // Garante que só aceita se o status for 'pending' (não 'pending_payment')
     const order = orders.find(o => o.id === orderId);
     if (order && order.status === 'pending') {
-        updateStatusMutation.mutate({ orderId, newStatus: 'preparing' as Enums<'order_status'> });
+      updateStatusMutation.mutate({ orderId, newStatus: 'preparing' as Enums<'order_status'> });
     } else {
-        toast.error("Ação inválida. O pedido não está no status Pendente.");
+      toast.error("Ação inválida. O pedido não está no status Pendente.");
     }
   };
+
   const handleDecline = (orderId: string) => {
     // Garante que só recusa se o status for 'pending' (não 'pending_payment')
     const order = orders.find(o => o.id === orderId);
     if (order && order.status === 'pending') {
-        updateStatusMutation.mutate({ orderId, newStatus: 'cancelled' });
+      updateStatusMutation.mutate({ orderId, newStatus: 'cancelled' });
     } else {
-        toast.error("Ação inválida. O pedido não está no status Pendente.");
+      toast.error("Ação inválida. O pedido não está no status Pendente.");
     }
   };
+
   const handleViewDetails = (order: Order) => {
     onViewDetails(order);
   };
+
   const handleDelete = (orderId: string) => {
     deleteMutation.mutate(orderId);
   };
-  
+
   const handlePageChange = useCallback((page: number) => {
     setCurrentPage(page);
   }, []);
@@ -375,17 +337,15 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
   const isAllSelected = orders.length > 0 && orders.every(o => selectedOrders.includes(o.id));
 
   if (isLoading) return <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{[...Array(4)].map((_, i) => <Card key={i}><CardContent className="p-4 space-y-3"><Skeleton className="h-32 w-full" /></CardContent></Card>)}</div>;
+
   if (isError) return <Alert variant="destructive"><Terminal className="h-4 w-4" /><AlertTitle>Erro ao carregar pedidos</AlertTitle><AlertDescription>{error instanceof Error ? error.message : "Ocorreu um erro desconhecido."}</AlertDescription><Button onClick={() => refetch()} className="mt-3" variant="secondary" size="sm"><RefreshCw className="h-4 w-4 mr-2" /> Tentar Novamente</Button></Alert>;
+
   if (!orders || orders.length === 0) return <div className="text-center py-12 bg-card rounded-lg border"><ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" /><p className="text-lg font-semibold">Nenhum pedido encontrado.</p><p className="text-sm text-muted-foreground">Verifique o status selecionado ou aguarde novos pedidos.</p></div>;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4 p-3 border rounded-lg bg-muted/50">
-        <Checkbox 
-          checked={isAllSelected} 
-          onCheckedChange={handleSelectAll} 
-          className="h-5 w-5"
-        />
+        <Checkbox checked={isAllSelected} onCheckedChange={handleSelectAll} className="h-5 w-5" />
         <span className="text-sm font-medium">
           Selecionar todos ({orders.length}) nesta página.
         </span>
@@ -397,12 +357,12 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {orders.map((order) => (
-          <OrderCard 
-            key={order.id} 
-            order={order} 
-            onViewDetails={handleViewDetails} 
-            onAccept={handleAccept} 
-            onDecline={handleDecline} 
+          <OrderCard
+            key={order.id}
+            order={order}
+            onViewDetails={handleViewDetails}
+            onAccept={handleAccept}
+            onDecline={handleDecline}
             onDelete={handleDelete}
             isSelected={selectedOrders.includes(order.id)}
             onSelect={handleSelectOrder}
@@ -410,14 +370,9 @@ const OrdersList = ({ status, onViewDetails, restaurantId, selectedOrders, setSe
           />
         ))}
       </div>
-      
       {totalPages > 1 && (
         <div className="flex justify-center pt-4">
-          <PaginationComponent 
-            currentPage={currentPage} 
-            totalPages={totalPages} 
-            onPageChange={handlePageChange} 
-          />
+          <PaginationComponent currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
         </div>
       )}
     </div>
@@ -431,13 +386,22 @@ const Orders = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [massAction, setMassAction] = useState<Enums<'order_status'> | 'delete' | ''>('');
-  
-  const handleViewDetails = (order: Order) => { setSelectedOrder(order); setIsModalOpen(true); };
-  const handleCloseModal = () => { setIsModalOpen(false); setSelectedOrder(null); };
-  
+
+  const handleViewDetails = (order: Order) => {
+    setSelectedOrder(order);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedOrder(null);
+  };
+
   const handleRefreshAll = () => {
     queryClient.invalidateQueries({ queryKey: ['orders', userRestaurantId] });
-    toast.info("Atualizando pedidos...", { description: "Buscando novos dados no servidor." });
+    toast.info("Atualizando pedidos...", {
+      description: "Buscando novos dados no servidor."
+    });
   };
 
   // Função para buscar itens do pedido para impressão
@@ -446,7 +410,6 @@ const Orders = () => {
       .from('order_items')
       .select('*, products(name)')
       .eq('order_id', orderId);
-    
     if (error) throw new Error(`Erro ao buscar itens do pedido: ${error.message}`);
     return data;
   };
@@ -456,42 +419,46 @@ const Orders = () => {
     try {
       // 1. Buscar itens do pedido
       const items = await fetchOrderItemsForPrint(order.id);
-      
+
       // 2. Buscar o nome do método de pagamento
       let paymentMethodName = 'Não especificado';
       if (order.payment_method_id) {
         paymentMethodName = await fetchPaymentMethodName(order.payment_method_id);
       }
-      
+
       // 3. Gerar conteúdo HTML para impressão
       const printContent = generatePrintContent(order, items, paymentMethodName);
-      
+
       // 4. Criar janela de impressão
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write(`
           <html>
-            <head>
-              <title>Pedido #${order.id ? order.id.slice(-4) : 'N/A'}</title>
-              <style>
-                @media print {
-                  body { margin: 0; }
-                  /* Estilo para garantir que a linha tracejada apareça */
-                  .dashed-line { border-top: 1px dashed #000; }
+          <head>
+            <title>Pedido #${order.id ? order.id.slice(-4) : 'N/A'}</title>
+            <style>
+              @media print {
+                body {
+                  margin: 0;
                 }
-              </style>
-            </head>
-            <body>
-              ${printContent}
-              <script>
-                window.onload = function() {
-                  window.print();
-                  window.onafterprint = function() {
-                    window.close();
-                  }
+                /* Estilo para garantir que a linha tracejada apareça */
+                .dashed-line {
+                  border-top: 1px dashed #000;
                 }
-              </script>
-            </body>
+              }
+            </style>
+          </head>
+          <body>
+            ${printContent}
+            <script>
+              window.onload = function() {
+                window.print();
+                window.onafterprint = function() {
+                  window.close();
+                }
+              }
+            </script>
+          </body>
           </html>
         `);
         printWindow.document.close();
@@ -536,7 +503,6 @@ const Orders = () => {
 
   const handleApplyMassAction = () => {
     if (!massAction || selectedOrders.length === 0) return;
-
     if (massAction === 'delete') {
       document.getElementById('mass-delete-trigger')?.click();
     } else {
@@ -545,26 +511,25 @@ const Orders = () => {
   };
 
   const statusTabs: { value: Enums<'order_status'> | 'all', label: string }[] = [
-    { value: 'pending_payment', label: 'Aguardando Pag.' }, 
-    { value: 'pending', label: 'Pendentes' }, 
-    { value: 'preparing', label: 'Em Preparação' }, 
-    { value: 'ready', label: 'Prontos' }, 
+    { value: 'pending_payment', label: 'Aguardando Pag.' },
+    { value: 'pending', label: 'Pendentes' },
+    { value: 'preparing', label: 'Em Preparação' },
+    { value: 'ready', label: 'Prontos' },
     { value: 'delivering', label: 'Em Entrega' },
-    { value: 'delivered', label: 'Entregues' }, 
+    { value: 'delivered', label: 'Entregues' },
     { value: 'cancelled', label: 'Cancelados' },
-    { value: 'all', label: 'Todos' }, 
+    { value: 'all', label: 'Todos' },
   ];
 
   const isMassActionPending = massActionMutation.isPending;
 
   if (!userRestaurantId) {
-      return <div className="flex h-screen items-center justify-center">Carregando...</div>;
+    return <div className="flex h-screen items-center justify-center">Carregando...</div>;
   }
 
   return (
     <>
       <OrderDetailsModal order={selectedOrder} isOpen={isModalOpen} onClose={handleCloseModal} />
-      
       <AlertDialog>
         <AlertDialogTrigger asChild>
           <button id="mass-delete-trigger" className="hidden" />
@@ -578,17 +543,12 @@ const Orders = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => massActionMutation.mutate({ orderIds: selectedOrders, action: 'delete' })}
-              className="bg-destructive hover:bg-destructive/90"
-              disabled={isMassActionPending}
-            >
+            <AlertDialogAction onClick={() => massActionMutation.mutate({ orderIds: selectedOrders, action: 'delete' })} className="bg-destructive hover:bg-destructive/90" disabled={isMassActionPending}>
               {isMassActionPending ? 'Excluindo...' : 'Excluir Permanentemente'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       <main className="flex-1 p-4 sm:p-6 md:p-8 space-y-6">
         <div className="flex flex-wrap gap-4 justify-between items-center">
           <div className="flex items-center gap-2">
@@ -596,12 +556,10 @@ const Orders = () => {
               <RefreshCw className="h-4 w-4 mr-2" /> Atualizar Dados
             </Button>
           </div>
-          
           {selectedOrders.length > 0 && (
             <div className="flex items-center gap-2 p-2 border rounded-lg bg-card shadow-lg animate-fade-in">
               <ShoppingCart className="h-5 w-5 text-primary mr-2" />
               <span className="text-sm font-medium mr-4">{selectedOrders.length} selecionado(s)</span>
-              
               <Select value={massAction} onValueChange={(value) => setMassAction(value as Enums<'order_status'> | 'delete')}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Ação em Massa" />
@@ -614,25 +572,20 @@ const Orders = () => {
                   ))}
                 </SelectContent>
               </Select>
-              
-              <Button 
-                onClick={handleApplyMassAction} 
-                disabled={!massAction || isMassActionPending}
-              >
+              <Button onClick={handleApplyMassAction} disabled={!massAction || isMassActionPending}>
                 {isMassActionPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Aplicar'}
               </Button>
             </div>
           )}
         </div>
-        
         {userRestaurantId ? (
           <Tabs defaultValue="pending">
             <TabsList className="w-full overflow-x-auto justify-start">{statusTabs.map(tab => <TabsTrigger key={tab.value} value={tab.value} className="whitespace-nowrap">{tab.label}</TabsTrigger>)}</TabsList>
             {statusTabs.map(tab => (
               <TabsContent key={tab.value} value={tab.value} className="mt-6">
-                <OrdersList 
-                  status={tab.value} 
-                  onViewDetails={handleViewDetails} 
+                <OrdersList
+                  status={tab.value}
+                  onViewDetails={handleViewDetails}
                   restaurantId={userRestaurantId}
                   selectedOrders={selectedOrders}
                   setSelectedOrders={setSelectedOrders}
