@@ -1,12 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal, User, Phone, MapPin, CreditCard, Truck, Clock, Calendar, Euro, Package, CheckCircle, XCircle, Check } from 'lucide-react';
@@ -20,14 +15,14 @@ type Customer = Tables<'customers'>;
 type PaymentMethod = Tables<'payment_methods'>;
 
 // Definindo o tipo Order com as relações que estamos buscando
-type Order = OrderBase & { 
+type Order = OrderBase & {
   customer: Customer | null;
   payment_methods: Pick<PaymentMethod, 'name'> | null;
 };
 
 // Atualizando OrderItem para incluir is_price_by_weight do produto
-type OrderItem = Tables<'order_items'> & { 
-  products: (Tables<'products'> & { is_price_by_weight: boolean | null }) | null 
+type OrderItem = Tables<'order_items'> & {
+  products: (Tables<'products'> & { is_price_by_weight: boolean | null }) | null;
 };
 
 const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: React.ElementType, color: string }> = {
@@ -43,7 +38,8 @@ const ORDER_STATUS_MAP: Record<Enums<'order_status'>, { label: string, icon: Rea
 const fetchOrderItems = async (orderId: string): Promise<OrderItem[]> => {
   const { data, error } = await supabase
     .from('order_items')
-    .select('*, products(name, is_price_by_weight)') // Buscando is_price_by_weight
+    .select('*, products(name, is_price_by_weight)')
+    // Buscando is_price_by_weight
     .eq('order_id', orderId);
   if (error) throw new Error(error.message);
   return data as OrderItem[];
@@ -53,21 +49,20 @@ const fetchOrderItems = async (orderId: string): Promise<OrderItem[]> => {
 const fetchOrderDetails = async (orderId: string): Promise<Order> => {
   const { data, error } = await supabase
     .from('orders')
-    .select(`
-      *,
-      customer:customers(name, phone, cpf_cnpj, email),
-      payment_methods(name)
+    .select(` 
+      *, 
+      customer:customers(name, phone, cpf_cnpj, email, street, number, neighborhood, city, zip_code, complement, state), 
+      payment_methods(name) 
     `)
     .eq('id', orderId)
     .limit(1)
     .single();
-
   if (error) throw new Error(`Erro ao buscar detalhes do pedido: ${error.message}`);
   if (!data) throw new Error('Pedido não encontrado.');
-  
+
   // Log temporário para depuração
   console.log("Dados do pedido carregados:", data);
-  
+
   // O cast é seguro porque a query acima garante as relações
   return data as Order;
 };
@@ -82,13 +77,13 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   // Estado para o nome do método de pagamento buscado separadamente
   const [paymentMethodName, setPaymentMethodName] = useState<string>('Carregando...');
 
   useEffect(() => {
     const fetchItems = async () => {
       if (!order?.id) return;
-      
       setIsLoading(true);
       setError(null);
       try {
@@ -114,16 +109,13 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
         setPaymentMethodName('Não especificado');
         return;
       }
-
       try {
         const { data, error } = await supabase
           .from('payment_methods')
           .select('name')
           .eq('id', order.payment_method_id)
           .single();
-
         if (error) throw error;
-        
         setPaymentMethodName(data?.name || 'Método não encontrado');
       } catch (err) {
         console.error("Failed to fetch payment method name:", err);
@@ -148,9 +140,54 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
   const customerPhone = order?.customer?.phone;
   const customerEmail = order?.customer?.email;
   const customerCpfCnpj = order?.customer?.cpf_cnpj;
-  const deliveryAddress = order?.delivery_address;
-  
-  // statusInfo, orderNumber, createdAt, formattedDate, changeFor, deliveryFee permanecem os mesmos
+
+  // Formatação do endereço com a nova ordem
+  const deliveryAddress = useMemo(() => {
+    if (!order?.customer) return null;
+    
+    const { street, number, neighborhood, city, state, zip_code, complement } = order.customer;
+    
+    // Se não tiver rua, não tem endereço completo
+    if (!street) return null;
+    
+    const parts = [];
+    
+    // 1. Rua e Número
+    if (street) parts.push(street);
+    if (number) parts.push(number);
+    
+    // 2. Bairro
+    if (neighborhood) parts.push(neighborhood);
+    
+    // Endereço principal
+    let addressLine = parts.join(', ');
+    
+    // 3. Cidade e Estado
+    const locationParts = [];
+    if (city) locationParts.push(city);
+    if (state) locationParts.push(state);
+    let locationLine = locationParts.join(' - ');
+    
+    // 4. CEP
+    const cleanedZip = zip_code?.replace(/\D/g, '') || '';
+    let formattedZip = '';
+    if (cleanedZip.length === 8) {
+      formattedZip = `${cleanedZip.slice(0, 5)}-${cleanedZip.slice(5)}`;
+    }
+    if (formattedZip) {
+      locationLine += (locationLine ? ', CEP: ' : 'CEP: ') + formattedZip;
+    }
+    
+    // 5. Complemento (entre parênteses)
+    if (complement) {
+      locationLine += (locationLine ? ', ' : '') + `(Comp: ${complement})`;
+    }
+    
+    // Combina as linhas
+    const fullAddress = [addressLine, locationLine].filter(Boolean).join(', ');
+    return fullAddress || null;
+  }, [order?.customer]);
+
   const statusInfo = order?.status ? ORDER_STATUS_MAP[order.status] : null;
   const orderNumber = order?.id ? order.id.slice(-4) : 'N/A';
   const createdAt = order?.created_at ? new Date(order.created_at) : null;
@@ -172,7 +209,6 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
             )}
           </DialogTitle>
         </DialogHeader>
-        
         {error && (
           <Alert variant="destructive">
             <Terminal className="h-4 w-4" />
@@ -180,7 +216,6 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-
         {isLoading ? (
           <div className="space-y-4">
             <Skeleton className="h-4 w-1/3" />
@@ -236,16 +271,12 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
                 </div>
               </div>
             </div>
-
             <div>
               <h3 className="font-semibold mb-2">Itens do Pedido</h3>
               <div className="space-y-2">
                 {orderItems.map((item) => {
                   const isWeight = item.products?.is_price_by_weight;
-                  const quantityLabel = isWeight 
-                    ? `${item.quantity} kg` 
-                    : `${item.quantity} x`;
-                  
+                  const quantityLabel = isWeight ? `${item.quantity} kg` : `${item.quantity} x`;
                   return (
                     <div key={item.id} className="flex justify-between items-start p-2 bg-muted/50 rounded">
                       <div>
@@ -261,7 +292,6 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
                 })}
               </div>
             </div>
-
             <div className="pt-4 border-t">
               <div className="flex justify-between mb-1">
                 <span>Subtotal</span>
@@ -276,7 +306,6 @@ const OrderDetailsModal = ({ order, isOpen, onClose }: OrderDetailsModalProps) =
                 <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(order.total_amount)}</span>
               </div>
             </div>
-
             <div className="pt-4">
               {order.notes && (
                 <div className="text-sm">
