@@ -81,7 +81,7 @@ const addressSchema = z.object({
     message: 'O CEP deve ter 8 dígitos.',
   }),
   street: z.string().min(1, 'Rua é obrigatória.'),
-  number: z.string().min(1, 'Número é obrigatório.'), // OBRIGATÓRIO
+  number: z.string().optional(), // REMOVIDO O .min(1, ...)
   complement: z.string().optional(),
   neighborhood: z.string().min(1, 'Bairro é obrigatório.'),
   city: z.string().min(1, 'Cidade é obrigatória.'),
@@ -336,7 +336,7 @@ const Checkout = () => {
     defaultValues: {
       zip_code: '',
       street: '',
-      number: '',
+      number: '', // Mantido no defaultValues, mas não será usado no campo de input
       complement: '',
       neighborhood: '',
       city: '',
@@ -350,7 +350,7 @@ const Checkout = () => {
     addressForm.reset({
       zip_code: '',
       street: '',
-      number: '',
+      number: '', // Mantido no reset
       complement: '',
       neighborhood: '',
       city: '',
@@ -643,7 +643,7 @@ const Checkout = () => {
 
       const currentAddress = addressForm.getValues();
       // Usando currentAddress.number (que veio do Autocomplete)
-      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
+      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number || ''}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
 
       const customerPayload: any = {
         user_id: user?.id || null,
@@ -727,7 +727,7 @@ const Checkout = () => {
 
       const currentAddress = addressForm.getValues();
       // Usando currentAddress.number (que veio do Autocomplete)
-      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
+      const deliveryAddress = deliveryOption === 'delivery' ? `${currentAddress.street}, ${currentAddress.number || ''}${currentAddress.complement ? ` - ${currentAddress.complement}` : ''}, ${currentAddress.neighborhood}, ${currentAddress.city}, ${currentAddress.state}, ${currentAddress.zip_code}` : null;
 
       const orderPayload: TablesInsert<'orders'> = {
         restaurant_id: restaurant.id,
@@ -903,14 +903,11 @@ const Checkout = () => {
     addressForm.setValue('number', address.number, { shouldValidate: true }); // Mantém o número preenchido pelo Autocomplete
     addressForm.setValue('complement', '', { shouldValidate: true }); 
 
-    // Força a validação do formulário de endereço após o preenchimento
-    addressForm.trigger();
-
     // Se o número não veio preenchido, avisa o usuário
     if (!address.number) {
-      toast.warning("Endereço encontrado! Por favor, preencha o campo 'Número' e clique em Salvar.");
+      toast.warning("Endereço encontrado! Por favor, adicione o complemento (se houver) e clique em Salvar.");
     } else {
-      toast.info("Endereço encontrado! Verifique o número e clique em Salvar.");
+      toast.info("Endereço encontrado! Verifique o complemento e clique em Salvar.");
     }
 
     // Limpa o estado de endereço salvo para forçar o usuário a clicar em Salvar
@@ -931,7 +928,7 @@ const Checkout = () => {
     
     const parts = [];
     
-    // 1. Rua e Número (Número agora é obrigatório)
+    // 1. Rua e Número (Número agora é opcional, vindo do Autocomplete)
     if (street) parts.push(street);
     if (number) parts.push(number);
     
@@ -966,12 +963,6 @@ const Checkout = () => {
     
     return fullAddress;
   }, [addressFields]);
-
-  // Verifica se o formulário de endereço tem erros de validação
-  const hasAddressErrors = Object.keys(addressForm.formState.errors).length > 0;
-  
-  // Desabilita o botão Salvar se houver erros ou se estiver processando
-  const isSaveButtonDisabled = saveAddressMutation.isPending || isGeocoding || hasAddressErrors;
 
   if (!restaurantId) {
     return (
@@ -1164,15 +1155,9 @@ const Checkout = () => {
                       <input type="hidden" {...addressForm.register('neighborhood')} />
                       <input type="hidden" {...addressForm.register('city')} />
                       <input type="hidden" {...addressForm.register('state')} />
+                      <input type="hidden" {...addressForm.register('number')} /> {/* Mantido como hidden para salvar o valor do Autocomplete */}
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 min-w-0">
-                        {/* CAMPO NÚMERO REINTRODUZIDO */}
-                        <div className="space-y-1.5 sm:space-y-2">
-                          <Label htmlFor="number" className="text-xs sm:text-sm">Número *</Label>
-                          <Input id="number" {...addressForm.register('number')} placeholder="Nº" className="h-9 sm:h-12 text-sm" autoComplete="off" />
-                          {addressForm.formState.errors.number && <p className="text-destructive text-xs sm:text-sm">{addressForm.formState.errors.number.message}</p>}
-                        </div>
-                        {/* CAMPO COMPLEMENTO */}
+                      <div className="grid grid-cols-1 gap-3 sm:gap-4 min-w-0">
                         <div className="space-y-1.5 sm:space-y-2">
                           <Label htmlFor="complement" className="text-xs sm:text-sm">Complemento</Label>
                           <Input id="complement" {...addressForm.register('complement')} placeholder="Apto, Bloco..." className="h-9 sm:h-12 text-sm" autoComplete="off" />
@@ -1190,25 +1175,15 @@ const Checkout = () => {
                       <Button
                         type="submit"
                         className="w-full h-auto py-2 text-xs sm:text-base mt-2 whitespace-normal"
-                        disabled={isSaveButtonDisabled}
+                        disabled={saveAddressMutation.isPending || isGeocoding}
                       >
-                        {isSaveButtonDisabled ? (
+                        {saveAddressMutation.isPending || isGeocoding ? (
                           <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin mr-2" />
                         ) : (
                           <Save className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                         )}
                         Salvar e Calcular
                       </Button>
-                      
-                      {/* Mensagem de erro se houver campos obrigatórios faltando */}
-                      {hasAddressErrors && (
-                        <Alert variant="destructive" className="mt-3 p-2 sm:p-4">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription className="text-xs">
-                            Preencha todos os campos obrigatórios (Rua, Número, Bairro, Cidade, Estado, CEP) para salvar o endereço.
-                          </AlertDescription>
-                        </Alert>
-                      )}
                     </form>
                   </Form>
 
