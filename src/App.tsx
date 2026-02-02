@@ -6,9 +6,8 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import CartProvider from "./hooks/use-cart";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { LoadingSpinner } from "./components/LoadingSpinner";
-import { Wrapper, Status } from "@googlemaps/react-wrapper";
+import { Wrapper, Status } from "@googlemaps/react-wrapper"; // Importando Wrapper
 
-// Importando Wrapper
 // Lazy load all page components
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -54,6 +53,7 @@ const ClientRoutesWithMaps = () => (
       <Route path="/checkout" element={<Checkout />} />
       <Route path="/order-success/:orderId" element={<OrderSuccess />} />
       <Route path="/payment-redirect/:orderId" element={<PaymentRedirect />} />
+      
       {/* Rotas do Painel de Administração (que também usam mapas) */}
       <Route element={<DashboardLayout />}>
         <Route path="/dashboard" element={<Dashboard />} />
@@ -65,11 +65,13 @@ const ClientRoutesWithMaps = () => (
         <Route path="/delivery" element={<Delivery />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
+      
       {/* Rota 404 */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   </Wrapper>
 );
+
 
 function App() {
   return (
@@ -84,7 +86,8 @@ function App() {
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/admin-auth" element={<AdminAuth />} />
-                  <Route path="/password-recovery" element={<PasswordRecovery />} />
+                  <Route path="/password-recovery" element={<PasswordRecovery />} /> 
+                  
                   {/* Rotas que dependem do SDK do Google Maps (Menu, Checkout, Admin) */}
                   <Route path="/*" element={<ClientRoutesWithMaps />} />
                 </Routes>
