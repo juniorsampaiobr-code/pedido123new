@@ -81,7 +81,7 @@ const addressSchema = z.object({
     message: 'O CEP deve ter 8 dígitos.',
   }),
   street: z.string().min(1, 'Rua é obrigatória.'),
-  number: z.string().optional(), // AGORA OPCIONAL NO SCHEMA
+  number: z.string().optional(), // Mantido opcional
   complement: z.string().optional(),
   neighborhood: z.string().min(1, 'Bairro é obrigatório.'),
   city: z.string().min(1, 'Cidade é obrigatória.'),
@@ -180,6 +180,7 @@ const Checkout = () => {
   const [isOnlineWarningModalOpen, setIsOnlineWarningModalOpen] = useState(false);
   const [pendingOnlinePaymentId, setPendingOnlinePaymentId] = useState<string | null>(null);
   const [savedAddressString, setSavedAddressString] = useState<string | null>(null);
+  const [showNumberMissingWarning, setShowNumberMissingWarning] = useState(false); // NOVO ESTADO
   // Referência para o timer de inatividade
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -362,6 +363,7 @@ const Checkout = () => {
     setDeliveryFee(0);
     setDeliveryTime(null);
     setIsDeliveryAreaValid(true);
+    setShowNumberMissingWarning(false); // Limpa o aviso
   }, []);
 
   const deliveryOption = form.watch('delivery_option');
@@ -468,6 +470,7 @@ const Checkout = () => {
       setIsDeliveryAreaValid(true);
       setCustomerCoords(null);
       setSavedAddressString(null);
+      setShowNumberMissingWarning(false); // Limpa o aviso ao mudar o endereço
     }
   }, [currentAddressString, savedAddressString, deliveryOption]);
 
@@ -499,6 +502,7 @@ const Checkout = () => {
       // VALIDAÇÃO EXPLÍCITA DO NÚMERO AQUI
       if (deliveryOption === 'delivery' && !finalNumber) {
           setIsGeocoding(false);
+          // Lança um erro que será capturado pelo onError e exibido como toast
           throw new Error("O número da residência é obrigatório para a entrega. Por favor, inclua o número na busca (Ex: Rua X, 123) e clique em Salvar.");
       }
       
@@ -619,6 +623,7 @@ const Checkout = () => {
       const finalNumber = variables.number || ''; // Usando o número que veio do Autocomplete
       const newAddressString = `${variables.street}|${finalNumber}|${variables.complement || ''}|${variables.neighborhood}|${variables.city}|${variables.zip_code}|${variables.state}`; // UPDATED
       setSavedAddressString(newAddressString);
+      setShowNumberMissingWarning(false); // Sucesso: Limpa o aviso
       toast.success('Endereço salvo e taxa de entrega calculada!');
     },
     onError: (err) => {
@@ -908,10 +913,12 @@ const Checkout = () => {
     addressForm.setValue('number', address.number, { shouldValidate: true }); // Mantém o número preenchido pelo Autocomplete
     addressForm.setValue('complement', '', { shouldValidate: true }); 
 
-    // Se o número não veio preenchido, avisa o usuário para incluir na busca
+    // Se o número não veio preenchido, exibe o aviso fixo
     if (!address.number) {
+      setShowNumberMissingWarning(true);
       toast.warning("Endereço encontrado, mas o número está faltando. Por favor, inclua o número na busca (Ex: Rua X, 123) e clique em Salvar.");
     } else {
+      setShowNumberMissingWarning(false);
       toast.info("Endereço encontrado! Verifique o complemento e clique em Salvar.");
     }
 
@@ -1153,6 +1160,17 @@ const Checkout = () => {
                         <Label htmlFor="address-search" className="text-xs sm:text-sm">Buscar Endereço (Rua, Nº, Bairro) *</Label>
                         <AddressAutocomplete onAddressSelect={handleAddressSelect} disabled={isGeocoding} />
                       </div>
+                      
+                      {/* NOVO: Aviso Fixo */}
+                      {showNumberMissingWarning && (
+                        <Alert variant="destructive" className="p-2 sm:p-4">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertTitle className="text-sm">Número da Residência Ausente</AlertTitle>
+                          <AlertDescription className="text-xs">
+                            Por favor, inclua o **número** na sua busca (Ex: Rua X, 123) e clique em Salvar.
+                          </AlertDescription>
+                        </Alert>
+                      )}
 
                       {/* Campos escondidos preenchidos pelo Autocomplete */}
                       <input type="hidden" {...addressForm.register('zip_code')} />
@@ -1163,9 +1181,9 @@ const Checkout = () => {
                       <input type="hidden" {...addressForm.register('number')} /> 
 
                       <div className="grid grid-cols-1 gap-3 sm:gap-4 min-w-0">
-                        {/* CAMPO NÚMERO REMOVIDO, DEIXANDO APENAS COMPLEMENTO */}
+                        {/* CAMPO COMPLEMENTO */}
                         <div className="space-y-1.5 sm:space-y-2">
-                          <Label htmlFor="complement" className="text-xs sm:text-sm">Complemento (Ex: Apto, Bloco, Casa 2)</Label>
+                          <Label htmlFor="complement" className="text-xs sm:text-sm">Complemento</Label>
                           <Input id="complement" {...addressForm.register('complement')} placeholder="Apto, Bloco..." className="h-9 sm:h-12 text-sm" autoComplete="off" />
                         </div>
                       </div>
