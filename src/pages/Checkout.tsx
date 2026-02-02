@@ -81,7 +81,7 @@ const addressSchema = z.object({
     message: 'O CEP deve ter 8 dígitos.',
   }),
   street: z.string().min(1, 'Rua é obrigatória.'),
-  number: z.string().optional(), // REMOVIDO O .min(1, ...)
+  number: z.string().optional(), // AGORA OPCIONAL NO SCHEMA
   complement: z.string().optional(),
   neighborhood: z.string().min(1, 'Bairro é obrigatório.'),
   city: z.string().min(1, 'Cidade é obrigatória.'),
@@ -336,7 +336,7 @@ const Checkout = () => {
     defaultValues: {
       zip_code: '',
       street: '',
-      number: '', // Mantido no defaultValues, mas não será usado no campo de input
+      number: '',
       complement: '',
       neighborhood: '',
       city: '',
@@ -350,7 +350,7 @@ const Checkout = () => {
     addressForm.reset({
       zip_code: '',
       street: '',
-      number: '', // Mantido no reset
+      number: '',
       complement: '',
       neighborhood: '',
       city: '',
@@ -494,8 +494,13 @@ const Checkout = () => {
     mutationFn: async (data: AddressFormValues): Promise<{ customer: Customer | null, feeResult: { coords: { lat: number, lng: number } | null, fee: number, time: [number, number] | null, isValid: boolean } }> => {
       setIsGeocoding(true);
       
-      // O número deve vir do Autocomplete (data.number) ou ser vazio
       const finalNumber = data.number || '';
+      
+      // VALIDAÇÃO EXPLÍCITA DO NÚMERO AQUI
+      if (deliveryOption === 'delivery' && !finalNumber) {
+          setIsGeocoding(false);
+          throw new Error("O número da residência é obrigatório para a entrega. Por favor, inclua o número na busca (Ex: Rua X, 123) e clique em Salvar.");
+      }
       
       // UPDATED: Include state in fullAddress for geocoding
       const fullAddress = `${data.street}, ${finalNumber}${data.complement ? ` - ${data.complement}` : ''}, ${data.neighborhood}, ${data.city}, ${data.state}, ${data.zip_code}`;
@@ -903,9 +908,9 @@ const Checkout = () => {
     addressForm.setValue('number', address.number, { shouldValidate: true }); // Mantém o número preenchido pelo Autocomplete
     addressForm.setValue('complement', '', { shouldValidate: true }); 
 
-    // Se o número não veio preenchido, avisa o usuário
+    // Se o número não veio preenchido, avisa o usuário para incluir na busca
     if (!address.number) {
-      toast.warning("Endereço encontrado! Por favor, adicione o complemento (se houver) e clique em Salvar.");
+      toast.warning("Endereço encontrado, mas o número está faltando. Por favor, inclua o número na busca (Ex: Rua X, 123) e clique em Salvar.");
     } else {
       toast.info("Endereço encontrado! Verifique o complemento e clique em Salvar.");
     }
@@ -928,7 +933,7 @@ const Checkout = () => {
     
     const parts = [];
     
-    // 1. Rua e Número (Número agora é opcional, vindo do Autocomplete)
+    // 1. Rua e Número
     if (street) parts.push(street);
     if (number) parts.push(number);
     
@@ -1145,7 +1150,7 @@ const Checkout = () => {
                   <Form {...addressForm}>
                     <form onSubmit={addressForm.handleSubmit(handleSaveAddress)} id="address-form-inner" className="space-y-3 sm:space-y-4" autoComplete="off">
                       <div className="space-y-1.5 sm:space-y-2">
-                        <Label htmlFor="address-search" className="text-xs sm:text-sm">Buscar Endereço *</Label>
+                        <Label htmlFor="address-search" className="text-xs sm:text-sm">Buscar Endereço (Rua, Nº, Bairro) *</Label>
                         <AddressAutocomplete onAddressSelect={handleAddressSelect} disabled={isGeocoding} />
                       </div>
 
@@ -1155,11 +1160,12 @@ const Checkout = () => {
                       <input type="hidden" {...addressForm.register('neighborhood')} />
                       <input type="hidden" {...addressForm.register('city')} />
                       <input type="hidden" {...addressForm.register('state')} />
-                      <input type="hidden" {...addressForm.register('number')} /> {/* Mantido como hidden para salvar o valor do Autocomplete */}
+                      <input type="hidden" {...addressForm.register('number')} /> 
 
                       <div className="grid grid-cols-1 gap-3 sm:gap-4 min-w-0">
+                        {/* CAMPO NÚMERO REMOVIDO, DEIXANDO APENAS COMPLEMENTO */}
                         <div className="space-y-1.5 sm:space-y-2">
-                          <Label htmlFor="complement" className="text-xs sm:text-sm">Complemento</Label>
+                          <Label htmlFor="complement" className="text-xs sm:text-sm">Complemento (Ex: Apto, Bloco, Casa 2)</Label>
                           <Input id="complement" {...addressForm.register('complement')} placeholder="Apto, Bloco..." className="h-9 sm:h-12 text-sm" autoComplete="off" />
                         </div>
                       </div>
