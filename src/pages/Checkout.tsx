@@ -402,50 +402,85 @@ const Checkout = () => {
   }, [restaurantId, queryClient]);
   // --- Efeito de Inicialização (Carregar dados do cliente) ---
   useEffect(() => {
-    if (customer) {
-      // 1. Dados Pessoais
-      form.reset({
-        ...form.getValues(),
-        name: customer.name || '',
-        phone: formatPhoneNumber(customer.phone || ''),
-        cpf_cnpj: formatCpfCnpj(customer.cpf_cnpj || ''),
-        change_for: '',
-      });
-      // 2. Dados de Endereço (Preenchimento Automático)
-      // Se houver endereço salvo e coordenadas, preenchemos o form e marcamos como salvo.
-      // Isso irá disparar o efeito de cálculo de taxa automaticamente.
-      if (customer.street && customer.zip_code) {
-        addressForm.reset({
-          zip_code: customer.zip_code,
-          street: customer.street,
-          number: customer.number || '',
-          complement: customer.complement || '',
-          neighborhood: customer.neighborhood || '',
-          city: customer.city || '',
-          state: customer.state || '',
-          // ADDED
+    const initializeCustomerData = async () => {
+      if (customer) {
+        // 1. Dados Pessoais
+        form.reset({
+          ...form.getValues(),
+          name: customer.name || '',
+          phone: formatPhoneNumber(customer.phone || ''),
+          cpf_cnpj: formatCpfCnpj(customer.cpf_cnpj || ''),
+          change_for: '',
         });
-        // Se houver coordenadas, configuramos o estado para "Endereço Salvo"
-        if (customer.latitude && customer.longitude) {
-          setCustomerCoords([Number(customer.latitude), Number(customer.longitude)]);
-          setIsAddressSaved(true);
-          const addrString = `${customer.street}|${customer.number || ''}|${customer.complement || ''}|${customer.neighborhood}|${customer.city}|${customer.zip_code}|${customer.state}`;
-          // UPDATED
-          setSavedAddressString(addrString);
+        // 2. Dados de Endereço (Preenchimento Automático)
+        // Se houver endereço salvo e coordenadas, preenchemos o form e marcamos como salvo.
+        // Isso irá disparar o efeito de cálculo de taxa automaticamente.
+        if (customer.street && customer.zip_code) {
+          addressForm.reset({
+            zip_code: customer.zip_code,
+            street: customer.street,
+            number: customer.number || '',
+            complement: customer.complement || '',
+            neighborhood: customer.neighborhood || '',
+            city: customer.city || '',
+            state: customer.state || '',
+            // ADDED
+          });
+          // Se houver coordenadas, configuramos o estado para "Endereço Salvo"
+          if (customer.latitude && customer.longitude) {
+            setCustomerCoords([Number(customer.latitude), Number(customer.longitude)]);
+            setIsAddressSaved(true);
+            const addrString = `${customer.street}|${customer.number || ''}|${customer.complement || ''}|${customer.neighborhood}|${customer.city}|${customer.zip_code}|${customer.state}`;
+            // UPDATED
+            setSavedAddressString(addrString);
+
+            // *** CORREÇÃO: CALCULAR TAXA DE ENTREGA PARA ENDEREÇO SALVO ***
+            if (restaurant && deliveryZones) {
+              try {
+                const feeResult = await calculateFee(
+                  customer.zip_code,
+                  customer.street,
+                  customer.number || '',
+                  customer.city || '',
+                  customer.neighborhood || '',
+                  customer.state || '',
+                  Number(customer.latitude),
+                  Number(customer.longitude)
+                );
+
+                setDeliveryFee(feeResult.fee);
+                setDeliveryTime(feeResult.time);
+                setIsDeliveryAreaValid(feeResult.isValid);
+
+                if (!feeResult.isValid) {
+                  toast.warning("Seu endereço salvo está fora da área de entrega. Por favor, verifique ou selecione Retirada no Local.");
+                }
+              } catch (e) {
+                console.error("Erro ao calcular taxa de endereço salvo:", e);
+                toast.error("Erro ao calcular taxa de entrega para endereço salvo.");
+                setIsDeliveryAreaValid(false);
+                setDeliveryFee(0);
+                setDeliveryTime(null);
+              }
+            }
+            // *** FIM DA CORREÇÃO ***
+          }
         }
+      } else if (user && !isLoadingCustomer) {
+        // Fallback para metadata do usuário se não houver registro de customer
+        const userMetadata = user.user_metadata;
+        form.reset({
+          ...form.getValues(),
+          name: (userMetadata.full_name as string) || '',
+          phone: formatPhoneNumber((userMetadata.phone as string) || ''),
+          cpf_cnpj: formatCpfCnpj((userMetadata.cpf_cnpj as string) || ''),
+          change_for: '',
+        });
       }
-    } else if (user && !isLoadingCustomer) {
-      // Fallback para metadata do usuário se não houver registro de customer
-      const userMetadata = user.user_metadata;
-      form.reset({
-        ...form.getValues(),
-        name: (userMetadata.full_name as string) || '',
-        phone: formatPhoneNumber((userMetadata.phone as string) || ''),
-        cpf_cnpj: formatCpfCnpj((userMetadata.cpf_cnpj as string) || ''),
-        change_for: '',
-      });
-    }
-  }, [customer, user, isLoadingCustomer, form, addressForm]);
+    };
+
+    initializeCustomerData();
+  }, [customer, user, isLoadingCustomer, form, addressForm, calculateFee, restaurant, deliveryZones]);
   useEffect(() => {
     if (deliveryOption === 'delivery' && savedAddressString !== null && currentAddressString !== savedAddressString) {
       setIsAddressSaved(false);
