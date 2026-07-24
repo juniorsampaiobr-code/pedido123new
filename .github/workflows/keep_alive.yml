@@ -8,9 +8,17 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Permite realizar commits no repositório para evitar inatividade por 60 dias
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Ping Supabase API
         run: |
           curl -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/healthcheck?select=*" \
           -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
           -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
+
+      - name: Keepalive Workflow
+        uses: gautamkrishnar/keepalive-workflow@v2 # Gera atividade automática para evitar desativação do GitHub Actions após 60 dias
