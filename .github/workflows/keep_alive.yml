@@ -2,23 +2,29 @@ name: Keep Supabase Alive
 
 on:
   schedule:
-    - cron: '0 0 * * *' # Executa todos os dias à meia-noite UTC
-  workflow_dispatch: # Permite execução manual para testes
+    - cron: '*/5 * * * *' # Executa a cada 5 minutos (frequência máxima permitida pelo GitHub Actions)
+  workflow_dispatch: # Permite execução manual para testes na aba Actions
 
 jobs:
   ping:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # Permite realizar commits no repositório para evitar inatividade por 60 dias
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Ping Supabase API
+      - name: Ping Supabase Database
         run: |
-          curl -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/healthcheck?select=*" \
-          -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-          -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
+          URL="${{ secrets.SUPABASE_URL }}"
+          KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          
+          # Fallback para os dados do projeto se não houver Secrets configurados
+          if [ -z "$URL" ]; then
+            URL="https://vtskautbkbhqwinuassp.supabase.co"
+          fi
+          if [ -z "$KEY" ]; then
+            KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0c2thdXRia2JocXdpbnVhc3NwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4OTEwMjcsImV4cCI6MjA3NjQ2NzAyN30.EqQChO6dPqP0YHWVkyzPT2cXcIzkvm1WqLblU9bfNmM"
+          fi
 
-      - name: Keepalive Workflow
-        uses: gautamkrishnar/keepalive-workflow@v2 # Gera atividade automática para evitar desativação do GitHub Actions após 60 dias
+          echo "Pingando banco Supabase em: $URL"
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X GET "$URL/rest/v1/healthcheck?select=*" \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY")
+
+          echo "$RESPONSE"
