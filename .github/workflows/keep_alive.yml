@@ -12,7 +12,7 @@ jobs:
     name: Ping Supabase Database
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Permite que o keepalive-workflow gere atividade caso o repositório fique inativo
+      contents: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -73,11 +73,22 @@ jobs:
             exit 1
           fi
 
-      # Evita que o GitHub desative automaticamente workflows agendados após 60 dias sem commits
-      - name: Keep GitHub Actions Active (Prevent 60-day auto-disable)
-        uses: gautamkrishnar/keepalive-workflow@v2
+      # Evita que o GitHub desative automaticamente os workflows após 60 dias sem commits
+      - name: Keep GitHub Actions Active (Native Git)
         continue-on-error: true
-        with:
-          committer_username: 'github-actions[bot]'
-          committer_email: 'github-actions[bot]@users.noreply.github.com'
-          commit_message: 'chore(keepalive): keep github actions active [skip ci]'
+        run: |
+          LAST_COMMIT_DATE=$(git log -1 --format=%ct)
+          NOW=$(date +%s)
+          DAYS_SINCE=$(( (NOW - LAST_COMMIT_DATE) / 86400 ))
+          echo "Dias desde o último commit: $DAYS_SINCE"
+
+          if [ "$DAYS_SINCE" -ge 30 ]; then
+            echo "Mais de 30 dias sem commits. Criando commit automático para manter o agendador ativo..."
+            mkdir -p .github
+            echo "$(date -u)" > .github/.keepalive
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add .github/.keepalive
+            git commit -m "chore: keep github actions active [skip ci]" || true
+            git push origin main || true
+          fi
