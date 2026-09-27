@@ -2,19 +2,27 @@ name: Keep Supabase Alive
 
 on:
   schedule:
-    - cron: '0 6 * * *' # Executa todo dia às 03:00 (Horário de Brasília / UTC-3 = 06:00 UTC)
-  workflow_dispatch: # Permite execução manual para testes na aba Actions
+    # Executa 4 vezes ao dia em horários espaçados (01:17, 07:17, 13:17, 19:17 UTC)
+    # Usar um minuto quebrado (17) evita atrasos nas filas de execução do GitHub Actions
+    - cron: '17 1,7,13,19 * * *'
+  workflow_dispatch: # Permite execução manual a qualquer momento na aba Actions
 
 jobs:
-  ping:
+  ping-supabase:
+    name: Ping Supabase Database
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Permite que o keepalive-workflow gere atividade caso o repositório fique inativo
     steps:
-      - name: Ping Supabase Database
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Ping Supabase Database Tables
         run: |
           URL="${{ secrets.SUPABASE_URL }}"
           KEY="${{ secrets.SUPABASE_ANON_KEY }}"
           
-          # Fallback para os dados do projeto se não houver Secrets configurados
+          # Fallback para as credenciais do projeto caso Secrets não estejam preenchidas
           if [ -z "$URL" ]; then
             URL="https://vtskautbkbhqwinuassp.supabase.co"
           fi
@@ -22,9 +30,54 @@ jobs:
             KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0c2thdXRia2JocXdpbnVhc3NwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4OTEwMjcsImV4cCI6MjA3NjQ2NzAyN30.EqQChO6dPqP0YHWVkyzPT2cXcIzkvm1WqLblU9bfNmM"
           fi
 
-          echo "Pingando banco Supabase em: $URL"
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X GET "$URL/rest/v1/healthcheck?select=*" \
-            -H "apikey: $KEY" \
-            -H "Authorization: Bearer $KEY")
+          echo "🚀 Iniciando ping de atividade no Supabase: $URL"
 
-          echo "$RESPONSE"
+          # 1. Consulta na tabela healthcheck
+          echo "👉 Consultando tabela 'healthcheck'..."
+          STATUS_1=$(curl -s -o /dev/null -w "%{http_code}" \
+            --retry 3 --retry-delay 2 --max-time 15 \
+            -X GET "$URL/rest/v1/healthcheck?select=*" \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY" \
+            -H "Cache-Control: no-cache" \
+            -H "Pragma: no-cache")
+          echo "Status healthcheck: $STATUS_1"
+
+          # 2. Consulta na tabela categories (garante leitura em tabelas reais de negócio)
+          echo "👉 Consultando tabela 'categories'..."
+          STATUS_2=$(curl -s -o /dev/null -w "%{http_code}" \
+            --retry 3 --retry-delay 2 --max-time 15 \
+            -X GET "$URL/rest/v1/categories?select=id,name&limit=1" \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY" \
+            -H "Cache-Control: no-cache" \
+            -H "Pragma: no-cache")
+          echo "Status categories: $STATUS_2"
+
+          # 3. Consulta na tabela restaurants
+          echo "👉 Consultando tabela 'restaurants'..."
+          STATUS_3=$(curl -s -o /dev/null -w "%{http_code}" \
+            --retry 3 --retry-delay 2 --max-time 15 \
+            -X GET "$URL/rest/v1/restaurants?select=id,name&limit=1" \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY" \
+            -H "Cache-Control: no-cache" \
+            -H "Pragma: no-cache")
+          echo "Status restaurants: $STATUS_3"
+
+          # Validação: Pelo menos uma das consultas deve ter retornado 200 OK
+          if [ "$STATUS_1" -eq 200 ] || [ "$STATUS_2" -eq 200 ] || [ "$STATUS_3" -eq 200 ]; then
+            echo "✅ Sucesso! O banco de dados Supabase foi acionado e permanece ativo."
+          else
+            echo "❌ Falha ao comunicar com o Supabase. Status: HC=$STATUS_1, CAT=$STATUS_2, REST=$STATUS_3"
+            exit 1
+          fi
+
+      # Evita que o GitHub desative automaticamente workflows agendados após 60 dias sem commits
+      - name: Keep GitHub Actions Active (Prevent 60-day auto-disable)
+        uses: gautamkrishnar/keepalive-workflow@v2
+        continue-on-error: true
+        with:
+          committer_username: 'github-actions[bot]'
+          committer_email: 'github-actions[bot]@users.noreply.github.com'
+          commit_message: 'chore(keepalive): keep github actions active [skip ci]'
